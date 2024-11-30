@@ -96,11 +96,14 @@ using Solution = std::map<int, Answers>; // Puzzle part -> Answers
 using Model = std::vector<std::string>;
 
 Model parse(auto& in) {
+  std::cout << "\n<BEGIN parse>";
   Model result{};
   std::string line{};
   while (std::getline(in,line)) {
+    std::cout << "\nLine:" << std::quoted(line);
     result.push_back(line);
   }
+  std::cout << "\n<END parse>";
   return result;
 }
 
@@ -127,7 +130,7 @@ int main(int argc, char *argv[])
   for (int i = 0; i < argc; ++i) {
     std::cout << NL << "argv[" << i << "] : " << std::quoted(argv[i]);
   }
-  // day00 x y
+  // day_n x y
   std::tuple<int,std::string> args{1,"example.txt"};
   auto& [part,file] = args;
   if (argc > 1 ) {
@@ -136,7 +139,9 @@ int main(int argc, char *argv[])
       file = argv[2];
     }
   }
-  std::cout << NL << "Part : " << part << " file : " << file;
+  constexpr std::string input_folder{"../../"};
+  file = input_folder + file;
+  std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
   std::ifstream in{ file };
   auto model = parse(in);
 
