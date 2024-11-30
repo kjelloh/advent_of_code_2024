@@ -22,6 +22,64 @@
 #include <optional>
 #include <regex>
 
+std::pair<std::string_view, std::vector<std::string_view>> split_string_view(std::string_view input, char separator) {
+    std::vector<std::string_view> parts;
+    size_t start = 0;
+    size_t end;
+
+    // Find each substring separated by the separator
+    while ((end = input.find(separator, start)) != std::string_view::npos) {
+        parts.emplace_back(input.substr(start, end - start));
+        start = end + 1;
+    }
+
+    // Add the last substring
+    parts.emplace_back(input.substr(start));
+
+    // Return the original string view and the vector of parts
+    return {input, parts};
+}
+
+constexpr int NonMatching = -1; // Constant for non-matching tokens
+
+std::pair<std::string, std::vector<std::string_view>> split_string_regex(const std::string& input, const std::string& regex_pattern) {
+    std::vector<std::string_view> parts;
+    std::regex regex(regex_pattern);
+
+    // Using the constant NonMatching for clarity
+    auto begin = std::sregex_token_iterator(input.begin(), input.end(), regex, NonMatching);
+    auto end = std::sregex_token_iterator();
+
+    for (auto it = begin; it != end; ++it) {
+        // Create a string_view on each segment based on the original string
+        std::string_view part(input.data() + (it->first - input.begin()), it->length());
+        parts.emplace_back(part); // Add the string_view to parts
+    }
+
+    // Return the original string and the vector of parts
+    return {input, parts};
+}
+
+std::pair<std::string_view, std::vector<std::string_view>> find_overlapping_matches(std::string_view input, std::string const& regex_pattern) {
+    std::vector<std::string_view> matches; // Vector to hold the matches
+    auto to_windowed_regex = [](std::string const& regex) -> std::string {
+      if (regex.size()>0 and regex[0] != '^') return std::string{"^"} + regex;
+      return regex;
+    };
+    std::regex regex{to_windowed_regex(regex_pattern)};
+    std::match_results<std::string_view::const_iterator> match; // Match results holder
+
+    for (int position = 0;position < input.size();++position) {
+      if (std::regex_search(input.begin() + position, input.end(), match, regex)) {
+        std::println("matched '{}' at position:{}",match.str(),position);
+        matches.emplace_back(input.substr(position,match[0].length())); // Store matched substring as string_view
+      }
+    }
+  
+    // Return the original input and the vector of matches
+    return {input, matches}; // Return original string and matches as string_views
+}
+
 
 char const* example = R"()";
 
