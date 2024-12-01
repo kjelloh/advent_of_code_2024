@@ -125,12 +125,12 @@ namespace part2 {
   Result solve_for(Model& model,auto args) {
     Result result{};
     std::cout << NL << NL << "part2";
+    std::map<Result,Result> count{};
+    std::for_each(model.second.begin(), model.second.end(), [&count](auto const& x){
+      count[x]++;
+    });
     for (int i=0;i<model.first.size();++i) {
-      Result count{0};
-      for (int j=0;j<model.first.size();++j) {
-        if (model.second[j] == model.first[i]) ++count;
-      }
-      result += model.first[i]*count;
+      result += model.first[i]*count[model.first[i]];
     }
     return result;
   }
