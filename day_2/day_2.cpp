@@ -110,7 +110,7 @@ namespace part2 {
 
   bool can_be_made_safe(std::vector<Result> report) {
     std::cout << "\ncan_be_made_safe(" << report << ")";
-    bool result;
+    bool result{};
     // TRAP! If we detect a level that causes the report to indicate UNSAFE
     //       we may fix the report by removing either of the levels in the pair
     //       that causes the inconsistency (diff size or level trend)
@@ -121,10 +121,18 @@ namespace part2 {
       candidate.erase(candidate.begin() + i);
       std::cout << "\n\ttry " << candidate;
       if (is_safe(candidate)) {
+        std::cout << " MADE SAFE!";
         result = true;
         break;
       }
     }
+    if (not result) {
+      std::cout << " FAILED TO MAKE SAFE";
+    }
+    else {
+      std::cout << " CAN BE MADE SAFE!";
+    }
+
     return result;
   }
 
@@ -134,11 +142,11 @@ namespace part2 {
     int count{};
     for (auto const& report : model) {
       if (can_be_made_safe(report)) {
-        ++ result;
+        ++result;
         std::cout << " #" << result;
       }
     }
-    return result; // 515 is too low
+    return result;
   }
 }
 
@@ -150,28 +158,62 @@ int main(int argc, char *argv[])
     std::cout << NL << "argv[" << i << "] : " << std::quoted(argv[i]);
   }
   // day_n x y
-  std::tuple<int,std::string> args{1,"example.txt"};
-  auto& [part,file] = args;
-  if (argc > 1 ) {
-    part = std::stoi(argv[1]);
-    if (argc > 2) {
-      file = argv[2];
+  std::tuple<char,std::vector<std::string>> args{{},{}};
+  auto& [part,files] = args;
+  if (argc > 1 and strlen(argv[1])==1) {
+    part = argv[1][0];
+    for (int i=2;i<argc;++i) {
+      files.push_back(argv[i]);
     }
   }
+  else {
+    part = '*';
+  }
+  if (files.size()==0) {
+    files.push_back("example.txt");
+    files.push_back("puzzle.txt");
+  }
+
   constexpr std::string input_folder{"../../"};
-  file = input_folder + file;
-  std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-  std::ifstream in{ file };
-  auto model = parse(in);
 
   switch (part) {
-  case 1: {
-    auto answer = part1::solve_for(model,args);
-    solution[part].push_back({ file,answer });
+  case '1': {
+    for (auto file : files) {
+      file = input_folder + file;
+      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
+      std::ifstream in{ file };
+      auto model = parse(in);
+      auto answer = part1::solve_for(model,args);
+      solution[part].push_back({ file,answer });
+    }
   } break;
-  case 2: {
-    auto answer = part2::solve_for(model,args);
-    solution[part].push_back({ file,answer });
+  case '2': {
+    for (auto file : files) {
+      file = input_folder + file;
+      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
+      std::ifstream in{ file };
+      auto model = parse(in);
+      auto answer = part2::solve_for(model,args);
+      solution[part].push_back({ file,answer });
+    }
+  } break;
+  case '*': {
+    for (auto file : files) {
+      file = input_folder + file;
+      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
+      std::ifstream in{ file };
+      auto model = parse(in);
+      auto answer = part1::solve_for(model,args);
+      solution['1'].push_back({ file,answer });
+    }
+    for (auto file : files) {
+      file = input_folder + file;
+      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
+      std::ifstream in{ file };
+      auto model = parse(in);
+      auto answer = part2::solve_for(model,args);
+      solution['2'].push_back({ file,answer });
+    }
   } break;
   default:
     std::cout << NL << "No part " << part << " only part 1 and 2";
@@ -179,7 +221,7 @@ int main(int argc, char *argv[])
 
   std::cout << NL << NL << "------------ REPORT----------------";
   for (auto const& [part, answers] : solution) {
-    std::cout << NL << "Part " << part << " answers";
+    std::cout << NL << "Part " << char(part) << " answers";
     for (auto const& [heading, answer] : answers) {
       if (answer != 0) std::cout << NT << "answer[" << heading << "] " << answer;
       else std::cout << NT << "answer[" << heading << "] " << " NO OPERATION ";
