@@ -84,10 +84,51 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  std::ostream& operator<<(std::ostream& out,std::vector<Result> report) {
+    for (auto const& level : report) {
+      out << " " << level;
+    }
+    return out;
+  }
+
+  std::optional<int> unsafe_index_in(std::vector<Result> report) {
+    std::cout << "\nunsafe_index_in(" << report << ")";
+    std::optional<int> result{};
+    // Report is SAFE if all increasing or decreasing
+    // AND the change is at leasts 1 and at most 3
+    bool is_safe{true};
+    bool is_increasing{report[1] > report[0]};
+    for (int i=0;i<report.size()-1;++i) {
+      auto diff = report[i+1] - report[i];
+      is_safe = is_safe and (is_increasing == (diff > 0)) and (std::abs(diff) >= 1) and (std::abs(diff) <= 3);
+      std::cout << "\n\tdiff:" << diff << " is_safe:" << is_safe << " " << report[i] << " " << report[i+1];
+      if (not is_safe) {
+        std::cout << " unsafe_index:" << i+1;
+        return i+1;
+      }
+    }
+    return result;
+  }
+
   Result solve_for(Model& model,auto args) {
     Result result{};
     std::cout << NL << NL << "part2";
-    return result;
+    for (auto report : model) {
+      std::cout << "\nreport:" << report;
+      if (auto unsafe_index = unsafe_index_in(report)) {
+        std::cout << " REMOVED index:" << *unsafe_index;
+        report.erase(report.begin() + *unsafe_index);
+      }
+      if (auto unsafe_index = unsafe_index_in(report); not unsafe_index) {
+        std::cout << "\n\tSAFE";
+        ++result;
+      }
+      else {
+        std::cout << "\n\tUNSAFE";
+      }
+    }
+    return result; // 515 is too low
   }
 }
 
