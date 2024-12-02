@@ -36,6 +36,13 @@ using Solution = std::map<int, Answers>; // Puzzle part -> Answers
 
 using Model = std::vector<std::vector<Result>>;
 
+std::ostream& operator<<(std::ostream& out,std::vector<Result> report) {
+  for (auto const& level : report) {
+    out << " " << level;
+  }
+  return out;
+}
+
 Model parse(auto& in) {
   std::cout << "\n<BEGIN parse>";
   Model result{};
@@ -56,28 +63,43 @@ Model parse(auto& in) {
   return result;
 }
 
+bool is_safe(std::vector<Result> report) {
+  std::cout << "\nis_safe(" << report << ")";
+  bool result;
+  // Report is SAFE if all increasing or decreasing
+  // AND the change is at leasts 1 and at most 3
+  std::vector<Result> diff{};
+  for (int i=0;i<report.size()-1;++i) {
+    diff.push_back(report[i+1]-report[i]);
+  }
+  auto diffs_ok = std::all_of(diff.begin(), diff.end(), [](Result d){return std::abs(d) >= 1 and std::abs(d) <= 3;});
+  std::cout << "\n\tdiff:" << diff;
+  if (diffs_ok) std::cout << " safe"; else std::cout << " unsafe";
+  std::vector<Result> trend{}; // increase +1, decrease -1 or 'flat' 0
+  for (int i=0;i<diff.size();++i) {
+    if (diff[i]>0) trend.push_back(1);
+    else if (diff[i]<0) trend.push_back(-1);
+    else trend.push_back(0);
+  }
+  auto trend_ok = std::abs(std::accumulate(trend.begin(),trend.end(),Result{})) == trend.size();
+  std::cout << "\n\ttrend:" << trend;
+  if (trend_ok) std::cout << " safe"; else std::cout << " unsafe";
+
+  result = diffs_ok and trend_ok;
+  if (result) std::cout << "\n\tSAFE";
+  else std::cout << "\n\tUNSAFE";
+  return result;
+}
+
 namespace part1 {
   Result solve_for(Model& model,auto args) {
     Result result{};
     std::cout << NL << NL << "part1";
     for (auto const& report : model) {
-      std::cout << "\nreport";
-      // Report is SAFE if all increasing or decreasing
-      // AND the change is at leasts 1 and at most 3
-      bool is_safe{true};
-      bool is_increasing{report[1] > report[0]};
-      for (int i=0;i<report.size()-1;++i) {
-        auto diff = report[i+1] - report[i];
-        is_safe = is_safe and (is_increasing == (diff > 0)) and (std::abs(diff) >= 1) and (std::abs(diff) <= 3);
-        std::cout << "\n\tdiff:" << diff << " is_safe:" << is_safe << " " << report[i] << " " << report[i+1];
-        if (not is_safe) break;
-      }
-      if (is_safe) {
+      std::cout << "\nreport" << report;
+      if (is_safe(report)) {
         ++result;
-        std::cout << "\tSAFE";
-      }
-      else {
-        std::cout << "\tUNSAFE";
+        std::cout << " #" << result;
       }
     }
     return result;
@@ -86,55 +108,8 @@ namespace part1 {
 
 namespace part2 {
 
-  std::ostream& operator<<(std::ostream& out,std::vector<Result> report) {
-    for (auto const& level : report) {
-      out << " " << level;
-    }
-    return out;
-  }
-
-  std::optional<int> unsafe_index_in(std::vector<Result> report) {
-    std::cout << "\nunsafe_index_in(" << report << ")";
-    std::optional<int> result{};
-    // Report is SAFE if all increasing or decreasing
-    // AND the change is at leasts 1 and at most 3
-    bool is_safe{true};
-    bool is_increasing{report[1] > report[0]};
-    for (int i=0;i<report.size()-1;++i) {
-      auto diff = report[i+1] - report[i];
-      is_safe = is_safe and (is_increasing == (diff > 0)) and (std::abs(diff) >= 1) and (std::abs(diff) <= 3);
-      std::cout << "\n\tdiff:" << diff << " is_safe:" << is_safe << " " << report[i] << " " << report[i+1];
-      if (not is_safe) {
-        std::cout << " unsafe_index:" << i+1;
-        return i+1;
-      }
-    }
-    return result;
-  }
-
-  bool is_safe(std::vector<Result> report) {
-    bool result;
-    std::vector<Result> diff{};
-    for (int i=0;i<report.size()-1;++i) {
-      diff.push_back(report[i+1]-report[i]);
-    }
-    std::cout << "\n\tdiff:" << diff;
-    std::vector<Result> trend{};
-    for (int i=0;i<diff.size();++i) {
-      if (diff[i]>0) trend.push_back(1);
-      else if (diff[i]<0) trend.push_back(-1);
-      else trend.push_back(0);
-    }
-    std::cout << "\n\ttrend:" << trend;
-
-    result =     std::all_of(diff.begin(), diff.end(), [](Result d){
-                   return std::abs(d) >= 1 and std::abs(d) <= 3;
-                 })
-             and std::abs(std::accumulate(trend.begin(),trend.end(),Result{})) == trend.size();
-    return result;
-  }
-
   bool can_be_made_safe(std::vector<Result> report) {
+    std::cout << "\ncan_be_made_safe(" << report << ")";
     bool result;
     // TRAP! If we detect a level that causes the report to indicate UNSAFE
     //       we may fix the report by removing either of the levels in the pair
@@ -144,6 +119,7 @@ namespace part2 {
     for (int i=0;i<report.size();++i) {
       auto candidate = report;
       candidate.erase(candidate.begin() + i);
+      std::cout << "\n\ttry " << candidate;
       if (is_safe(candidate)) {
         result = true;
         break;
@@ -156,27 +132,11 @@ namespace part2 {
     Result result{};
     std::cout << NL << NL << "part2";
     int count{};
-    for (auto const& candidate : model) {
-      auto report = candidate;
-      std::cout << "\nreport[" << count++ << "]" << report;
-      if (auto unsafe_index = unsafe_index_in(report)) {
-        std::cout << " REMOVED report[" << *unsafe_index << "]:" << report[*unsafe_index];
-        report.erase(report.begin() + *unsafe_index);
+    for (auto const& report : model) {
+      if (can_be_made_safe(report)) {
+        ++ result;
+        std::cout << " #" << result;
       }
-      
-      if (auto unsafe_index = unsafe_index_in(report); not unsafe_index) {
-        ++result;
-        std::cout << "\n\tSAFE no:" << result;
-      }
-      else {
-        std::cout << "\n\tUNSAFE";
-        if (can_be_made_safe(candidate)) {
-          ++ result;
-          std::cout << " ACTUALLY SAFE no:" << result;
-        }
-      }
-
-      
     }
     return result; // 515 is too low
   }
