@@ -39,10 +39,11 @@ using Model = std::vector<std::vector<Result>>;
 Model parse(auto& in) {
   std::cout << "\n<BEGIN parse>";
   Model result{};
+  int count{};
   std::string line{};
   while (std::getline(in,line)) {
     result.push_back({});
-    std::cout << "\nLine:" << std::quoted(line);
+    std::cout << "\nLine[" << count++ << "]:" << std::quoted(line);
     std::istringstream ls{line};
     Result level{};
     std::cout << " --> ";
@@ -111,22 +112,71 @@ namespace part2 {
     return result;
   }
 
+  bool is_safe(std::vector<Result> report) {
+    bool result;
+    std::vector<Result> diff{};
+    for (int i=0;i<report.size()-1;++i) {
+      diff.push_back(report[i+1]-report[i]);
+    }
+    std::cout << "\n\tdiff:" << diff;
+    std::vector<Result> trend{};
+    for (int i=0;i<diff.size();++i) {
+      if (diff[i]>0) trend.push_back(1);
+      else if (diff[i]<0) trend.push_back(-1);
+      else trend.push_back(0);
+    }
+    std::cout << "\n\ttrend:" << trend;
+
+    result =     std::all_of(diff.begin(), diff.end(), [](Result d){
+                   return std::abs(d) >= 1 and std::abs(d) <= 3;
+                 })
+             and std::abs(std::accumulate(trend.begin(),trend.end(),Result{})) == trend.size();
+    return result;
+  }
+
+  bool can_be_made_safe(std::vector<Result> report) {
+    bool result;
+    // TRAP! If we detect a level that causes the report to indicate UNSAFE
+    //       we may fix the report by removing either of the levels in the pair
+    //       that causes the inconsistency (diff size or level trend)
+    
+    // Check if we can make the report indicate SAFE by removing any one level?
+    for (int i=0;i<report.size();++i) {
+      auto candidate = report;
+      candidate.erase(candidate.begin() + i);
+      if (is_safe(candidate)) {
+        result = true;
+        break;
+      }
+    }
+    return result;
+  }
+
   Result solve_for(Model& model,auto args) {
     Result result{};
     std::cout << NL << NL << "part2";
-    for (auto report : model) {
-      std::cout << "\nreport:" << report;
+    int count{};
+    for (auto const& candidate : model) {
+      auto report = candidate;
+      std::cout << "\nreport[" << count++ << "]" << report;
       if (auto unsafe_index = unsafe_index_in(report)) {
-        std::cout << " REMOVED index:" << *unsafe_index;
+        std::cout << " REMOVED report[" << *unsafe_index << "]:" << report[*unsafe_index];
         report.erase(report.begin() + *unsafe_index);
       }
+      
       if (auto unsafe_index = unsafe_index_in(report); not unsafe_index) {
-        std::cout << "\n\tSAFE";
         ++result;
+        std::cout << "\n\tSAFE no:" << result;
       }
       else {
         std::cout << "\n\tUNSAFE";
+        if (can_be_made_safe(candidate)) {
+          ++ result;
+          std::cout << " ACTUALLY SAFE no:" << result;
+        }
       }
+
+      
     }
     return result; // 515 is too low
   }
