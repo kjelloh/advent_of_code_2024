@@ -20,6 +20,7 @@
 #include <format>
 #include <optional>
 #include <regex>
+#include <functional>
 
 auto const NL = "\n";
 auto const T = "\t";
@@ -39,28 +40,32 @@ Model parse(auto& in) {
   Model result{};
   std::string line{};
   while (std::getline(in,line)) {
-    std::cout << "\n\tline:" << std::quoted(line);
-    // part 1, match 'mul(a,b)' into groups for a and b
-    // std::regex pattern(R"(mul\((\d+),(\d+)\))"); // match 'mul(a,b)' into a,b subgroups
-    // part 2, match either 'word()' or 'word(a,b)'
-    std::regex pattern(R"((([a-zA-Z']+)\(\))|(([a-zA-Z]+)\((\d+),(\d+)\)))");
+    // std::cout << "\n\tline:" << std::quoted(line);
+    // part 2, match 'don't()', 'do()' or 'mul(a,b)' and group to access a and b values.
+    std::regex pattern(R"((don't\(\))|(do\(\))|(mul\((\d+),(\d+)\)))");
     auto matches_begin = std::sregex_iterator(line.begin(), line.end(), pattern);
     auto matches_end = std::sregex_iterator();
     for (std::sregex_iterator iter = matches_begin; iter != matches_end; ++iter) {
-      std::smatch match = *iter;
-      std::string s = match.str();
-      std::cout << "\nop:" << s;
+      std::smatch matches = *iter;
       Expression exp{};
-      if (match[1].matched) {  // Case 1: Empty parentheses
-        std::cout << "\nMatched text: " << match[1] << " (word with empty parentheses)";
-        exp.f = match[1];
+      // Check which part of the pattern matched and extract the values
+      if (matches[1].matched) {
+        exp.f = matches[1].str();
+        std::cout << "\"" << matches[1].str() << "\" matched 'don't()'" << std::endl;
       }
-      else if (match[3].matched) {  // Case 2: Integers in parentheses
-        std::cout << "\nMatched text: " << match[3] << " (word with integers)";
-        std::cout << "\n\tWord: " << match[4] << ", a: " << match[5] << ", b: " << match[6] << std::endl;
-        exp.f = match[4].str();
-        exp.left_op = std::stoi(match[5].str());
-        exp.right_op = std::stoi(match[6].str());
+      else if (matches[2].matched) {
+        exp.f = matches[2].str();
+        std::cout << "\"" << matches[2].str() << "\" matched 'do()'" << std::endl;
+      }
+      else if (matches[3].matched) {
+        // Extract the values for 'mul(a,b)'
+        std::string a = matches[4].str();  // Value for 'a'
+        std::string b = matches[5].str();  // Value for 'b'
+        std::cout << "\"" << matches[3].str() << "\" matched 'mul(a,b)' with a = "
+                  << a << " and b = " << b << std::endl;
+        exp.f = "mul";
+        exp.left_op = std::stoi(a);
+        exp.right_op = std::stoi(b);
       }
       std::cout << " --> " << std::quoted(exp.f) << " " << exp.left_op << " " << exp.right_op;
       result.push_back(exp);
@@ -73,6 +78,7 @@ Model parse(auto& in) {
 using Args = std::vector<std::string>;
 
 namespace part1 {
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
@@ -129,7 +135,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -174,8 +180,11 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+   ANSWERS
+   duration:1ms answer[Part 1 Test] 161
+   duration:58ms answer[Part 1     ] 175615763
+   duration:0ms answer[Part 2 Test] 48
+   duration:35ms answer[Part 2     ] 74361272
+   */
   return 0;
 }
