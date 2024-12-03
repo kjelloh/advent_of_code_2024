@@ -75,12 +75,13 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  for (int state=0;state<4;++state) {
+  std::vector<int> states = {0,1,2,3};
+  for (auto state : states) {
     switch (state) {
       case 0: {
         std::filesystem::path file{"../../example.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Test",part1::solve_for(in,args)});
+        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
       case 2: {
         std::filesystem::path file{"../../example.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Test",part2::solve_for(in,args)});
+        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
