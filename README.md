@@ -32,3 +32,24 @@ To use the Z-shell scripts.
   }
 
 ```
+### day_3
+
+* In XCode, I missed to have a return statement in a parse() function and got a mysterious 'Thread 1: EXC_BREAKPOINT (code=1, subcode=0x100002694)' at the std::getline(...) call!
+```
+ Model parse(std::istream& in) {
+    std::cout << "\n<BEGIN parse>";
+    Model result{};
+    std::string line{};
+    // StringParser mul_parser("mul(");
+    while (std::getline(in,line)) { <== BREAK HERE...
+      /*
+      if (auto result = mul_parser.parse(line)) {
+        auto [thing,tail] = *result;
+        std::cout << "\nmul_parser --> [thing:" << thing << ",tail:" << tail << "]";
+      }
+       */
+    }
+    // MISSING return statement here
+  }
+```
+NOTE: XCode did NOT warn or signal in any way about the missing return statement.
