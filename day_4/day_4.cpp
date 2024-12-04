@@ -46,7 +46,10 @@ using Args = std::vector<std::string>;
 struct Vector {
   int row;
   int col;
-  Vector operator+(Vector const& other) {return {row+other.row,col+other.col};}
+  Vector operator+(Vector const& other) const {return {row+other.row,col+other.col};}
+  bool operator<(Vector const& other) const {
+    return (row < other.row) or (row == other.row and col < other.col);
+  }
 };
 
 std::vector<Vector> const DIRS = {
@@ -59,6 +62,7 @@ std::vector<Vector> const DIRS = {
   ,{-1,0}
   ,{-1,1}
 };
+using Vectors = std::set<Vector>;
 
 /*
  ....XXMAS.
@@ -131,11 +135,48 @@ namespace part1 {
 }
 
 namespace part2 {
+  char at_pos(Vector const& pos,Model const& model) {
+    return model[pos.row][pos.col];
+  }
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
-    std::cout << NL << NL << "part2";
+    Result acc{0};
+    std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      Vector const UP_LEFT{-1,-1};
+      Vector const DOWN_LEFT{1,-1};
+      Vector const UP_RIGHT{-1,1};
+      Vector const DOWN_RIGHT{1,1};
+      for (int row=1;row < model.size()-1;++row) {
+        for (int col=1;col<model[0].size()-1;++col) {
+          Vector pos{row,col};
+          std::cout << NL << "Check [row:" << pos.row << ",col:" << pos.col << "]" << " --> acc:" << acc;
+          if (at_pos(pos,model) == 'A') {
+            bool mas_1 =
+              (    at_pos(pos+UP_LEFT,model)=='M'
+               and at_pos(pos+DOWN_RIGHT,model)=='S')
+              or
+              (    at_pos(pos+UP_LEFT,model)=='S'
+               and at_pos(pos+DOWN_RIGHT,model)=='M');
+            bool mas_2 =
+              (    at_pos(pos+DOWN_LEFT,model)=='M'
+               and at_pos(pos+UP_RIGHT,model)=='S')
+              or
+              (    at_pos(pos+DOWN_LEFT,model)=='S'
+               and at_pos(pos+UP_RIGHT,model)=='M');
+
+            if (mas_1 and mas_2) {
+              ++acc;
+              std::cout << NL << T << "Found X-MAS!";
+            }
+            else {
+              std::cout << NL << T << "NON X-MAS 'A'";
+            }
+          }
+        }
+      }
+      result = acc;
     }
     return result;
   }
@@ -151,7 +192,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1};
+  std::vector<int> states = {3};
   for (auto state : states) {
     switch (state) {
       case 0: {
