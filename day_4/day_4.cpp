@@ -64,31 +64,9 @@ std::vector<Vector> const DIRS = {
 };
 using Vectors = std::set<Vector>;
 
-/*
- ....XXMAS.
- .SAMXMS...
- ...S..A...
- ..A.A.MS.X
- XMASAMX.MM
- X.....XA.A
- S.S.S.S.SS
- .A.A.A.A.A
- ..M.M.M.MM
- .X.X.XMASX
- 
- 0,4 1,1
- 0,5 0,1
- 1,4 0,-1
- 3,9 1,0 1,-1
- 4,0 0,1
- 4,6 0,-1 -1,0
- 5,6 -1,-1
- 9,1 -1,1
- 9,3 -1,-1 -1,1
- 9,5 -1,-1 1,-1 0,1
- 9,9 -1,-1 -1,0
- 
- */
+char at_pos(Vector const& pos,Model const& model) {
+  return model[pos.row][pos.col];
+}
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -100,16 +78,15 @@ namespace part1 {
       std::string const XMAS{"XMAS"};
       for (int row=0;row < model.size();++row) {
         for (int col=0;col<model[0].size();++col) {
-          // Try walking in all possible directions
           Vector start{row,col};
-          for (auto const& dv : DIRS) {
+          if (at_pos(start,model)=='X') for (auto const& dv : DIRS) {
             auto pos = start;
             bool found_xmas{false};
             for (int index=0;index<XMAS.size();++index) {
               if (pos.row < 0 or pos.row >= model.size() or pos.col < 0 or pos.col > model[0].size()) {
                 break;
               }
-              if (model[pos.row][pos.col] == XMAS[index]) {
+              if (at_pos(pos,model) == XMAS[index]) {
                 found_xmas = (index == XMAS.size()-1);
                 pos = pos + dv;
                 continue;
@@ -135,9 +112,6 @@ namespace part1 {
 }
 
 namespace part2 {
-  char at_pos(Vector const& pos,Model const& model) {
-    return model[pos.row][pos.col];
-  }
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     Result acc{0};
@@ -238,9 +212,10 @@ int main(int argc, char *argv[])
   /*
   For my input:
    ANSWERS
-   duration:20ms answer[Part 1 Example] 18
-   duration:3544ms answer[Part 1     ] 2401
+   duration:3ms answer[Part 1 Example] 18
+   duration:697ms answer[Part 1     ] 2401
    duration:1ms answer[Part 2 Example] 9
-   duration:524ms answer[Part 2     ] 1822  */
+   duration:523ms answer[Part 2     ] 1822   
+   */
   return 0;
 }
