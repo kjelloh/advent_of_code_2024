@@ -225,62 +225,71 @@ namespace part2 {
           updates_to_fix.push_back(*iter);
         }
       }
-
-      bool all_rules_pass{true};
-      int updates_count{};
-      do {
-        all_rules_pass = true;
-        updates_count=0;
-        for (auto iter=updates_to_fix.begin();iter != updates_to_fix.end();++iter) {
-          ++updates_count;
-          if (std::find(candidate.first.begin(),candidate.first.end(),iter) == candidate.first.end()) {
-            Update update_to_fix = *iter;
+      // fix updates
+      for (auto iter=updates_to_fix.begin();iter != updates_to_fix.end();++iter) {
+        if (std::find(candidate.first.begin(),candidate.first.end(),iter) == candidate.first.end()) {
+          Update update_to_fix = *iter;
 //            print(NL);print(NL);
 //            std::cout << "TO FIX ";
 //            print(update_to_fix);
-            // Find rules that fails and use them to fix candidate
+          // Find rules that fails and use them to fix candidate
+          bool all_rules_pass{true};
+          int rules_index{};
+          do {
+            all_rules_pass = true;
+            rules_index=0;
             for (auto const& rule : model.rules) {
-//              print(NL);
-//              print(rule);
+              ++rules_index;
+  //              print(NL);
+  //              print(rule);
 
               std::map<PageNo,Update::iterator> p2i{};
               for (auto page_iter=update_to_fix.begin();page_iter != update_to_fix.end();++page_iter) {
                 p2i[*page_iter] = page_iter;
               }
               if (not p2i.contains(rule.first) or not p2i.contains(rule.second)) {
-//                print(NL);
-//                print(T);
-//                print(" NO FIX - (don't apply) on ");
-//                print(update_to_fix);
+  //                print(NL);
+  //                print(T);
+  //                print(" NO FIX - (don't apply) on ");
+  //                print(update_to_fix);
               }
               else if (p2i[rule.first] < p2i[rule.second]) {
-//                print(NL);
-//                print(T);
-//                print(" NO FIX - OK on ");
-//                print(update_to_fix);
+  //                print(NL);
+  //                print(T);
+  //                print(" NO FIX - OK on ");
+  //                print(update_to_fix);
               }
               else {
                 all_rules_pass = false;
                 print(NL);
                 print(T);
-                print(" FIX - FAILED on ");
+                std::cout << "[" << rules_index << "]:";
+                print(rule);
+                print(" FAILED on ");
                 print(update_to_fix);
                 // Swap the pages in the update as defined by the failed rule
                 std::swap(*p2i[rule.first],*p2i[rule.second]);
                 print(" FIXED = ");
                 print(update_to_fix);
                 *iter = update_to_fix;
-                // goto restart;
+                break; // re-apply all rules again (some may now break again?)
               }
             }
-          }
+            if (all_rules_pass) {
+              print(NL);
+              print("FINAL:");
+              print(*iter);
+            }
+            else {
+              print(NL);
+              std::cout << NL << "RESTART on rules_index:" << rules_index;
+            }
+          } while (!all_rules_pass);
         }
-        restart:
-        std::cout << NL << "updates_count:" << updates_count;
-      } while (!all_rules_pass);
+      }
       auto const& fixed_updates = updates_to_fix;
       for (auto const& fixed_update : fixed_updates) {
-        print(NL); print(NL);
+        print(NL);
         print(fixed_update);
         auto middle = fixed_update[fixed_update.size()/2];
         std::cout << " --> middle:" << middle;
