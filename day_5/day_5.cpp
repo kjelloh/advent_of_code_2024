@@ -270,7 +270,7 @@ namespace part2 {
                 print(" FIXED = ");
                 print(update_to_fix);
                 *iter = update_to_fix;
-                goto restart;
+                // goto restart;
               }
             }
           }
@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -348,8 +348,11 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
+   ANSWERS
+   duration:1ms answer[Part 1 Example] 143
+   duration:856ms answer[Part 1     ] 4814
+   duration:0ms answer[Part 2 Example] 123
+   duration:2876ms answer[Part 2     ] 5448
   */
   return 0;
 }
