@@ -106,8 +106,87 @@ void print(Model const& model) {
   print(model.updates);
 }
 
+namespace take_2 {
+  class LessThan {
+  public:
+    LessThan(PageOrderingRules const& rules) : m_rules{std::move(rules)} {};
+    bool operator()(PageNo a,PageNo b) const {
+      return std::any_of(m_rules.begin(),m_rules.end(),[first=a,second=b](auto const& rule){
+        // returns true if rule macth (a to be considered less_than b
+        // otherwise 'ignore' as in return false.
+        return (first == rule.first and second == rule.second);
+      });
+    }
+  private:
+    PageOrderingRules m_rules;
+  };
+  namespace part1 {
+    std::optional<Result> solve_for(std::istream& in,Args const& args) {
+      std::optional<Result> result{};
+      Result acc{};
+      std::cout << NL << NL << "take_2::part1";
+      if (in) {
+        auto model = parse(in);
+        print(model);
+        Updates fixed_updates{model.updates};
+        for (auto& fixed_update : fixed_updates) {
+          print(NL);print(fixed_update);
+          std::sort(fixed_update.begin(),fixed_update.end(),LessThan{model.rules});
+          std::cout << " sorted --> ";
+          print(fixed_update);
+        }
+        // Now we can identify those who where valid from the beginning
+        // by finding all that are unchanged
+        std::vector<std::pair<Update,Update>> paired_updates{};
+        for (int i=0;i<model.updates.size();++i) {
+          paired_updates.push_back({model.updates[i],fixed_updates[i]});
+        }
+        auto acc_valid = [](auto acc,auto const& entry){
+          if (entry.first == entry.second) {
+            auto middle = entry.second[entry.second.size()/2];
+            acc += middle;
+            print(NL);
+            print(entry.second);
+            std::cout << " --> middle:" << middle << " acc:" << acc;
+          }
+          return acc;
+        };
+        auto acc_invalid = [](auto acc,auto const& entry){
+          if (entry.first != entry.second) {
+            auto middle = entry.second[entry.second.size()/2];
+            acc += middle;
+            print(NL);
+            print(entry.second);
+            std::cout << " --> middle:" << middle << " acc:" << acc;
+          }
+          return acc;
+        };
+        
+        if (args.size()>0 and args[0]=="invalid") {
+          acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_invalid);
+        }
+        else {
+          // default part_1
+          acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_valid);
+        }
+        result = acc;
+      }
+      return result;
+    }
+  }
+  namespace part2 {
+    std::optional<Result> solve_for(std::istream& in,Args const& args) {
+      return take_2::part1::solve_for(in, Args{"invalid"});
+    }
+  }
+
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    return take_2::part1::solve_for(in, Args{"valid"});
+    
+    
     std::optional<Result> result{};
     Result acc{};
     std::cout << NL << NL << "part1";
@@ -171,6 +250,8 @@ namespace part1 {
 
 namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    return take_2::part2::solve_for(in, args);
+    
     std::optional<Result> result{};
     Result acc{};
     std::cout << NL << NL << "part1";
@@ -358,10 +439,10 @@ int main(int argc, char *argv[])
   /*
   For my input:
    ANSWERS
-   duration:1ms answer[Part 1 Example] 143
-   duration:856ms answer[Part 1     ] 4814
+   duration:0ms answer[Part 1 Example] 143
+   duration:382ms answer[Part 1     ] 4814
    duration:0ms answer[Part 2 Example] 123
-   duration:2876ms answer[Part 2     ] 5448
+   duration:362ms answer[Part 2     ] 5448
   */
   return 0;
 }
