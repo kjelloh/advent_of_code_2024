@@ -106,280 +106,87 @@ void print(Model const& model) {
   print(model.updates);
 }
 
-namespace take_2 {
-  class LessThan {
-  public:
-    LessThan(PageOrderingRules const& rules) : m_rules{std::move(rules)} {};
-    bool operator()(PageNo a,PageNo b) const {
-      return std::any_of(m_rules.begin(),m_rules.end(),[first=a,second=b](auto const& rule){
-        // returns true if rule macth (a to be considered less_than b
-        // otherwise 'ignore' as in return false.
-        return (first == rule.first and second == rule.second);
-      });
-    }
-  private:
-    PageOrderingRules m_rules;
-  };
-  namespace part1 {
-    std::optional<Result> solve_for(std::istream& in,Args const& args) {
-      std::optional<Result> result{};
-      Result acc{};
-      std::cout << NL << NL << "take_2::part1";
-      if (in) {
-        auto model = parse(in);
-        print(model);
-        Updates fixed_updates{model.updates};
-        for (auto& fixed_update : fixed_updates) {
-          print(NL);print(fixed_update);
-          std::sort(fixed_update.begin(),fixed_update.end(),LessThan{model.rules});
-          std::cout << " sorted --> ";
-          print(fixed_update);
-        }
-        // Now we can identify those who where valid from the beginning
-        // by finding all that are unchanged
-        std::vector<std::pair<Update,Update>> paired_updates{};
-        for (int i=0;i<model.updates.size();++i) {
-          paired_updates.push_back({model.updates[i],fixed_updates[i]});
-        }
-        auto acc_valid = [](auto acc,auto const& entry){
-          if (entry.first == entry.second) {
-            auto middle = entry.second[entry.second.size()/2];
-            acc += middle;
-            print(NL);
-            print(entry.second);
-            std::cout << " --> middle:" << middle << " acc:" << acc;
-          }
-          return acc;
-        };
-        auto acc_invalid = [](auto acc,auto const& entry){
-          if (entry.first != entry.second) {
-            auto middle = entry.second[entry.second.size()/2];
-            acc += middle;
-            print(NL);
-            print(entry.second);
-            std::cout << " --> middle:" << middle << " acc:" << acc;
-          }
-          return acc;
-        };
-        
-        if (args.size()>0 and args[0]=="invalid") {
-          acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_invalid);
-        }
-        else {
-          // default part_1
-          acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_valid);
-        }
-        result = acc;
-      }
-      return result;
-    }
+class LessThan {
+public:
+  LessThan(PageOrderingRules const& rules) : m_rules{std::move(rules)} {};
+  bool operator()(PageNo a,PageNo b) const {
+    return std::any_of(m_rules.begin(),m_rules.end(),[first=a,second=b](auto const& rule){
+      // returns true if rule macth (a to be considered less_than b
+      // otherwise 'ignore' as in return false.
+      return (first == rule.first and second == rule.second);
+    });
   }
-  namespace part2 {
-    std::optional<Result> solve_for(std::istream& in,Args const& args) {
-      return take_2::part1::solve_for(in, Args{"invalid"});
-    }
-  }
+private:
+  PageOrderingRules m_rules;
+};
 
-}
-
-namespace part1 {
+namespace common {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    return take_2::part1::solve_for(in, Args{"valid"});
-    
-    
     std::optional<Result> result{};
     Result acc{};
-    std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
       print(model);
-      using CandidateRefs = std::vector<Updates::const_iterator>;
-      std::pair<CandidateRefs,CandidateRefs> candidate{};
-      for (auto iter=model.updates.begin();iter != model.updates.end();++iter) {
-        candidate.first.push_back(iter);
+      Updates fixed_updates{model.updates};
+      for (auto& fixed_update : fixed_updates) {
+        print(NL);print(fixed_update);
+        std::sort(fixed_update.begin(),fixed_update.end(),LessThan{model.rules});
+        std::cout << " sorted --> ";
+        print(fixed_update);
       }
-      // Apply each rule to each in candidate.first and keep in candidate.second if applies
-      for (auto const& rule : model.rules) {
-        print(NL);
-        print(rule);
-        
-        // try current candidates
-        for (auto cand_iter : candidate.first) {
-          std::map<PageNo,Update::const_iterator> p2i{};
-          for (auto page_iter=cand_iter->begin();page_iter != cand_iter->end();++page_iter) {
-            p2i[*page_iter] = page_iter;
-          }
-          if (not p2i.contains(rule.first) or not p2i.contains(rule.second)) {
-            print(NL);
-            print(T);
-            print(" OK (don't apply) on ");
-            print(*cand_iter);
-            candidate.second.push_back(cand_iter); // keep
-          }
-          else if (p2i[rule.first] < p2i[rule.second]) {
-            print(NL);
-            print(T);
-            print(" OK on ");
-            print(*cand_iter);
-            candidate.second.push_back(cand_iter); // keep
-          }
-          else {
-            print(NL);
-            print(T);
-            print(" FAILED on ");
-            print(*cand_iter);
-          }
+      // Now we can identify valid and unvalid updates by
+      // comparing if the sorted update differs or not
+      std::vector<std::pair<Update,Update>> paired_updates{};
+      for (int i=0;i<model.updates.size();++i) {
+        paired_updates.push_back({model.updates[i],fixed_updates[i]});
+      }
+      // valid updates accumulator lambda
+      auto acc_valid = [](auto acc,auto const& entry){
+        if (entry.first == entry.second) {
+          auto middle = entry.second[entry.second.size()/2];
+          acc += middle;
+          print(NL);
+          print(entry.second);
+          std::cout << " --> middle:" << middle << " acc:" << acc;
         }
-        candidate.first = candidate.second;
-        candidate.second.clear();
+        return acc;
+      };
+      // invalid updates acc lambda
+      auto acc_invalid = [](auto acc,auto const& entry){
+        if (entry.first != entry.second) {
+          auto middle = entry.second[entry.second.size()/2];
+          acc += middle;
+          print(NL);
+          print(entry.second);
+          std::cout << " --> middle:" << middle << " acc:" << acc;
+        }
+        return acc;
+      };
+      
+      // Choose lamda based on args
+      if (args.size()>0 and args[0]=="invalid") {
+        // part_2 option
+        acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_invalid);
       }
-      print(NL);
-      for (auto const& iter : candidate.first) {
-        print(NL); print(T);
-        auto middle = (*iter)[iter->size()/2];
-        print(*iter);
-        std::cout << " --> middle:" << middle;
-        acc += middle;
-        std::cout << " --> acc:" << acc;
+      else {
+        // default part_1
+        acc = std::accumulate(paired_updates.begin(),paired_updates.end(),acc,acc_valid);
       }
       result = acc;
     }
     return result;
+  }
+}
+
+namespace part1 {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    return common::solve_for(in, Args{"valid"});
   }
 }
 
 namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    return take_2::part2::solve_for(in, args);
-    
-    std::optional<Result> result{};
-    Result acc{};
-    std::cout << NL << NL << "part1";
-    if (in) {
-      auto model = parse(in);
-      print(model);
-      using CandidateRefs = std::vector<Updates::const_iterator>;
-      std::pair<CandidateRefs,CandidateRefs> candidate{};
-      for (auto iter=model.updates.begin();iter != model.updates.end();++iter) {
-        candidate.first.push_back(iter);
-      }
-      // Apply each rule to each in candidate.first and keep in candidate.second if applies
-      for (auto const& rule : model.rules) {
-        print(NL);
-        print(rule);
-        
-        // try current candidates
-        for (auto cand_iter : candidate.first) {
-          std::map<PageNo,Update::const_iterator> p2i{};
-          for (auto page_iter=cand_iter->begin();page_iter != cand_iter->end();++page_iter) {
-            p2i[*page_iter] = page_iter;
-          }
-          if (not p2i.contains(rule.first) or not p2i.contains(rule.second)) {
-            print(NL);
-            print(T);
-            print(" OK (don't apply) on ");
-            print(*cand_iter);
-            candidate.second.push_back(cand_iter); // keep
-          }
-          else if (p2i[rule.first] < p2i[rule.second]) {
-            print(NL);
-            print(T);
-            print(" OK on ");
-            print(*cand_iter);
-            candidate.second.push_back(cand_iter); // keep
-          }
-          else {
-            print(NL);
-            print(T);
-            print(" FAILED on ");
-            print(*cand_iter);
-          }
-        }
-        candidate.first = candidate.second;
-        candidate.second.clear();
-      }
-      std::cout << NL << "FIX FAILED UPDATES";
-      Updates updates_to_fix{};
-      for (auto iter=model.updates.begin();iter != model.updates.end();++iter) {
-        if (std::find(candidate.first.begin(),candidate.first.end(),iter) == candidate.first.end()) {
-          // Not in valid candidates
-          updates_to_fix.push_back(*iter);
-        }
-      }
-      // fix updates
-      for (auto iter=updates_to_fix.begin();iter != updates_to_fix.end();++iter) {
-        if (std::find(candidate.first.begin(),candidate.first.end(),iter) == candidate.first.end()) {
-          Update update_to_fix = *iter;
-//            print(NL);print(NL);
-//            std::cout << "TO FIX ";
-//            print(update_to_fix);
-          // Find rules that fails and use them to fix candidate
-          bool all_rules_pass{true};
-          int rules_index{};
-          do {
-            all_rules_pass = true;
-            rules_index=0;
-            for (auto const& rule : model.rules) {
-              ++rules_index;
-  //              print(NL);
-  //              print(rule);
-
-              std::map<PageNo,Update::iterator> p2i{};
-              for (auto page_iter=update_to_fix.begin();page_iter != update_to_fix.end();++page_iter) {
-                p2i[*page_iter] = page_iter;
-              }
-              if (not p2i.contains(rule.first) or not p2i.contains(rule.second)) {
-  //                print(NL);
-  //                print(T);
-  //                print(" NO FIX - (don't apply) on ");
-  //                print(update_to_fix);
-              }
-              else if (p2i[rule.first] < p2i[rule.second]) {
-  //                print(NL);
-  //                print(T);
-  //                print(" NO FIX - OK on ");
-  //                print(update_to_fix);
-              }
-              else {
-                all_rules_pass = false;
-                print(NL);
-                print(T);
-                std::cout << "[" << rules_index << "]:";
-                print(rule);
-                print(" FAILED on ");
-                print(update_to_fix);
-                // Swap the pages in the update as defined by the failed rule
-                std::swap(*p2i[rule.first],*p2i[rule.second]);
-                print(" FIXED = ");
-                print(update_to_fix);
-                *iter = update_to_fix;
-                break; // re-apply all rules again (some may now break again?)
-              }
-            }
-            if (all_rules_pass) {
-              print(NL);
-              print("FINAL:");
-              print(*iter);
-            }
-            else {
-              print(NL);
-              std::cout << NL << "RESTART on rules_index:" << rules_index;
-            }
-          } while (!all_rules_pass);
-        }
-      }
-      auto const& fixed_updates = updates_to_fix;
-      for (auto const& fixed_update : fixed_updates) {
-        print(NL);
-        print(fixed_update);
-        auto middle = fixed_update[fixed_update.size()/2];
-        std::cout << " --> middle:" << middle;
-        acc += middle;
-        std::cout << " --> acc:" << acc;
-      }
-      result = acc;
-    }
-    return result;
+    return common::solve_for(in, Args{"invalid"});
   }
 }
 
@@ -440,9 +247,9 @@ int main(int argc, char *argv[])
   For my input:
    ANSWERS
    duration:0ms answer[Part 1 Example] 143
-   duration:382ms answer[Part 1     ] 4814
+   duration:389ms answer[Part 1     ] 4814
    duration:0ms answer[Part 2 Example] 123
-   duration:362ms answer[Part 2     ] 5448
+   duration:376ms answer[Part 2     ] 5448
   */
   return 0;
 }
