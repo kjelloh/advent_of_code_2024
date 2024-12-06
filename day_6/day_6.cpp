@@ -33,8 +33,9 @@ Model parse(auto& in) {
   std::cout << "\n<BEGIN parse>";
   Model result{};
   std::string line{};
+  int count{};
   while (std::getline(in,line)) {
-    std::cout << "\nLine:" << std::quoted(line);
+    std::cout << "\nLine[" << ++count << "]:" << line.size() << " " << std::quoted(line);
     result.push_back(line);
   }
   std::cout << "\n<END parse>";
@@ -135,7 +136,7 @@ public:
   }
     
   bool on_map(Vector const& pos) const {
-    return (pos.row()>=0 and pos.row() < height() and pos.col() >= 0 and pos.col() < height());
+    return (pos.row()>=0 and pos.row() < height() and pos.col() >= 0 and pos.col() < width());
   }
   
   bool on_map() const {
@@ -195,7 +196,15 @@ namespace part2 {
     }
     std::vector<Vector> positions() {
       std::vector<Vector> result{};
+      // Place and obstacle somewhere along the original path
+      // to divert into a loop
       for (auto const& pos : m_sim.visited()) {
+
+// Try a l l grid positions for obstacle to see if we missed something?
+//      for (int row=0;row<m_sim.height();++row)
+//        for (int col=0;col<m_sim.width();++col) {
+//          Vector pos{row,col};
+
         std::set<std::pair<Vector,Vector>> visited{};
 //        print(NL);
 //        print("try obstacle at pos:");
@@ -229,6 +238,7 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      std::cout << "\nheight:" << model.size() << " width:" << model[0].size();
       Simulation sim{model};
       LoopFinder loop_finder{sim};
       auto positions = loop_finder.positions();
@@ -254,7 +264,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {3};
+  std::vector<int> states = {2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
