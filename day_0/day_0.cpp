@@ -33,8 +33,9 @@ Model parse(auto& in) {
   std::cout << "\n<BEGIN parse>";
   Model result{};
   std::string line{};
+  int count{};
   while (std::getline(in,line)) {
-    std::cout << "\nLine:" << std::quoted(line);
+    std::cout << "\nLine[" << count++ << "]:" << line.size() << " " << std::quoted(line);
     result.push_back(line);
   }
   std::cout << "\n<END parse>";
@@ -66,8 +67,7 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   Args args{};
   for (int i=0;i<argc;++i) {
     args.push_back(argv[i]);
