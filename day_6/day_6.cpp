@@ -41,34 +41,36 @@ Model parse(auto& in) {
   return result;
 }
 
+class Vector {
+public:
+  Vector() = default;
+  Vector(int row,int col) : m_row{row},m_col{col} {};
+  Vector operator+(Vector const& other) {
+    return Vector{m_row+other.m_row,m_col+other.m_col};
+  }
+  auto row() const {return m_row;}
+  auto col() const {return m_col;}
+  auto& row() {return m_row;}
+  auto& col() {return m_col;}
+  bool operator<(Vector const& other) const {
+    return (m_row==other.m_row)?(m_col<other.m_col):(m_row<other.m_row);
+  }
+private:
+  int m_row{};
+  int m_col{};
+};
+void print(Vector const& v) {
+  std::cout << "[row:" << v.row() << ",col:" << v.col() << "]";
+}
+
 void print(std::string s) {std::cout << s;}
 
 class Simulation {
 private:
-  class Vector {
-  public:
-    Vector() = default;
-    Vector(int row,int col) : m_row{row},m_col{col} {};
-    Vector operator+(Vector const& other) {
-      return Vector{m_row+other.m_row,m_col+other.m_col};
-    }
-    auto row() const {return m_row;}
-    auto col() const {return m_col;}
-    auto& row() {return m_row;}
-    auto& col() {return m_col;}
-    bool operator<(Vector const& other) const {
-      return (m_row==other.m_row)?(m_col<other.m_col):(m_row<other.m_row);
-    }
-  private:
-    int m_row{};
-    int m_col{};
-  };
-  void print(Vector const& v) {
-    std::cout << "[row:" << v.row() << ",col:" << v.col() << "]";
-  }
   using Pos = Vector;
   using Dir = Vector;
   Model m_grid;
+  Pos m_start;
   Pos m_pos{};
   Dir m_dir{};
   Result m_count{};
@@ -79,15 +81,36 @@ private:
   Vector const LEFT{0,-1};
 public:
   
-  char at(Vector const& pos) {
+  Simulation& restart() {
+//    print("restart");
+    m_pos = m_start;
+    m_dir = UP;
+    return *this;
+  }
+  
+  std::pair<Vector,Vector> state() const {
+    return {m_pos,m_dir};
+  }
+
+  char at(Vector const& pos) const {
     if (on_map(pos)) return m_grid[pos.row()][pos.col()];
     return '?';
   }
-  auto width() {
+
+  void set(Vector const& pos,char ch) {
+    if (not on_map(pos)) {
+      std::ostringstream os{};
+      os << "at(pos) called with pos:" << pos.row() << "," << pos.col() << " not on map";
+      throw std::runtime_error{os.str()};
+    }
+    m_grid[pos.row()][pos.col()] = ch;
+  }
+
+  auto width() const {
     return m_grid[0].size();
   }
-  
-  auto height() {
+    
+  auto height() const {
     return m_grid.size();
   }
 
@@ -97,12 +120,13 @@ public:
         Vector pos{row,col};
         auto ch = at(pos);
         if (ch=='^') {
-          m_pos = pos;
+          m_start = pos;
+          m_pos = m_start;
           m_dir = UP;
-          ::print(NL);
-          ::print("m_pos");print(m_pos);
-          ::print(" ");
-          ::print("m_dir");print(m_dir);
+          print(NL);
+          print("m_pos");print(m_pos);
+          print(" ");
+          print("m_dir");print(m_dir);
           m_grid[pos.row()][pos.col()] = '.';
           m_visited.insert(pos);
         }
@@ -110,32 +134,34 @@ public:
     }
   }
     
-  bool on_map(Vector const& pos) {
+  bool on_map(Vector const& pos) const {
     return (pos.row()>=0 and pos.row() < height() and pos.col() >= 0 and pos.col() < height());
   }
   
-  bool on_map() {
+  bool on_map() const {
     return on_map(m_pos);
   }
 
   bool operator++() {
     ++m_count;
     auto next_pos = m_pos + m_dir;
-    ::print(NL);
-    std::cout << at(next_pos) << " at ";
-    ::print("next_pos");print(next_pos);
+//    print(NL);
+//    std::cout << at(next_pos) << " at ";
+//    print("next_pos");print(next_pos);
     if (at(next_pos) == '#') {
       // turn right
-      ::print(NL);::print("TURN RIGHT");
+//      print(NL);print("TURN RIGHT");
       auto old_dir = m_dir;
       m_dir.row() = old_dir.col();
       m_dir.col() = -old_dir.row();
     }
     m_pos = m_pos + m_dir;
-    m_visited.insert(m_pos);
-    ::print(" m_pos:");print(m_pos);
-    std::cout << " m_count:" << m_count;
-    std::cout << " m_visited:" << m_visited.size();
+    if (on_map()) {
+      m_visited.insert(m_pos);
+//      print(" m_pos:");print(m_pos);
+//      std::cout << " m_count:" << m_count;
+//      std::cout << " m_visited:" << m_visited.size();
+    }
     return on_map();
   }
   
@@ -152,20 +178,67 @@ namespace part1 {
     if (in) {
       auto model = parse(in);
       Simulation sim{model};
-      while (++sim) {
-      }
-      result = sim.visited().size()-1;
+      while (++sim) {}
+      result = sim.visited().size();
     }
     return result;
   }
 }
 
 namespace part2 {
+  class LoopFinder {
+  private:
+    Simulation m_sim;
+  public:
+    LoopFinder(Simulation const& sim) : m_sim{sim} {
+      while (++m_sim) {}
+    }
+    std::vector<Vector> positions() {
+      std::vector<Vector> result{};
+      for (auto const& pos : m_sim.visited()) {
+        std::set<std::pair<Vector,Vector>> visited{};
+//        print(NL);
+//        print("try obstacle at pos:");
+//        print(pos);
+        Simulation sim_candidate{m_sim};
+        sim_candidate.set(pos,'#');
+        sim_candidate.restart();
+//        print(NL);print(T);
+        while (++sim_candidate) {
+          if (visited.contains(sim_candidate.state())) {
+            print(NL);
+            print(" FOUND:");
+            print(pos);
+            result.push_back(pos);
+            print(" count:");
+            std::cout << result.size();
+            break; // is loop
+          }
+          else {
+//            print(" ");
+//            print(sim_candidate.state().first);
+            visited.insert(sim_candidate.state());
+          }
+        }
+      }
+      return result; // 1995 too low
+    }
+  };
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      Simulation sim{model};
+      LoopFinder loop_finder{sim};
+      auto positions = loop_finder.positions();
+//      for (auto const& pos : positions) {
+//        print(NL);
+//        print("will loop with obstacle at:");
+//        print(pos);
+//      }
+      result = positions.size();
+
     }
     return result;
   }
@@ -181,7 +254,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1};
+  std::vector<int> states = {3};
   for (auto state : states) {
     switch (state) {
       case 0: {
