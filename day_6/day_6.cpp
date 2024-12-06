@@ -145,12 +145,13 @@ public:
 
   bool operator++() {
     ++m_count;
-    auto next_pos = m_pos + m_dir;
-//    print(NL);
-//    std::cout << at(next_pos) << " at ";
-//    print("next_pos");print(next_pos);
-    if (at(next_pos) == '#') {
-      // turn right
+    while (true) {
+      auto next_pos = m_pos + m_dir;
+  //    print(NL);
+  //    std::cout << at(next_pos) << " at ";
+  //    print("next_pos");print(next_pos);
+      if (at(next_pos) != '#') break; // next step ok
+      // turn right and try again
 //      print(NL);print("TURN RIGHT");
       auto old_dir = m_dir;
       m_dir.row() = old_dir.col();
