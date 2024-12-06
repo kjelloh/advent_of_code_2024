@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {2,3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -310,8 +310,10 @@ int main(int argc, char *argv[])
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+   duration:0ms answer[Part 1 Example] 41
+   duration:11ms answer[Part 1     ] 5516
+   duration:3ms answer[Part 2 Example] 6
+   duration:23863ms answer[Part 2     ] 2008
+   */
   return 0;
 }
