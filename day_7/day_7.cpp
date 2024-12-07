@@ -27,30 +27,105 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = std::vector<std::string>;
+using Operands = std::vector<Integer>;
+using Model = std::vector<std::pair<Integer,Operands>>;
 
 Model parse(auto& in) {
   std::cout << "\n<BEGIN parse>";
   Model result{};
   std::string line{};
+  int count{};
   while (std::getline(in,line)) {
-    std::cout << "\nLine:" << std::quoted(line);
-    result.push_back(line);
+    std::cout << "\nLine[" << count++ << "]:" << line.size() << " " << std::quoted(line);
+    result.push_back({});
+    std::istringstream is{line};
+    char colon{};
+    Integer operand{};
+    is >> result.back().first >> colon;
+    while (is >> operand) result.back().second.push_back(operand);
   }
   std::cout << "\n<END parse>";
   return result;
 }
 
+std::ostream& operator<<(std::ostream& os,Operands const& operands) {
+  for (auto const& operand : operands) {
+    os << " " << operand;
+  }
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  int count{};
+  for (auto const& entry : model) {
+    os << NL << "equation[" << count++ << "]";
+    os << " " << entry.first << " =? " << entry.second;
+  }
+  return os;
+}
+
 using Args = std::vector<std::string>;
+
+using Operators = std::string;
+Result eval(Operators const& operators,Operands const& operands) {
+  std::cout << NL << "eval(" << operators << "," << operands << ")";
+  Result result{};
+  // Evaluate using reversed polish notation
+  std::stack<Integer> vals{operands.rbegin(),operands.rend()};
+  result = vals.top();vals.pop();
+  for (auto const& op : operators) {
+    auto x = vals.top();vals.pop();
+    std::cout << NL << T << op << " " << result << " " << x;
+    switch (op) {
+      case '+': result += x;break;
+      case '*': result *= x;break;
+      default:std::cerr << "ERROR, unknown operator " << op;break;
+    }
+    std::cout << " = " << result;
+  }
+  return result;
+}
+
+Operators to_operators(int index,auto length) {
+  Operators result{};
+  std::bitset<32> bits = index;
+  for (int i=0;i<length;++i) {
+    if (bits[i]) result.push_back('*');
+    else result.push_back('+');
+  }
+  return result;
+}
+
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
+    Result acc{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << model;
+      for (auto const& entry : model) {
+        auto y = entry.first;
+        auto const& operands = entry.second;
+        auto N = operands.size()-1;
+        auto M = 1 << N; // 2^N
+        for (auto i=decltype(M){};i<M;++i) {
+          auto ops = to_operators(i,N);
+          if (y == eval(ops,operands)) {
+            acc += y;
+            std::cout << NL << ops << " on " << operands << " is " << y << " OK acc:" << acc;
+            break;
+          }
+//          else {
+//            std::cout << NL << ops << " on " << operands << " is " << y << " FAILED";
+//          }
+        }
+      }
+      result = acc;
     }
-    return result;
+    return result; // 6167992527400 is too low
+                   // 6231007345478 ok
   }
 }
 
@@ -74,7 +149,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1};
+  std::vector<int> states = {1};
   for (auto state : states) {
     switch (state) {
       case 0: {
