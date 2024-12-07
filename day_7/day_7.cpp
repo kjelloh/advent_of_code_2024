@@ -68,36 +68,41 @@ using Args = std::vector<std::string>;
 
 using Operators = std::string;
 Result eval(Operators const& operators,Operands const& operands) {
-  std::cout << NL << "eval(" << operators << "," << operands << ")";
+//  std::cout << NL << "eval(" << operators << "," << operands << ")";
   Result result{};
   // Evaluate using reversed polish notation
   std::stack<Integer> vals{operands.rbegin(),operands.rend()};
   result = vals.top();vals.pop();
   for (auto const& op : operators) {
     auto x = vals.top();vals.pop();
-    std::cout << NL << T << op << " " << result << " " << x;
+//    std::cout << NL << T << op << " " << result << " " << x;
     switch (op) {
       case '+': result += x;break;
       case '*': result *= x;break;
+      case '|': {
+        auto s1 = std::to_string(result);
+        auto s2 = std::to_string(x);
+        auto s = s1 + s2;
+        result = std::stol(s);
+      } break;
       default:std::cerr << "ERROR, unknown operator " << op;break;
     }
-    std::cout << " = " << result;
+//    std::cout << " = " << result;
   }
   return result;
 }
-
-Operators to_operators(int index,auto length) {
-  Operators result{};
-  std::bitset<32> bits = index;
-  for (int i=0;i<length;++i) {
-    if (bits[i]) result.push_back('*');
-    else result.push_back('+');
-  }
-  return result;
-}
-
 
 namespace part1 {
+  Operators to_operators(int index,auto length) {
+    Operators result{};
+    std::bitset<32> bits = index;
+    for (int i=0;i<length;++i) {
+      if (bits[i]) result.push_back('*');
+      else result.push_back('+');
+    }
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     Result acc{};
@@ -117,9 +122,6 @@ namespace part1 {
             std::cout << NL << ops << " on " << operands << " is " << y << " OK acc:" << acc;
             break;
           }
-//          else {
-//            std::cout << NL << ops << " on " << operands << " is " << y << " FAILED";
-//          }
         }
       }
       result = acc;
@@ -130,11 +132,42 @@ namespace part1 {
 }
 
 namespace part2 {
+  Operators to_operators(int index,auto length) {
+    Operators result{};
+    // interpret index in base 3
+    std::array<char,3> const OPS{'|','*','+'};
+    for (int i=0;i<length;++i) {
+      result.push_back(OPS[index % 3]);
+      index /= 3;
+    }
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
-    std::cout << NL << NL << "part2";
+    Result acc{};
+    std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << model;
+      for (auto const& entry : model) {
+        std::cout << NL << "processing:" << entry.first << " <-> " << entry.second;
+        auto y = entry.first;
+        auto const& operands = entry.second;
+        auto N = operands.size()-1;
+        auto M = std::pow(3,N); // 3^N
+        int loop_count{};
+        for (auto i=decltype(M){};i<M;++i) {
+//          if (loop_count++ % 20000 == 0) std::cout << '.';
+          auto ops = to_operators(i,N);
+          if (y == eval(ops,operands)) {
+            acc += y;
+            std::cout << NL << ops << " on " << operands << " is " << y << " OK acc:" << acc;
+            break;
+          }
+        }
+      }
+      result = acc;
     }
     return result;
   }
@@ -149,7 +182,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {1};
+  std::vector<int> states = {3};
   for (auto state : states) {
     switch (state) {
       case 0: {
