@@ -79,7 +79,7 @@ Result eval(Operators const& operators,Operands const& operands) {
     switch (op) {
       case '+': result += x;break;
       case '*': result *= x;break;
-      case '|': {
+      case '&': {
         auto s1 = std::to_string(result);
         auto s2 = std::to_string(x);
         auto s = s1 + s2;
@@ -119,7 +119,7 @@ namespace part1 {
           auto ops = to_operators(i,N);
           if (y == eval(ops,operands)) {
             acc += y;
-            std::cout << NL << ops << " on " << operands << " is " << y << " OK acc:" << acc;
+            std::cout << NL << T << ops << " on " << operands << " is " << y << " OK acc:" << acc;
             break;
           }
         }
@@ -135,7 +135,7 @@ namespace part2 {
   Operators to_operators(int index,auto length) {
     Operators result{};
     // interpret index in base 3
-    std::array<char,3> const OPS{'|','*','+'};
+    std::array<char,3> const OPS{'&','*','+'};
     for (int i=0;i<length;++i) {
       result.push_back(OPS[index % 3]);
       index /= 3;
@@ -151,7 +151,7 @@ namespace part2 {
       auto model = parse(in);
       std::cout << model;
       for (auto const& entry : model) {
-        std::cout << NL << "processing:" << entry.first << " <-> " << entry.second;
+        std::cout << NL << "processing:" << entry.first << " : " << entry.second;
         auto y = entry.first;
         auto const& operands = entry.second;
         auto N = operands.size()-1;
@@ -162,7 +162,7 @@ namespace part2 {
           auto ops = to_operators(i,N);
           if (y == eval(ops,operands)) {
             acc += y;
-            std::cout << NL << ops << " on " << operands << " is " << y << " OK acc:" << acc;
+            std::cout << NL << T << ops << " on " << operands << " is " << y << " OK acc:" << acc;
             break;
           }
         }
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -227,8 +227,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
+   
+   ANSWERS
+   duration:0ms answer[Part 1 Example] 3749
+   duration:259ms answer[Part 1     ] 6231007345478
+   duration:0ms answer[Part 2 Example] 11387
+   duration:25775ms answer[Part 2     ] 333027885676693
+   
   */
   return 0;
 }
