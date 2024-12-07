@@ -29,17 +29,101 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = Integer;
 using Model = std::vector<std::string>;
 
-Model parse(auto& in) {
-  std::cout << "\n<BEGIN parse>";
-  Model result{};
-  std::string line{};
-  int count{};
-  while (std::getline(in,line)) {
-    std::cout << "\nLine[" << count++ << "]:" << line.size() << " " << std::quoted(line);
-    result.push_back(line);
+namespace parsing {
+  class Splitter; // Forward
+  class Splitters; // Forward
+  using SplitterPair = std::pair<Splitter,Splitter>;
+
+  class Splitter {
+  public:
+    Splitter(std::string const& s) : m_s{s} {}
+    Splitter(std::istream& is) : m_s{
+       std::istreambuf_iterator<char>(is)
+      ,std::istreambuf_iterator<char>()
+    } {};
+    Splitters lines() const;
+    SplitterPair split(char ch) const;
+    Splitters splits(char sep = ' ') const;
+    std::string const& str() const {return m_s;}
+    operator std::string() const {return m_s;}
+    auto size() const {return m_s.size();}
+  private:
+    std::string m_s{};
+  };
+
+  class Splitters {
+  public:
+    Splitters& push_back(Splitter const& splitter) {
+      m_splitters.push_back(splitter);
+      return *this;
+    }
+    auto begin() {return m_splitters.begin();}
+    auto end() {return m_splitters.end();}
+    
+  private:
+    std::vector<Splitter> m_splitters{};
+  };
+
+  Splitters Splitter::lines() const {
+    Splitters result{};
+    std::istringstream is{m_s};
+    std::string line{};
+    while (std::getline(is,line)) result.push_back(line);
+    return result;
   }
-  std::cout << "\n<END parse>";
-  return result;
+
+  SplitterPair Splitter::split(char sep) const {
+    std::size_t pos = m_s.find(sep);
+    if (pos == std::string::npos) {
+      return {m_s, std::string{}};
+    }
+    // Split at the separator
+    return {m_s.substr(0, pos), m_s.substr(pos + 1)};
+  }
+
+  std::string trim(const std::string& str) {
+      auto start = std::find_if_not(str.begin(), str.end(), ::isspace);
+      auto end = std::find_if_not(str.rbegin(), str.rend(), ::isspace).base();
+      return std::string(start, end);
+  }
+
+  Splitters Splitter::splits(char sep) const {
+    Splitters result{};
+    auto split_range =
+        m_s
+      | std::ranges::views::split(sep)  // Split by separator
+      | std::ranges::views::transform([](auto&& range) {
+          return std::string(range.begin(), range.end());
+        })  // Convert each split range to a string
+      | std::ranges::views::transform(trim)  // Trim each part
+      | std::ranges::views::filter([](const std::string& part) {
+          return !part.empty();  // Filter out empty parts
+        });
+
+    // Collect the results into the vector
+    for (const auto& part : split_range) {
+        result.push_back(part);
+    }
+    return result;
+  }
+
+  Model parse(auto& in) {
+    std::cout << "\n<BEGIN parse>";
+    Model result{};
+    std::string line{};
+    int count{};
+    auto lines = Splitter{in}.lines();
+    for (auto const& line : lines) {
+      std::cout << "\nLine[" << count++ << "]:" << " " << std::quoted(line.str()) << ":" << line.size();
+      result.push_back(line);
+    }
+    std::cout << "\n<END parse>";
+    return result;
+  }
+}
+
+Model parse(auto& in) {
+  return parsing::parse(in);
 }
 
 using Args = std::vector<std::string>;
@@ -75,7 +159,11 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1,2,3};
+//  std::vector<int> states = {0};
+  std::vector<int> states = {0,1};
+//  std::vector<int> states = {2};
+//  std::vector<int> states = {2,3};
+//  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
