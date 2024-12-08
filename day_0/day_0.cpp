@@ -30,10 +30,6 @@ using Result = Integer;
 using Model = std::vector<std::string>;
 
 namespace parsing {
-  class Splitter; // Forward
-  class Splitters; // Forward
-  using SplitterPair = std::pair<Splitter,Splitter>;
-
   class Splitter {
   public:
     Splitter(std::string const& s) : m_s{s} {}
@@ -41,89 +37,73 @@ namespace parsing {
        std::istreambuf_iterator<char>(is)
       ,std::istreambuf_iterator<char>()
     } {};
-    Splitters lines() const;
-    SplitterPair split(char ch) const;
-    Splitters splits(char sep = ' ') const;
+    std::vector<Splitter> lines() const {
+      std::vector<Splitter> result{};
+      std::istringstream is{m_s};
+      std::string line{};
+      while (std::getline(is,line)) result.push_back(line);
+      return result;
+    }
+    std::pair<Splitter,Splitter> split(char ch) const {
+      std::size_t pos = m_s.find(ch);
+      if (pos == std::string::npos) {
+        return {m_s, std::string{}};
+      }
+      return {m_s.substr(0, pos), m_s.substr(pos + 1)};
+    }
+    std::vector<Splitter> splits(char sep) const {
+      std::vector<Splitter> result{};
+      std::istringstream is{m_s};
+      std::string line{};
+      while (std::getline(is, line, sep)) {
+        result.push_back(line);
+      }
+      return result;
+    }
+    Splitter trim() {
+        auto start = std::find_if_not(m_s.begin(), m_s.end(), ::isspace);
+        auto end = std::find_if_not(m_s.rbegin(), m_s.rend(), ::isspace).base();
+        return std::string(start, end);
+    }
+    std::vector<Splitter> groups(std::string const& regexPattern) {
+        std::vector<Splitter> result;
+        std::regex pattern(regexPattern);
+        std::smatch matches;
+
+        if (std::regex_search(m_s, matches, pattern)) {
+            // Iterate over the captured groups (start from 1, as 0 is the whole match)
+            for (size_t i = 1; i < matches.size(); ++i) {
+                result.push_back(matches[i].str());
+            }
+        }
+        return result;
+    }
+
     std::string const& str() const {return m_s;}
     operator std::string() const {return m_s;}
     auto size() const {return m_s.size();}
   private:
     std::string m_s{};
   };
-
-  class Splitters {
-  public:
-    Splitters& push_back(Splitter const& splitter) {
-      m_splitters.push_back(splitter);
-      return *this;
-    }
-    auto begin() {return m_splitters.begin();}
-    auto end() {return m_splitters.end();}
-    
-  private:
-    std::vector<Splitter> m_splitters{};
-  };
-
-  Splitters Splitter::lines() const {
-    Splitters result{};
-    std::istringstream is{m_s};
-    std::string line{};
-    while (std::getline(is,line)) result.push_back(line);
-    return result;
-  }
-
-  SplitterPair Splitter::split(char sep) const {
-    std::size_t pos = m_s.find(sep);
-    if (pos == std::string::npos) {
-      return {m_s, std::string{}};
-    }
-    // Split at the separator
-    return {m_s.substr(0, pos), m_s.substr(pos + 1)};
-  }
-
-  std::string trim(const std::string& str) {
-      auto start = std::find_if_not(str.begin(), str.end(), ::isspace);
-      auto end = std::find_if_not(str.rbegin(), str.rend(), ::isspace).base();
-      return std::string(start, end);
-  }
-
-  Splitters Splitter::splits(char sep) const {
-    Splitters result{};
-    auto split_range =
-        m_s
-      | std::ranges::views::split(sep)  // Split by separator
-      | std::ranges::views::transform([](auto&& range) {
-          return std::string(range.begin(), range.end());
-        })  // Convert each split range to a string
-      | std::ranges::views::transform(trim)  // Trim each part
-      | std::ranges::views::filter([](const std::string& part) {
-          return !part.empty();  // Filter out empty parts
-        });
-
-    // Collect the results into the vector
-    for (const auto& part : split_range) {
-        result.push_back(part);
-    }
-    return result;
-  }
-
-  Model parse(auto& in) {
-    std::cout << "\n<BEGIN parse>";
-    Model result{};
-    std::string line{};
-    int count{};
-    auto lines = Splitter{in}.lines();
-    for (auto const& line : lines) {
-      std::cout << "\nLine[" << count++ << "]:" << " " << std::quoted(line.str()) << ":" << line.size();
-      result.push_back(line);
-    }
-    std::cout << "\n<END parse>";
-    return result;
-  }
 }
 
 Model parse(auto& in) {
-  return parsing::parse(in);
+  using namespace parsing;
+  Model result{};
+  auto input = Splitter{in};
+  auto lines = input.lines();
+  if (lines.size()>1) {
+    std::cout << NL << T << lines.size() << " lines";
+    for (int i=0;i<lines.size() and i<5;++i) {
+      auto line = lines[i];
+      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+    }
+  }
+  else {
+    // single line
+    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
+  }
+  return result;
 }
 
 using Args = std::vector<std::string>;
