@@ -188,9 +188,12 @@ namespace part1 {
               if (delta.first % 2 == 0 and delta.second % 2 == 0) {
                 std::cout << " between candidates ";
                 // halfway between is valid c1=vi+0.5*delta, c2=vj-0.5*delta
+                // NOTE: For my input this never happens?
                 Position c1{vi.first+delta.first/2,vi.second+delta.second/2};
                 Position c2{vj.first-delta.first/2,vj.second-delta.second/2};
                 std::cout << c1 << " " << c2;
+                candidates.insert(c1);
+                candidates.insert(c2);
               }
             }
           }
@@ -208,6 +211,53 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      auto const WIDTH = model[0].size();
+      auto const HEIGHT = model.size();
+      std::map<char,std::vector<Position>> c2p{};
+      for (int r=0;r<model.size();++r) {
+        for (int c=0;c<model[0].size();++c) {
+          auto ch = model[r][c];
+          if (ch != '.') c2p[ch].push_back({r,c});
+        }
+      }
+      if (true) {
+        for (auto const& entry : c2p) {
+          std::cout << NL << entry.first;
+          for (auto const& pos : entry.second) {
+            std::cout << " [r:" << pos.first << ",c:" << pos.second << "]";
+          }
+        }
+      }
+      
+      std::set<Position> candidates{};
+      for (auto const& entry : c2p) {
+        auto ch = entry.first;
+        auto v = entry.second;
+        for (int i=0;i<v.size();++i) {
+          for (int j=0;j<v.size();++j) {
+            if (i!=j) {
+              auto vi = v[i];
+              auto vj = v[j];
+              std::cout << NL << vi << " and " << vj;
+              PositionPair pp{vi,vj};
+              auto delta = to_delta(pp);
+              for (int factor=0;factor<=WIDTH+1;++factor) {
+                Position c{vi.first+factor*delta.first,vi.second+factor*delta.second};
+                std::cout << NL << T << " candidate " << c;
+                if (c.first>=0 and c.first<WIDTH and c.second>=0 and c.second < HEIGHT) {
+                  std::cout << " OK (on grid)";
+                  candidates.insert(c);
+                }
+                else {
+                  std::cout << " BREAK";
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      result = candidates.size();
     }
     return result;
   }
@@ -223,9 +273,9 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {0};
-  std::vector<int> states = {0,1};
+//  std::vector<int> states = {0,1};
 //  std::vector<int> states = {2};
-//  std::vector<int> states = {2,3};
+  std::vector<int> states = {2,3};
 //  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
