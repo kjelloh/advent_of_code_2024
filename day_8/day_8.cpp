@@ -275,8 +275,8 @@ int main(int argc, char *argv[]) {
 //  std::vector<int> states = {0};
 //  std::vector<int> states = {0,1};
 //  std::vector<int> states = {2};
-  std::vector<int> states = {2,3};
-//  std::vector<int> states = {0,1,2,3};
+//  std::vector<int> states = {2,3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -321,8 +321,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+
+   ANSWERS
+   duration:0ms answer[Part 1 Example] 14
+   duration:6ms answer[Part 1     ] 244
+   duration:0ms answer[Part 2 Example] 34
+   duration:14ms answer[Part 2     ] 912
+   
+   */
   return 0;
 }
