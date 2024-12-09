@@ -134,6 +134,96 @@ std::ostream& operator<<(std::ostream& os,Blocks const& blocks) {
 }
 
 namespace part1 {
+  auto next_free_segment = [](Blocks const& compressed,auto lix, auto rix){
+    while (lix < rix and compressed[lix].id >= 0) {
+      std::cout << NL << T << "skipped left:" << compressed[lix];
+      ++lix;
+    }
+    return lix;
+  };
+
+  auto next_file_segment = [](Blocks const& compressed,auto lix, auto rix){
+    while (lix < rix and compressed[rix].id < 0) {
+      std::cout << NL << T << "skipped right:" << compressed[rix];
+      --rix;
+    }
+    return rix;
+  };
+  auto done = [](auto lix,auto rix){
+    return (lix>=rix);
+  };
+
+  auto to_compressed = [](Blocks const& blocks) {
+    auto compressed = blocks;
+
+    auto lix = decltype(compressed.size()){};
+    auto rix = compressed.size()-1;
+    
+    while (true) {
+      std::cout << NL << "processing [lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+      
+      lix = next_free_segment(compressed,lix,rix);
+      rix = next_file_segment(compressed, lix, rix);
+      
+      if (done(lix,rix)) break;
+      
+      std::cout << NL << T << "at[lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+      
+      // Move data in right to free in left(s)
+      auto to_move = std::min(compressed[lix].count,compressed[rix].count);
+      
+      auto diff = compressed[lix].count - compressed[rix].count;
+
+      if (diff > 0) {
+        // Spare room in left free block
+        // Split to accomodate for new left over free space
+        auto to_move = compressed[rix].count; // empty right data
+        Block new_free{-1,diff};
+        std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- new left:" << new_free << " <-- " << compressed[rix];
+        compressed[lix].id = compressed[rix].id;
+        compressed[lix].count = to_move;
+        compressed[rix].id = -1; // now free
+        compressed.insert(compressed.begin()+lix+1,new_free); // spare
+        // NOTE: Extended vector invalidates rix (all right of lix right shifted)
+        //       But rix will now then just ref to prev in list ok
+      }
+      else if (diff < 0) {
+        // right data > left free
+        // split right block by inserting left over data before right block
+        auto to_move = compressed[lix].count; // fill left free
+        std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- right:" << compressed[rix];
+        compressed[lix].id = compressed[rix].id;
+        compressed[lix].count = to_move;
+        compressed[rix].count -= to_move;
+      }
+      else {
+        // same size
+        std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- " << compressed[rix];
+        compressed[lix].id = compressed[rix].id;
+        compressed[lix].count = compressed[rix].count;
+        compressed[rix].id = -1; // now free
+      }
+    }
+    return compressed;
+  };
+
+  auto to_checksum = [](Blocks const& compressed) {
+    std::cout << NL << "compressed:" << compressed;
+    Result acc{};
+    int pos{};
+    for (int i=0;i<compressed.size();++i) {
+      auto const& b = compressed[i];
+      if (b.id<0) break;
+      for (int j=0;j<b.count;++j) {
+        std::cout << NL << T << pos << " * " << b.id << " = " << pos * b.id;
+        acc += pos * b.id;
+        ++pos;
+      }
+      std::cout << " acc:" << acc;
+    }
+    return acc;
+  };
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
@@ -147,90 +237,101 @@ namespace part1 {
         blocks.push_back({-1,free});
       }
       std::cout << NL << blocks;
-      
-      auto compressed = blocks;
-      
-      auto lix = decltype(compressed.size()){};
-      auto rix = compressed.size()-1;
-      
-      bool more_to_move{lix < rix};
-      std::size_t const COUNT_LIMIT{compressed.size()}; // break on failure
-      std::size_t count{};
-      while (more_to_move and ++count < COUNT_LIMIT) {
-        std::cout << NL << "processing [lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
-        // next free to the left
-        while (lix < rix and compressed[lix].id >= 0) {
-          std::cout << NL << T << "skipped left:" << compressed[lix];
-          ++lix;
-        }
-
-        // next occupied from end
-        while (lix < rix and compressed[rix].id < 0) {
-          std::cout << NL << T << "skipped right:" << compressed[rix];
-          --rix;
-        }
-        
-        if (lix>=rix) break;
-
-        std::cout << NL << T << "at[lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
-        
-        // Move data in right to free in left(s)
-        auto to_move = std::min(compressed[lix].count,compressed[rix].count);
-        
-        auto diff = compressed[lix].count - compressed[rix].count;
-
-        if (diff > 0) {
-          // Spare room in left free block
-          // Split to accomodate left over free space
-          auto to_move = compressed[rix].count; // empty right data
-          Block new_free{-1,diff};
-          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- new left:" << new_free << " <-- " << compressed[rix];
-          compressed[lix].id = compressed[rix].id;
-          std::cout << " compressed[lix].id = " << compressed[lix].id;
-          compressed[lix].count = to_move;
-          compressed[rix].id = -1; // now free
-          compressed.insert(compressed.begin()+lix+1,new_free); // spare
-          ++rix; // compensate for extended vector
-        }
-        else if (diff < 0) {
-          // right data > left free
-          // split right block by inserting left over data before right block
-          auto to_move = compressed[lix].count; // fill left free
-          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- right:" << compressed[rix];
-          compressed[lix].id = compressed[rix].id;
-          compressed[lix].count = to_move;
-          compressed[rix].count -= to_move;
-        }
-        else {
-          // same size
-          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- " << compressed[rix];
-          compressed[lix].id = compressed[rix].id;
-          compressed[lix].count = compressed[rix].count;
-          compressed[rix].id = -1; // now free
-        }
-        
-        more_to_move = lix < rix;
-      }
-      std::cout << NL << "compressed:" << compressed;
-      Result acc{};
-      int pos{};
-      for (int i=0;i<compressed.size();++i) {
-        auto const& b = compressed[i];
-        if (b.id<0) break;
-        for (int j=0;j<b.count;++j) {
-          std::cout << NL << T << pos << " * " << b.id << " = " << pos * b.id;
-          acc += pos * b.id;
-          ++pos;
-        }
-        std::cout << " acc:" << acc;
-      }
-      result = acc;
+      auto compressed = to_compressed(blocks);
+      result = to_checksum(compressed);
     }
     return result;
   }
 }
 
 namespace part2 {
+
+  auto next_free_segment = [](Blocks const& compressed,auto lix,auto rix){
+    // lix = next free from left that fits whole rix
+    for (lix=0;lix<rix;++lix) {
+      auto candidate = compressed[lix];
+      if (candidate.id < 0 and candidate.count >= compressed[rix].count) {
+        std::cout << NL << T << "lix:" << lix << " block:" << candidate << " has room for compressed[" << rix << "]" << compressed[rix];
+        break;
+      }
+    }
+    return lix;
+  };
+
+  auto next_file_segment = [](Blocks const& compressed,auto lix,auto rix){
+    while (rix > 0 and compressed[rix].id < 0) {
+      std::cout << NL << T << "skipped right:" << compressed[rix];
+      --rix;
+    }
+    return rix;
+  };
+
+  auto done = [](auto lix,auto rix){
+    return (rix < 1);
+  };
+
+  auto valid_lix = [](Blocks const& compressed,auto lix,auto rix) {
+    return (lix < rix);
+  };
+
+  auto to_compressed = [](Blocks const& blocks){
+    auto compressed = blocks;
+    
+    auto lix = decltype(compressed.size()){};
+    auto rix = compressed.size()-1;
+    
+    std::size_t const COUNT_LIMIT{compressed.size()}; // avoid eternal loop on failure
+    std::size_t count{};
+    while (++count < COUNT_LIMIT) {
+            
+      if (done(lix,rix)) break;
+      
+      std::cout << NL << "processing [lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+
+      rix = next_file_segment(compressed, lix, rix);
+      lix = next_free_segment(compressed, lix, rix);
+            
+      if (not valid_lix(compressed,lix,rix)) {
+        std::cout << NL << T << "No room to move " << compressed[rix];
+        --rix;
+        continue; // try to move next rix
+      }
+
+      if (done(lix,rix)) break;
+
+      std::cout << NL << T << "at[lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+      
+      // Move data in right to free in left(s)
+      auto to_move = std::min(compressed[lix].count,compressed[rix].count);
+      auto diff = compressed[lix].count - compressed[rix].count;
+
+      if (diff > 0) {
+        // Spare room in left free block
+        // Split to accomodate left over free space
+        auto to_move = compressed[rix].count; // empty right data
+        Block new_free{-1,diff};
+        std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- new left:" << new_free << " <-- " << compressed[rix];
+        compressed[lix].id = compressed[rix].id;
+        std::cout << " compressed[lix].id = " << compressed[lix].id;
+        compressed[lix].count = to_move;
+        compressed[rix].id = -1; // now free
+        compressed.insert(compressed.begin()+lix+1,new_free); // spare
+        ++rix; // compensate for extended vector
+      }
+      else if (diff < 0) {
+        // file blocks does not fit in free
+      }
+      else {
+        // same size
+        std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- " << compressed[rix];
+        compressed[lix].id = compressed[rix].id;
+        compressed[lix].count = compressed[rix].count;
+        compressed[rix].id = -1; // now free
+      }
+    }
+    return compressed;
+  };
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -244,92 +345,29 @@ namespace part2 {
         blocks.push_back({-1,free});
       }
       std::cout << NL << blocks;
-      
-      auto compressed = blocks;
-      
-      auto lix = decltype(compressed.size()){};
-      auto rix = compressed.size()-1;
-      
-      std::size_t const COUNT_LIMIT{compressed.size()}; // avoid eternal loop on failure
-      std::size_t count{};
-      while (++count < COUNT_LIMIT) {
-        
-        if (rix < 1) break;
-        
-        std::cout << NL << "processing [lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
-
-        // next occupied from end
-        while (rix > 0 and compressed[rix].id < 0) {
-          std::cout << NL << T << "skipped right:" << compressed[rix];
-          --rix;
-        }
-        
-        // lix = next free from left that fits whole rix
-        for (lix=0;lix<rix;++lix) {
-          auto candidate = compressed[lix];
-          if (candidate.id < 0 and candidate.count >= compressed[rix].count) {
-            std::cout << NL << T << "lix:" << lix << " block:" << candidate << " has room for compressed[" << rix << "]" << compressed[rix];
-            break;
-          }
-        }
-        
-        if (lix >= rix) {
-          std::cout << NL << T << "No room to move " << compressed[rix];
-          --rix;
-          continue; // try to move next rix
-        }
-                
-        if (rix < 1) break; // actually rix < first free. But this works too
-
-        std::cout << NL << T << "at[lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
-        
-        // Move data in right to free in left(s)
-        auto to_move = std::min(compressed[lix].count,compressed[rix].count);
-        
-        auto diff = compressed[lix].count - compressed[rix].count;
-
-        if (diff > 0) {
-          // Spare room in left free block
-          // Split to accomodate left over free space
-          auto to_move = compressed[rix].count; // empty right data
-          Block new_free{-1,diff};
-          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- new left:" << new_free << " <-- " << compressed[rix];
-          compressed[lix].id = compressed[rix].id;
-          std::cout << " compressed[lix].id = " << compressed[lix].id;
-          compressed[lix].count = to_move;
-          compressed[rix].id = -1; // now free
-          compressed.insert(compressed.begin()+lix+1,new_free); // spare
-          ++rix; // compensate for extended vector
-        }
-        else if (diff < 0) {
-          // file blocks does not fit in free
-        }
-        else {
-          // same size
-          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- " << compressed[rix];
-          compressed[lix].id = compressed[rix].id;
-          compressed[lix].count = compressed[rix].count;
-          compressed[rix].id = -1; // now free
-        }
-      }
-      // 00992111777.44.333....5555.6666.....8888..
+      auto compressed = to_compressed(blocks);
       std::cout << NL << "compressed:" << compressed;
-      Result acc{};
-      int pos{};
-      for (int i=0;i<compressed.size();++i) {
-        auto const& b = compressed[i];
-        for (int j=0;j<b.count;++j) {
-          if (b.id>=0) {
-            std::cout << NL << T << pos << " * " << b.id;
-            std::cout << " = " << pos * b.id;
-            acc += pos * b.id;
-            std::cout << " acc:" << acc;
+      
+      auto to_checksum = [](Blocks const& compressed){
+        Result acc{};
+        int pos{};
+        for (int i=0;i<compressed.size();++i) {
+          auto const& b = compressed[i];
+          for (int j=0;j<b.count;++j) {
+            if (b.id>=0) {
+              std::cout << NL << T << pos << " * " << b.id;
+              std::cout << " = " << pos * b.id;
+              acc += pos * b.id;
+              std::cout << " acc:" << acc;
+            }
+            ++pos;
           }
-          ++pos;
         }
-      }
-      result = acc;
+        return acc;
+      };
+      result = to_checksum(compressed);
     }
+    //
     return result;
   }
 }
