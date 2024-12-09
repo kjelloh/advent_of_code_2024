@@ -211,7 +211,6 @@ namespace part1 {
         
         more_to_move = lix < rix;
       }
-      // expected example: "0099811188827773336446555566.............."
       std::cout << NL << "compressed:" << compressed;
       Result acc{};
       int pos{};
@@ -237,6 +236,98 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      std::cout << NL << NL << "<model>" << model;
+      Blocks blocks{};
+      for (auto const& [id,p] : model) {
+        auto const& [count,free] = p;
+        blocks.push_back({id,count});
+        blocks.push_back({-1,free});
+      }
+      std::cout << NL << blocks;
+      
+      auto compressed = blocks;
+      
+      auto lix = decltype(compressed.size()){};
+      auto rix = compressed.size()-1;
+      
+      std::size_t const COUNT_LIMIT{compressed.size()}; // avoid eternal loop on failure
+      std::size_t count{};
+      while (++count < COUNT_LIMIT) {
+        
+        if (rix < 1) break;
+        
+        std::cout << NL << "processing [lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+
+        // next occupied from end
+        while (rix > 0 and compressed[rix].id < 0) {
+          std::cout << NL << T << "skipped right:" << compressed[rix];
+          --rix;
+        }
+        
+        // lix = next free from left that fits whole rix
+        for (lix=0;lix<rix;++lix) {
+          auto candidate = compressed[lix];
+          if (candidate.id < 0 and candidate.count >= compressed[rix].count) {
+            std::cout << NL << T << "lix:" << lix << " block:" << candidate << " has room for compressed[" << rix << "]" << compressed[rix];
+            break;
+          }
+        }
+        
+        if (lix >= rix) {
+          std::cout << NL << T << "No room to move " << compressed[rix];
+          --rix;
+          continue; // try to move next rix
+        }
+                
+        if (rix < 1) break; // actually rix < first free. But this works too
+
+        std::cout << NL << T << "at[lix:" << lix << ",rix:" << rix << "] = left:" << compressed[lix] << " right:" << compressed[rix];
+        
+        // Move data in right to free in left(s)
+        auto to_move = std::min(compressed[lix].count,compressed[rix].count);
+        
+        auto diff = compressed[lix].count - compressed[rix].count;
+
+        if (diff > 0) {
+          // Spare room in left free block
+          // Split to accomodate left over free space
+          auto to_move = compressed[rix].count; // empty right data
+          Block new_free{-1,diff};
+          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- new left:" << new_free << " <-- " << compressed[rix];
+          compressed[lix].id = compressed[rix].id;
+          std::cout << " compressed[lix].id = " << compressed[lix].id;
+          compressed[lix].count = to_move;
+          compressed[rix].id = -1; // now free
+          compressed.insert(compressed.begin()+lix+1,new_free); // spare
+          ++rix; // compensate for extended vector
+        }
+        else if (diff < 0) {
+          // file blocks does not fit in free
+        }
+        else {
+          // same size
+          std::cout << NL << T << compressed[lix] << " <-- " << to_move << " blocks <-- " << compressed[rix];
+          compressed[lix].id = compressed[rix].id;
+          compressed[lix].count = compressed[rix].count;
+          compressed[rix].id = -1; // now free
+        }
+      }
+      // 00992111777.44.333....5555.6666.....8888..
+      std::cout << NL << "compressed:" << compressed;
+      Result acc{};
+      int pos{};
+      for (int i=0;i<compressed.size();++i) {
+        auto const& b = compressed[i];
+        for (int j=0;j<b.count;++j) {
+          std::cout << NL << T << pos << " * " << b.id << " = " << pos * b.id;
+          if (b.id>=0) {
+            acc += pos * b.id;
+          }
+          ++pos;
+        }
+        std::cout << " acc:" << acc;
+      }
+      result = acc;
     }
     return result;
   }
@@ -251,10 +342,10 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {1};
+//  std::vector<int> states = {0};
 //  std::vector<int> states = {0,1};
 //  std::vector<int> states = {2};
-//  std::vector<int> states = {2,3};
+  std::vector<int> states = {2,3};
 //  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
