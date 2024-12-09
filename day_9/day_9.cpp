@@ -319,13 +319,14 @@ namespace part2 {
       for (int i=0;i<compressed.size();++i) {
         auto const& b = compressed[i];
         for (int j=0;j<b.count;++j) {
-          std::cout << NL << T << pos << " * " << b.id << " = " << pos * b.id;
           if (b.id>=0) {
+            std::cout << NL << T << pos << " * " << b.id;
+            std::cout << " = " << pos * b.id;
             acc += pos * b.id;
+            std::cout << " acc:" << acc;
           }
           ++pos;
         }
-        std::cout << " acc:" << acc;
       }
       result = acc;
     }
@@ -345,8 +346,8 @@ int main(int argc, char *argv[]) {
 //  std::vector<int> states = {0};
 //  std::vector<int> states = {0,1};
 //  std::vector<int> states = {2};
-  std::vector<int> states = {2,3};
-//  std::vector<int> states = {0,1,2,3};
+//  std::vector<int> states = {2,3};
+  std::vector<int> states = {0,1,2,3};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -391,8 +392,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
+
+   ANSWERS
+   duration:1ms answer[Part 1 Example] 1928
+   duration:331ms answer[Part 1     ] 6390180901651
+   duration:0ms answer[Part 2 Example] 2858
+   duration:587ms answer[Part 2     ] 6412390114238
+   
   */
   return 0;
 }
