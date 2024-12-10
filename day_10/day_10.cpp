@@ -329,7 +329,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11,10,21,20};
-  std::vector<int> states = {20};
+  std::vector<int> states = {12,10,22,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -342,7 +342,7 @@ int main(int argc, char *argv[]) {
       case 12: {
         std::filesystem::path file{"../../example2.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example2",part1::solve_for(in,args)});
+        if (in) answers.push_back({"Part 1 Larger Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
@@ -363,7 +363,7 @@ int main(int argc, char *argv[]) {
       case 22: {
         std::filesystem::path file{"../../example2.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
+        if (in) answers.push_back({"Part 2 Larger Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
@@ -395,8 +395,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+
+   ANSWERS
+   duration:13ms answer[Part 1 Larger Example] 36
+   duration:158ms answer[Part 1     ] 733
+   duration:8ms answer[Part 2 Larger Example] 81
+   duration:242ms answer[Part 2     ] 1514
+   
+   */
   return 0;
 }
