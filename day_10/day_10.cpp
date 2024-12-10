@@ -92,8 +92,10 @@ Model parse(auto& in) {
   Model result{};
   auto input = Splitter{in};
   auto lines = input.lines();
-  for (auto const& line : lines) {
-    std::cout << NL << line.str();
+  std::cout << NL << T << lines.size() << " lines";
+  for (int i=0;i<lines.size();++i) {
+    auto line = lines[i];
+    std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
     result.push_back(line);
   }
   return result;
@@ -139,6 +141,7 @@ std::ostream& operator<<(std::ostream& os,TrailHeads const& ths) {
 
 Result to_scores_sum(TrailHeads const& ths) {
   Result result{};
+  std::cout << NL << "to_scores_sum";
   for (auto const& [start,ends] : ths) {
     auto score = ends.size();
     std::cout << NL << T << "score start:" << start << " -> " << ends << " = " << score;
@@ -270,7 +273,6 @@ TrailHeads to_trail_heads(Model const& model,bool for_part_2) {
     auto ths = to_trail_heads(start, model,for_part_2);
     result[start] = ths[start];
   }
-  std::cout << result;
   return result;
 }
 
