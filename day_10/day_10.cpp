@@ -1,5 +1,7 @@
+#include "aoc.hpp"
+
 #include <cctype>
-#include <iostream>
+#include <iostream> // E.g., std::istream, std::ostream...
 #include <iomanip> // E.g., std::quoted
 #include <string>
 #include <string_view>
@@ -27,68 +29,10 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = std::vector<std::string>;
-
-namespace parsing {
-  class Splitter {
-  public:
-    Splitter(std::string const& s) : m_s{s} {}
-    Splitter(std::istream& is) : m_s{
-       std::istreambuf_iterator<char>(is)
-      ,std::istreambuf_iterator<char>()
-    } {};
-    std::vector<Splitter> lines() const {
-      std::vector<Splitter> result{};
-      std::istringstream is{m_s};
-      std::string line{};
-      while (std::getline(is,line)) result.push_back(line);
-      return result;
-    }
-    std::pair<Splitter,Splitter> split(char ch) const {
-      std::size_t pos = m_s.find(ch);
-      if (pos == std::string::npos) {
-        return {m_s, std::string{}};
-      }
-      return {m_s.substr(0, pos), m_s.substr(pos + 1)};
-    }
-    std::vector<Splitter> splits(char sep) const {
-      std::vector<Splitter> result{};
-      std::istringstream is{m_s};
-      std::string line{};
-      while (std::getline(is, line, sep)) {
-        result.push_back(line);
-      }
-      return result;
-    }
-    Splitter trim() {
-        auto start = std::find_if_not(m_s.begin(), m_s.end(), ::isspace);
-        auto end = std::find_if_not(m_s.rbegin(), m_s.rend(), ::isspace).base();
-        return std::string(start, end);
-    }
-    std::vector<Splitter> groups(std::string const& regexPattern) {
-        std::vector<Splitter> result;
-        std::regex pattern(regexPattern);
-        std::smatch matches;
-
-        if (std::regex_search(m_s, matches, pattern)) {
-            // Iterate over the captured groups (start from 1, as 0 is the whole match)
-            for (size_t i = 1; i < matches.size(); ++i) {
-                result.push_back(matches[i].str());
-            }
-        }
-        return result;
-    }
-
-    std::string const& str() const {return m_s;}
-    operator std::string() const {return m_s;}
-    auto size() const {return m_s.size();}
-  private:
-    std::string m_s{};
-  };
-}
+using Model = aoc::grid::Grid;
 
 Model parse(auto& in) {
-  using namespace parsing;
+  using namespace aoc::parsing;
   Model result{};
   auto input = Splitter{in};
   auto lines = input.lines();
@@ -103,31 +47,11 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
-struct Position {
-  int row{};
-  int col{};
-  bool operator<(const Position& other) const {
-    return std::tie(row, col) < std::tie(other.row, other.col);
-  }
-  bool operator==(const Position& other) const {
-    return row == other.row && col == other.col;
-  }
-};
-std::ostream& operator<<(std::ostream& os,Position const& pos) {
-  os << "{row:" << pos.row << ",col:" << pos.col << "}";
-  return os;
-}
-using Positions = std::vector<Position>;
-std::ostream& operator<<(std::ostream& os,Positions const& positions) {
-  int count{};
-  os << "{";
-  for (auto const& pos : positions) {
-    if (count++>0) os << ",";
-    os << pos;
-  }
-  os << "}";
-  return os;
-}
+using aoc::grid::Position;
+using aoc::grid::Positions;
+using aoc::grid::width;
+using aoc::grid::height;
+
 using TrailHeads = std::map<Position,Positions>;
 std::ostream& operator<<(std::ostream& os,TrailHeads const& ths) {
   for (auto const& [start,ends] : ths) {
@@ -147,26 +71,6 @@ Result to_scores_sum(TrailHeads const& ths) {
     std::cout << NL << T << "score start:" << start << " -> " << ends << " = " << score;
     result += score;
   }
-  return result;
-}
-
-auto height(Model const& model) {
-  return model.size();
-}
-
-auto width(Model const& model) {
-  return model[0].size();
-}
-
-bool on_map(Position const& pos,Model const& model) {
-  auto const [row,col] = pos;
-  return (row>=0 and row < height(model) and col >= 0 and col < width(model));
-}
-
-std::optional<char> at(Position pos,Model const& model) {
-  std::optional<char> result{};
-  auto const& [row,col] = pos;
-  if (on_map(pos,model)) result = model[row][col];
   return result;
 }
 
