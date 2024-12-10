@@ -94,7 +94,7 @@ Model parse(auto& in) {
   auto lines = input.lines();
   if (lines.size()>1) {
     std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size() and i<5;++i) {
+    for (int i=0;i<lines.size();++i) {
       auto line = lines[i];
       std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
     }
@@ -139,35 +139,32 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {0};
-  std::vector<int> states = {0,1};
-//  std::vector<int> states = {2};
-//  std::vector<int> states = {2,3};
-//  std::vector<int> states = {0,1,2,3};
+//  std::vector<int> states = {11};
+  std::vector<int> states = {11,10,21,20};
   for (auto state : states) {
     switch (state) {
-      case 0: {
+      case 11: {
         std::filesystem::path file{"../../example.txt"};
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 1: {
+      case 10: {
         std::filesystem::path file{"../../puzzle.txt"};
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 2: {
+      case 21: {
         std::filesystem::path file{"../../example.txt"};
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 3: {
+      case 20: {
         std::filesystem::path file{"../../puzzle.txt"};
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
