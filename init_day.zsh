@@ -24,6 +24,7 @@ mkdir -p "$NEW_FOLDER"
 
 # Copy main.cpp, CMakeLists.txt etc. from the template folder to the new folder
 cp -nv "$TEMPLATE_FOLDER/day_0.cpp" "$NEW_FOLDER/day_$DAY_NUMBER.cpp"
+cp -nv "$TEMPLATE_FOLDER/aoc.hpp" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/CMakeLists.txt" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/init_tool_chain.zsh" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/pull_data.zsh" "$NEW_FOLDER/"
