@@ -118,23 +118,20 @@ Numbers to_transformed(Number number) {
 }
 
 using Seen = std::map<std::pair<int,Number>,Result>; // seen[{remaining_blinks,number}] = count
-// recursive DFS
+
+// recursive DFS returns count of Number transformed remaining_blinks times
 Result find_count(int remaining_blinks,Number n,Seen& seen) {
   std::string indent(remaining_blinks,' ');
-  std::cout << NL << indent.size() << ":" << indent <<  "find_count(remaining_blinks:" << remaining_blinks << ",n:" << n << ",seen:" << seen.size() << ")";
   Result result{0};
   if (remaining_blinks==0) {
-    std::cout << NL << T << indent.size() << ":" << indent << "END";
     result = 1; // count self
   }
   else  {
     if (seen.contains({remaining_blinks,n})) {
-      std::cout << NL << T << indent.size() << ":" << indent << "seen";
       result = seen[{remaining_blinks,n}];
     }
     else {
       auto transformed = to_transformed(n);
-      std::cout << NL << T << indent.size() << ":" << indent << "transformed into " << transformed.size();
       for (auto tn : transformed) {
         result += find_count(remaining_blinks-1,tn,seen);
       }
@@ -152,7 +149,6 @@ Result find_count(int remaining_blinks,Numbers const& numbers) {
   Seen seen{};
   for (auto n : numbers) {
     result += find_count(remaining_blinks, n, seen);
-    std::cout << NL << indent.size() << ":" << indent <<  "result = " << result;
   }
   return result;
 }
@@ -166,33 +162,7 @@ namespace part1 {
       auto model = parse(in);
       std::cout << NL << "Initial arrangement:";
       std::cout << NL << model;
-      return find_count(blink_count,model);
-
-      auto before = model;
-      std::set<Number> seen{};
-      for (int blink=1;blink<=blink_count;++blink) {
-        Numbers after{};
-        for (int i=0;i<before.size();++i) {
-          auto n = before[i];
-          auto transformed = to_transformed(n);
-          for (auto tn : transformed) {
-            after.push_back(tn);
-            seen.insert(tn);
-          }
-        }
-        if (blink<10) {
-          std::cout << NL << "After " << blink << " blink(s)";
-          std::cout << NL << "" << after;
-        }
-        else {
-          std::cout << NL << "After " << blink << " blink(s)";
-        }
-        before = after;
-        std::cout << NL << "full:" << before.size() << " seen:" << seen.size();
-      }
-      // 1: 1 2024 1 0 9 9 2021976
-      // 2: 2097446912 14168 4048 2 0 2 4 40 48 2024 40 48 80 96 2 8 6 7 6 0 3 2
-      result = before.size();
+      result = find_count(blink_count,model);
     }
     return result;
   }
@@ -279,13 +249,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-
+   
    ANSWERS
    duration:0ms answer[Part 1 Example 1 blink] 7
    duration:1ms answer[Part 1 Example2 6 blinks] 22
-   duration:24ms answer[Part 1 Example2 25 blinks] 55312
-   duration:35ms answer[Part 1     ] 231278
-   duration:1223ms answer[Part 2     ] 274229228071551
+   duration:11ms answer[Part 1 Example2 25 blinks] 55312
+   duration:20ms answer[Part 1     ] 231278
+   duration:574ms answer[Part 2     ] 274229228071551
    
    */
   return 0;
