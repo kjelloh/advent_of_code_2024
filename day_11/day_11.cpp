@@ -23,7 +23,6 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
-#include <functional>
 
 // Try to read the path to teh actual working directory
 // from a text file at the location where we execute
@@ -118,50 +117,6 @@ Numbers to_transformed(Number number) {
   return result;
 }
 
-template<typename Key, typename Result, typename State>
-Result find_count(
-    int remaining_steps,
-    Key initial_key,
-    std::function<std::vector<Key>(Key)> const& transform_fn,
-    std::function<State(int, Key)> const& state_fn,
-    std::map<State, Result>& seen
-) {
-    if (remaining_steps == 0) {
-        return Result(1); // Base case: count the initial state itself
-    }
-
-    State memo_state = state_fn(remaining_steps, initial_key);
-    if (seen.contains(memo_state)) {
-        return seen[memo_state];
-    }
-
-    Result result = Result(0);
-    for (auto const& next_key : transform_fn(initial_key)) {
-        result += find_count(remaining_steps - 1, next_key, transform_fn, state_fn, seen);
-    }
-
-    seen[memo_state] = result;
-    return result;
-}
-
-// Overload for initial invocation
-template<typename Key, typename Result, typename State>
-Result find_count(
-    int remaining_steps,
-    std::vector<Key> const& initial_keys,
-    std::function<std::vector<Key>(Key)> const& transform_fn,
-    std::function<State(int, Key)> const& state_fn
-) {
-    Result result{};
-    std::map<State, Result> seen;
-
-    for (auto const& key : initial_keys) {
-        result += find_count(remaining_steps, key, transform_fn, state_fn, seen);
-    }
-
-    return result;
-}
-
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -185,7 +140,7 @@ namespace part1 {
 
       int remaining_steps = 25;
 
-      result = find_count<Key, Result, State>(
+      result = aoc::dfs::find_count<Key, Result, State>(
           blink_count,
           model,
           transform_fn,
@@ -277,7 +232,7 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-      
+         
    ANSWERS
    duration:0ms answer[Part 1 Example 1 blink] 7
    duration:0ms answer[Part 1 Example2 6 blinks] 22
