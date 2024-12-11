@@ -17,6 +17,8 @@
 
 namespace aoc {
   namespace parsing {
+    using Line = std::string;
+    using Lines = std::vector<Line>;
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -75,7 +77,6 @@ namespace aoc {
   }
 
   namespace grid {
-    using Grid = std::vector<std::string>;
 
     struct Position {
       int row{};
@@ -103,24 +104,54 @@ namespace aoc {
       return os;
     }
   
-    auto height(Grid const& grid) {
-      return grid.size();
-    }
+    class Grid {
+    public:
 
-    auto width(Grid const& grid) {
-      return grid[0].size();
-    }
+        Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
 
-    bool on_map(Position const& pos,Grid const& grid) {
-      auto const [row,col] = pos;
-      return (row>=0 and row < height(grid) and col >= 0 and col < width(grid));
-    }
+        // Returns the height of the grid
+        size_t height() const {
+            return grid_.size();
+        }
 
-    std::optional<char> at(Position pos,Grid const& grid) {
-      std::optional<char> result{};
-      auto const& [row,col] = pos;
-      if (on_map(pos,grid)) result = grid[row][col];
-      return result;
+        // Returns the width of the grid
+        size_t width() const {
+            return grid_.empty() ? 0 : grid_[0].size();
+        }
+
+        // Checks if a position is within the bounds of the grid
+        bool on_map(Position const& pos) const {
+            auto const [row, col] = pos;
+            return (row >= 0 && row < static_cast<int>(height()) &&
+                    col >= 0 && col < static_cast<int>(width()));
+        }
+
+        // Retrieves the character at a given position, if valid
+        std::optional<char> at(Position const& pos) const {
+            if (on_map(pos)) {
+                return grid_[pos.row][pos.col];
+            }
+            return std::nullopt;
+        }
+      bool contains(Position const& pos) const {
+        return at(pos).has_value();
+      }
+
+    private:
+        std::vector<std::string> grid_;
+    };
+  
+    using Path = Positions;
+    using Visited = std::map<Position, std::vector<Path>>;
+  
+    // Helper Functions for Specific Use Case
+    std::vector<Position> default_neighbors(Position const& pos) {
+        return {
+            {pos.row - 1, pos.col}, // Up
+            {pos.row + 1, pos.col}, // Down
+            {pos.row, pos.col - 1}, // Left
+            {pos.row, pos.col + 1}  // Right
+        };
     }
 
   } // namespace grid

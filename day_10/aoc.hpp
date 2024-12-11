@@ -12,7 +12,8 @@
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <regex>
-
+#include <functional>
+#include <map>
 
 namespace aoc {
   namespace parsing {
@@ -102,7 +103,7 @@ namespace aoc {
       os << "}";
       return os;
     }
-
+  
     class Grid {
     public:
 
@@ -132,11 +133,91 @@ namespace aoc {
             }
             return std::nullopt;
         }
+      bool contains(Position const& pos) const {
+        return at(pos).has_value();
+      }
 
     private:
         std::vector<std::string> grid_;
     };
+  
+    using Path = Positions;
+    using Visited = std::map<Position, std::vector<Path>>;
+  
+    // Helper Functions for Specific Use Case
+    std::vector<Position> default_neighbors(Position const& pos) {
+        return {
+            {pos.row - 1, pos.col}, // Up
+            {pos.row + 1, pos.col}, // Down
+            {pos.row, pos.col - 1}, // Left
+            {pos.row, pos.col + 1}  // Right
+        };
+    }
+
   } // namespace grid
+
+  namespace dfs {
+    /*
+     DFS to count number of created (visited) Keys.
+     From 2024 day_11
+      Key is a Number and transform_fn transforms the Number
+      into a vector of new numbers.
+      state_fn simply creates the memoised State std::pair<remaining_blinks,numer>
+     
+     Future re-use:
+       For a path length finding problem on a Grid Key can be a position.
+       transform_fn generates the next positions to move to.
+       State can now memoise current remaining steps and position to a known count.
+     
+       I suppose Key may also be a Path is we need the State to distinguish between
+       the ways we reach a position in the grid?
+     
+       Lets see if we can reuse this code :)
+     
+     */
+    template<typename Key, typename Result, typename State>
+    Result find_count(
+        int remaining_steps,
+        Key initial_key,
+        std::function<std::vector<Key>(Key)> const& transform_fn,
+        std::function<State(int, Key)> const& state_fn,
+        std::map<State, Result>& seen) {
+        if (remaining_steps == 0) {
+            return Result(1); // Base case: count the initial state itself
+        }
+
+        State memo_state = state_fn(remaining_steps, initial_key);
+        if (seen.contains(memo_state)) {
+            return seen[memo_state];
+        }
+
+        Result result = Result(0);
+        for (auto const& next_key : transform_fn(initial_key)) {
+            result += find_count(remaining_steps - 1, next_key, transform_fn, state_fn, seen);
+        }
+
+        seen[memo_state] = result;
+        return result;
+    }
+
+    // Overload for initial invocation
+    template<typename Key, typename Result, typename State>
+    Result find_count(
+        int remaining_steps,
+        std::vector<Key> const& initial_keys,
+        std::function<std::vector<Key>(Key)> const& transform_fn,
+        std::function<State(int, Key)> const& state_fn) {
+        Result result{};
+        std::map<State, Result> seen;
+
+        for (auto const& key : initial_keys) {
+            result += find_count(remaining_steps, key, transform_fn, state_fn, seen);
+        }
+
+        return result;
+    }
+
+  }
 } // namespace aoc
 
 #endif /* aoc_hpp */

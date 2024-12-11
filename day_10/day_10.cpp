@@ -90,9 +90,8 @@ Positions to_start_candidates(Grid const& grid) {
   return result;
 }
 
-using Path = Positions;
-//using Visited = std::set<Position>;
-using Visited = std::map<Position, std::vector<Path>>;
+using aoc::grid::Path;
+using aoc::grid::Visited;
 
 Positions find_ends(Position const& start,Grid const& grid,bool for_part_2) {
   std::cout << NL << NL << "find_ends(start:" << start << ")";
@@ -234,7 +233,6 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11,10,21,20};
   std::vector<int> states = {12,10,22,20};
   for (auto state : states) {
     switch (state) {
@@ -307,7 +305,7 @@ int main(int argc, char *argv[]) {
    duration:159ms answer[Part 1     ] 733
    duration:8ms answer[Part 2 Larger Example] 81
    duration:235ms answer[Part 2     ] 1514
-   
+      
    */
   return 0;
 }
