@@ -24,7 +24,7 @@
 #include <regex>
 #include <filesystem>
 
-// Try to read the path to teh actual working directory
+// Try to read the path to the actual working directory
 // from a text file at the location where we execute
 std::optional<std::filesystem::path> get_working_dir() {
   std::optional<std::filesystem::path> result{};
@@ -48,7 +48,7 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = std::vector<std::string>;
+using Model = aoc::parsing::Lines;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -60,11 +60,13 @@ Model parse(auto& in) {
     for (int i=0;i<lines.size();++i) {
       auto line = lines[i];
       std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+      result.push_back(line);
     }
   }
   else {
     // single line
     std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
+    result.push_back(input.trim());
   }
   return result;
 }
