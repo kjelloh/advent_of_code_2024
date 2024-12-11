@@ -164,11 +164,11 @@ namespace part1 {
     if (in) {
       int blink_count = (args.size()>0)?std::stoi(args[0]):25;
       auto model = parse(in);
+      std::cout << NL << "Initial arrangement:";
+      std::cout << NL << model;
       return find_count(blink_count,model);
 
       auto before = model;
-      std::cout << NL << "Initial arrangement:";
-      std::cout << NL << before;
       std::set<Number> seen{};
       for (int blink=1;blink<=blink_count;++blink) {
         Numbers after{};
@@ -227,20 +227,27 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {20};
+  std::vector<int> states = {11,126,1225,10,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
         std::filesystem::path file{working_dir / "example.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,{"1"})});
+        if (in) answers.push_back({"Part 1 Example 1 blink",part1::solve_for(in,{"1"})});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 12: {
+      case 126: {
         std::filesystem::path file{working_dir / "example2.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example2",part1::solve_for(in,{"6"})});
+        if (in) answers.push_back({"Part 1 Example2 6 blinks",part1::solve_for(in,{"6"})});
+        else std::cerr << "\nSORRY, no file " << file;
+        exec_times.push_back(std::chrono::system_clock::now());
+      } break;
+      case 1225: {
+        std::filesystem::path file{working_dir / "example2.txt"};
+        std::ifstream in{file};
+        if (in) answers.push_back({"Part 1 Example2 25 blinks",part1::solve_for(in,{"25"})});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
@@ -272,8 +279,14 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+
+   ANSWERS
+   duration:0ms answer[Part 1 Example 1 blink] 7
+   duration:1ms answer[Part 1 Example2 6 blinks] 22
+   duration:24ms answer[Part 1 Example2 25 blinks] 55312
+   duration:35ms answer[Part 1     ] 231278
+   duration:1223ms answer[Part 2     ] 274229228071551
+   
+   */
   return 0;
 }
