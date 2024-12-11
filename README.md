@@ -53,3 +53,17 @@ To use the Z-shell scripts.
   }
 ```
 NOTE: XCode did NOT warn or signal in any way about the missing return statement.
+
+## day_11
+* I got compiler error 'Non-constant-expression cannot be narrowed from type 'int' to 'char' in initializer list' on:
+```cpp
+std::string indent{remaining_blinks,' '};
+```
+I must confess I aim at always use the {} initialisation but has yet to fully realise when the compiler will be able to map this to the constructor of choise.
+
+In this case it seems the compiler fails ti map an {int,char} to the std::string(size,char) constructor?
+
+In case case, one fix is no NOT use brace-initialisation by apply the contructor directly as:
+```cpp
+std::string indent(remaining_blinks,' ');
+```
