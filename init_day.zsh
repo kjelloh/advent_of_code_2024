@@ -28,7 +28,7 @@ cp -nv "$TEMPLATE_FOLDER/aoc.hpp" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/CMakeLists.txt" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/init_tool_chain.zsh" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/pull_data.zsh" "$NEW_FOLDER/"
-touch "$NEW_FOLDER//example.txt"
+touch "$NEW_FOLDER/example.txt"
 
 # Create a day.txt file in the new sub-folder with the provided day number
 echo "$DAY_NUMBER" > "$NEW_FOLDER/day.txt"
@@ -36,3 +36,22 @@ echo "day.txt created in $NEW_FOLDER with value: $DAY_NUMBER"
 
 # Confirm the files have been copied
 echo "You can now cd to $NEW_FOLDER and do ./init_tool_chain.zsh and ./pull_data.zsh"
+
+# Add Git initialization and commit logic
+cd "$NEW_FOLDER" || exit 1
+
+# Stage the specified files for Git if they are not already tracked
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    for file in "CMakeLists.txt" "day_$DAY_NUMBER.cpp" "aoc.hpp"; do
+        if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
+            git add "$file"
+            echo "Added $file to Git index."
+        else
+            echo "$file is already tracked by Git."
+        fi
+    done
+    git commit -m "Initial commit for Day $DAY_NUMBER"
+    echo "Initial commit made for Day $DAY_NUMBER"
+else
+    echo "Not inside a Git repository. Skipping Git commit."
+fi
