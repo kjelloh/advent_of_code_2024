@@ -29,7 +29,7 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::grid::Grid;
+using Model = aoc::parsing::Lines;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -49,8 +49,6 @@ using Args = std::vector<std::string>;
 
 using aoc::grid::Position;
 using aoc::grid::Positions;
-using aoc::grid::width;
-using aoc::grid::height;
 
 using TrailHeads = std::map<Position,Positions>;
 std::ostream& operator<<(std::ostream& os,TrailHeads const& ths) {
@@ -74,14 +72,16 @@ Result to_scores_sum(TrailHeads const& ths) {
   return result;
 }
 
-Positions to_start_candidates(Model const& model) {
+using aoc::grid::Grid;
+
+Positions to_start_candidates(Grid const& grid) {
   Positions result;
   std::cout << NL << "to_start_candidates";
-  for (int row=0;row<height(model);++row) {
+  for (int row=0;row<grid.height();++row) {
 //    std::cout << NL << T;
-    for (int col=0;col<width(model);++col) {
+    for (int col=0;col<grid.width();++col) {
       Position pos{row,col};
-      if (auto och = at(pos,model)) {
+      if (auto och = grid.at(pos)) {
 //        std::cout << "{" << *och << "}";
         if (*och == '0') result.push_back(pos);
       }
@@ -94,7 +94,7 @@ using Path = Positions;
 //using Visited = std::set<Position>;
 using Visited = std::map<Position, std::vector<Path>>;
 
-Positions find_ends(Position const& start,Model const& model,bool for_part_2) {
+Positions find_ends(Position const& start,Grid const& grid,bool for_part_2) {
   std::cout << NL << NL << "find_ends(start:" << start << ")";
   Positions result{};
   Visited visited{};
@@ -127,7 +127,7 @@ Positions find_ends(Position const& start,Model const& model,bool for_part_2) {
     }
 
     visited[current.back()].push_back(current);
-    char cell_value = *at(current.back(),model);
+    char cell_value = *grid.at(current.back());
     
     std::cout << " '" << cell_value << "'";
 
@@ -146,7 +146,7 @@ Positions find_ends(Position const& start,Model const& model,bool for_part_2) {
     };
 
     for (const auto& neighbor : neighbors) {
-      if (auto och = at(neighbor,model)) {
+      if (auto och = grid.at(neighbor)) {
         Path next{current};
         next.push_back(neighbor);
         auto nch = *och;
@@ -301,12 +301,12 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-
+   
    ANSWERS
-   duration:13ms answer[Part 1 Larger Example] 36
-   duration:158ms answer[Part 1     ] 733
+   duration:12ms answer[Part 1 Larger Example] 36
+   duration:159ms answer[Part 1     ] 733
    duration:8ms answer[Part 2 Larger Example] 81
-   duration:242ms answer[Part 2     ] 1514
+   duration:235ms answer[Part 2     ] 1514
    
    */
   return 0;

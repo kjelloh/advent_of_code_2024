@@ -16,6 +16,8 @@
 
 namespace aoc {
   namespace parsing {
+    using Line = std::string;
+    using Lines = std::vector<Line>;
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -74,7 +76,6 @@ namespace aoc {
   }
 
   namespace grid {
-    using Grid = std::vector<std::string>;
 
     struct Position {
       int row{};
@@ -101,27 +102,40 @@ namespace aoc {
       os << "}";
       return os;
     }
-  
-    auto height(Grid const& grid) {
-      return grid.size();
-    }
 
-    auto width(Grid const& grid) {
-      return grid[0].size();
-    }
+    class Grid {
+    public:
 
-    bool on_map(Position const& pos,Grid const& grid) {
-      auto const [row,col] = pos;
-      return (row>=0 and row < height(grid) and col >= 0 and col < width(grid));
-    }
+        Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
 
-    std::optional<char> at(Position pos,Grid const& grid) {
-      std::optional<char> result{};
-      auto const& [row,col] = pos;
-      if (on_map(pos,grid)) result = grid[row][col];
-      return result;
-    }
+        // Returns the height of the grid
+        size_t height() const {
+            return grid_.size();
+        }
 
+        // Returns the width of the grid
+        size_t width() const {
+            return grid_.empty() ? 0 : grid_[0].size();
+        }
+
+        // Checks if a position is within the bounds of the grid
+        bool on_map(Position const& pos) const {
+            auto const [row, col] = pos;
+            return (row >= 0 && row < static_cast<int>(height()) &&
+                    col >= 0 && col < static_cast<int>(width()));
+        }
+
+        // Retrieves the character at a given position, if valid
+        std::optional<char> at(Position const& pos) const {
+            if (on_map(pos)) {
+                return grid_[pos.row][pos.col];
+            }
+            return std::nullopt;
+        }
+
+    private:
+        std::vector<std::string> grid_;
+    };
   } // namespace grid
 } // namespace aoc
 
