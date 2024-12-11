@@ -96,6 +96,67 @@ std::pair<Number,Number> to_split_number(Number number) {
   return {number/divisor,number%divisor};
 }
 
+Numbers to_transformed(Number number) {
+  Numbers result{};
+  //If the stone is engraved with the number 0, it is replaced by a stone engraved with the number 1.
+  if (is_zero(number)) {
+    result.push_back(1);
+  }
+
+  //If the stone is engraved with a number that has an even number of digits, it is replaced by two stones. The left half of the digits are engraved on the new left stone, and the right half of the digits are engraved on the new right stone. (The new numbers don't keep extra leading zeroes: 1000 would become stones 10 and 0.)
+  else if (has_even_digit_count(number)) {
+    auto [left,right] = to_split_number(number);
+    result.push_back(left);
+    result.push_back(right);
+  }
+  //If none of the other rules apply, the stone is replaced by a new stone; the old stone's number multiplied by 2024 is engraved on the new stone.
+  else {
+    result.push_back(number*2024);
+  }
+
+  return result;
+}
+
+using Seen = std::map<std::pair<int,Number>,Result>; // seen[{remaining_blinks,number}] = count
+// recursive DFS
+Result find_count(int remaining_blinks,Number n,Seen& seen) {
+  std::string indent(remaining_blinks,' ');
+  std::cout << NL << indent.size() << ":" << indent <<  "find_count(remaining_blinks:" << remaining_blinks << ",n:" << n << ",seen:" << seen.size() << ")";
+  Result result{0};
+  if (remaining_blinks==0) {
+    std::cout << NL << T << indent.size() << ":" << indent << "END";
+    result = 1; // count self
+  }
+  else  {
+    if (seen.contains({remaining_blinks,n})) {
+      std::cout << NL << T << indent.size() << ":" << indent << "seen";
+      result = seen[{remaining_blinks,n}];
+    }
+    else {
+      auto transformed = to_transformed(n);
+      std::cout << NL << T << indent.size() << ":" << indent << "transformed into " << transformed.size();
+      for (auto tn : transformed) {
+        result += find_count(remaining_blinks-1,tn,seen);
+      }
+      seen[{remaining_blinks,n}] = result;
+    }
+  }
+  std::cout << NL << indent.size() << ":" << indent << "find_count(remaining_blinks:" << remaining_blinks << ",n:" << n << ",seen:" << seen.size() << ") = " << result;
+  return result;
+}
+
+Result find_count(int remaining_blinks,Numbers const& numbers) {
+  std::string indent(remaining_blinks,' ');
+  std::cout << NL << indent.size() << ":" << indent <<  "find_count(remaining_blinks:" << remaining_blinks << ",numbers:" << numbers << ")";
+  Result result{};
+  Seen seen{};
+  for (auto n : numbers) {
+    result += find_count(remaining_blinks, n, seen);
+    std::cout << NL << indent.size() << ":" << indent <<  "result = " << result;
+  }
+  return result;
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -103,41 +164,31 @@ namespace part1 {
     if (in) {
       int blink_count = (args.size()>0)?std::stoi(args[0]):25;
       auto model = parse(in);
+      return find_count(blink_count,model);
+
       auto before = model;
       std::cout << NL << "Initial arrangement:";
       std::cout << NL << before;
+      std::set<Number> seen{};
       for (int blink=1;blink<=blink_count;++blink) {
         Numbers after{};
         for (int i=0;i<before.size();++i) {
-          auto number = before[i];
-
-          //If the stone is engraved with the number 0, it is replaced by a stone engraved with the number 1.
-          if (is_zero(number)) {
-            if (blink<10) std::cout << NL << T << "0 --> 1";
-            after.push_back(1);
-          }
-
-          //If the stone is engraved with a number that has an even number of digits, it is replaced by two stones. The left half of the digits are engraved on the new left stone, and the right half of the digits are engraved on the new right stone. (The new numbers don't keep extra leading zeroes: 1000 would become stones 10 and 0.)
-          else if (has_even_digit_count(number)) {
-            auto [left,right] = to_split_number(number);
-            if (blink<10) std::cout << NL << T << number << " --> " << left << " " << right;
-            after.push_back(left);
-            after.push_back(right);
-          }
-          //If none of the other rules apply, the stone is replaced by a new stone; the old stone's number multiplied by 2024 is engraved on the new stone.
-          else {
-            after.push_back(number*2024);
-            if (blink<10) std::cout << NL << T << number << " --> " << after.back();
+          auto n = before[i];
+          auto transformed = to_transformed(n);
+          for (auto tn : transformed) {
+            after.push_back(tn);
+            seen.insert(tn);
           }
         }
         if (blink<10) {
           std::cout << NL << "After " << blink << " blink(s)";
           std::cout << NL << "" << after;
         }
-        else if (blink%1000==0) {
+        else {
           std::cout << NL << "After " << blink << " blink(s)";
         }
         before = after;
+        std::cout << NL << "full:" << before.size() << " seen:" << seen.size();
       }
       // 1: 1 2024 1 0 9 9 2021976
       // 2: 2097446912 14168 4048 2 0 2 4 40 48 2024 40 48 80 96 2 8 6 7 6 0 3 2
@@ -151,9 +202,7 @@ namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
-    if (in) {
-      auto model = parse(in);
-    }
+    result = part1::solve_for(in, args);
     return result;
   }
 }
@@ -178,7 +227,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {10};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -198,21 +247,14 @@ int main(int argc, char *argv[]) {
       case 10: {
         std::filesystem::path file{working_dir / "puzzle.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
+        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,{"25"})});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
       case 20: {
         std::filesystem::path file{working_dir / "puzzle.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
+        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,{"75"})});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
