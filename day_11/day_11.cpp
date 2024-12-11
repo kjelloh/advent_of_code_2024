@@ -23,6 +23,7 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
+#include <functional>
 
 // Try to read the path to teh actual working directory
 // from a text file at the location where we execute
@@ -117,40 +118,48 @@ Numbers to_transformed(Number number) {
   return result;
 }
 
-using Seen = std::map<std::pair<int,Number>,Result>; // seen[{remaining_blinks,number}] = count
+template<typename Key, typename Result, typename State>
+Result find_count(
+    int remaining_steps,
+    Key initial_key,
+    std::function<std::vector<Key>(Key)> const& transform_fn,
+    std::function<State(int, Key)> const& state_fn,
+    std::map<State, Result>& seen
+) {
+    if (remaining_steps == 0) {
+        return Result(1); // Base case: count the initial state itself
+    }
 
-// recursive DFS returns count of Number transformed remaining_blinks times
-Result find_count(int remaining_blinks,Number n,Seen& seen) {
-  std::string indent(remaining_blinks,' ');
-  Result result{0};
-  if (remaining_blinks==0) {
-    result = 1; // count self
-  }
-  else  {
-    if (seen.contains({remaining_blinks,n})) {
-      result = seen[{remaining_blinks,n}];
+    State memo_state = state_fn(remaining_steps, initial_key);
+    if (seen.contains(memo_state)) {
+        return seen[memo_state];
     }
-    else {
-      auto transformed = to_transformed(n);
-      for (auto tn : transformed) {
-        result += find_count(remaining_blinks-1,tn,seen);
-      }
-      seen[{remaining_blinks,n}] = result;
+
+    Result result = Result(0);
+    for (auto const& next_key : transform_fn(initial_key)) {
+        result += find_count(remaining_steps - 1, next_key, transform_fn, state_fn, seen);
     }
-  }
-  std::cout << NL << indent.size() << ":" << indent << "find_count(remaining_blinks:" << remaining_blinks << ",n:" << n << ",seen:" << seen.size() << ") = " << result;
-  return result;
+
+    seen[memo_state] = result;
+    return result;
 }
 
-Result find_count(int remaining_blinks,Numbers const& numbers) {
-  std::string indent(remaining_blinks,' ');
-  std::cout << NL << indent.size() << ":" << indent <<  "find_count(remaining_blinks:" << remaining_blinks << ",numbers:" << numbers << ")";
-  Result result{};
-  Seen seen{};
-  for (auto n : numbers) {
-    result += find_count(remaining_blinks, n, seen);
-  }
-  return result;
+// Overload for initial invocation
+template<typename Key, typename Result, typename State>
+Result find_count(
+    int remaining_steps,
+    std::vector<Key> const& initial_keys,
+    std::function<std::vector<Key>(Key)> const& transform_fn,
+    std::function<State(int, Key)> const& state_fn
+) {
+    Result result{};
+    std::map<State, Result> seen;
+
+    for (auto const& key : initial_keys) {
+        result += find_count(remaining_steps, key, transform_fn, state_fn, seen);
+    }
+
+    return result;
 }
 
 namespace part1 {
@@ -162,7 +171,26 @@ namespace part1 {
       auto model = parse(in);
       std::cout << NL << "Initial arrangement:";
       std::cout << NL << model;
-      result = find_count(blink_count,model);
+
+      using Key = Number;    // Core component being transformed
+      using State = std::pair<int, Key>; // Unique identifier for memoization
+
+      auto transform_fn = [](Key k) -> std::vector<Key> {
+          return to_transformed(k); // Replace with actual transformation logic
+      };
+
+      auto state_fn = [](int steps, Key k) -> State {
+          return {steps, k}; // Combine steps and key into a unique state
+      };
+
+      int remaining_steps = 25;
+
+      result = find_count<Key, Result, State>(
+          blink_count,
+          model,
+          transform_fn,
+          state_fn
+      );
     }
     return result;
   }
@@ -249,13 +277,13 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-   
+      
    ANSWERS
    duration:0ms answer[Part 1 Example 1 blink] 7
-   duration:1ms answer[Part 1 Example2 6 blinks] 22
-   duration:11ms answer[Part 1 Example2 25 blinks] 55312
-   duration:20ms answer[Part 1     ] 231278
-   duration:574ms answer[Part 2     ] 274229228071551
+   duration:0ms answer[Part 1 Example2 6 blinks] 22
+   duration:6ms answer[Part 1 Example2 25 blinks] 55312
+   duration:11ms answer[Part 1     ] 231278
+   duration:249ms answer[Part 2     ] 274229228071551
    
    */
   return 0;
