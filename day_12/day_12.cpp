@@ -73,14 +73,130 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+using aoc::grid::Grid;
+using aoc::grid::Position;
+using aoc::grid::Positions;
+
+using Region = std::pair<char,Positions>;
+
+std::vector<Position> to_adjacent(Position const& pos) {
+    return {
+      {pos.row - 1, pos.col} // Up
+      ,{pos.row + 1, pos.col} // Down
+      ,{pos.row, pos.col - 1} // Left
+      ,{pos.row, pos.col + 1}  // Right
+//      ,{pos.row - 1, pos.col + 1}  // Up Right
+//      ,{pos.row + 1, pos.col + 1}  // Down Right
+//      ,{pos.row + 1, pos.col - 1}  // Down Left
+//      ,{pos.row - 1, pos.col - 1}  // Up Left
+    };
+}
+
+std::vector<Position> to_nighbours(Position const& pos) {
+    return {
+      {pos.row - 1, pos.col} // Up
+      ,{pos.row + 1, pos.col} // Down
+      ,{pos.row, pos.col - 1} // Left
+      ,{pos.row, pos.col + 1}  // Right
+    };
+}
+
+using RegionInfo = std::pair<Region, int>; // Region and perimeter count
+
+Result to_perimeter(Region const& region,Grid const& grid) {
+  Result result{};
+
+  auto const& [region_id,members] = region;
+  for (auto const& pos : members) {
+    for (auto const& neighbour : to_nighbours(pos)) {
+      if (not grid.on_map(neighbour) or grid.at(neighbour).value() != region_id) {
+        ++result;
+      }
+    }
+  }
+  return result;
+}
+
+// Flood-fill function
+RegionInfo flood_fill(Grid const& grid, Position start, std::set<Position>& visited) {
+  std::queue<Position> to_visit;
+  Region region;
+
+  // Get the ID of the region (character at the starting position)
+  char region_id = grid.at(start).value();
+  region.first = region_id;
+
+  // Begin the flood-fill
+  to_visit.push(start);
+  visited.insert(start);
+
+  while (!to_visit.empty()) {
+    Position current = to_visit.front();
+    to_visit.pop();
+
+    region.second.push_back(current);
+
+    // Check neighbors
+    for (Position const& adjacent : to_adjacent(current)) {
+      if (not grid.on_map(adjacent)) continue;
+      if (visited.count(adjacent)) continue;
+      if (grid.at(adjacent).value() != region_id) continue;
+      to_visit.push(adjacent);
+      visited.insert(adjacent);
+    }
+  }
+  return {region, to_perimeter(region,grid)};
+}
+
+using RegionInfos = std::vector<RegionInfo>;
+// Main function to compute regions and their perimeters
+RegionInfos compute_regions(Grid const& grid) {
+  RegionInfos result;
+  std::set<Position> visited;
+
+  for (int row = 0; row < static_cast<int>(grid.height()); ++row) {
+    for (int col = 0; col < static_cast<int>(grid.width()); ++col) {
+      Position pos = {row, col};
+      if (!visited.count(pos)) {
+        // Perform flood-fill for unvisited positions
+        auto region_info = flood_fill(grid, pos, visited);
+        char region_id = grid.at(pos).value();
+
+        // Update the map
+        result.push_back(region_info);
+      }
+    }
+  }
+  return result;
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
+    Result acc{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      Grid grid{model};
+
+      auto infos = compute_regions(grid);
+
+      for (const auto& [region,perimeter] : infos) {
+        auto id = region.first;
+        auto area = region.second.size();
+        auto price = area*perimeter;
+        std::cout << NL << "Plot ID: " << id;
+        std::cout << NL << T << "Region:" << region.second;
+        std::cout << NL << T << "Area:" << area;
+        std::cout << NL << T << "Perimeter: " << perimeter;
+        std::cout << NL << T << "Price: " << price;
+        std::cout << NL << "-------------------------";
+        acc += price;
+      }
+      result = acc;
     }
-    return result;
+    return result; // 1358716 is too high
+                   // 1352976
   }
 }
 
@@ -114,14 +230,28 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11};
-  std::vector<int> states = {11,10,21,20};
+  std::vector<int> states = {11,12,13,10};
+//  std::vector<int> states = {11,12,13,10,23,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
         std::filesystem::path file{working_dir / "example.txt"};
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
+        else std::cerr << "\nSORRY, no file " << file;
+        exec_times.push_back(std::chrono::system_clock::now());
+      } break;
+      case 12: {
+        std::filesystem::path file{working_dir / "example2.txt"};
+        std::ifstream in{file};
+        if (in) answers.push_back({"Part 1 Example 2",part1::solve_for(in,args)});
+        else std::cerr << "\nSORRY, no file " << file;
+        exec_times.push_back(std::chrono::system_clock::now());
+      } break;
+      case 13: {
+        std::filesystem::path file{working_dir / "example3.txt"};
+        std::ifstream in{file};
+        if (in) answers.push_back({"Part 1 Larger Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
@@ -132,10 +262,10 @@ int main(int argc, char *argv[]) {
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 21: {
+      case 23: {
         std::filesystem::path file{working_dir / "example.txt"};
         std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
+        if (in) answers.push_back({"Part 2 Larger Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
