@@ -87,6 +87,8 @@ namespace aoc {
       bool operator==(const Position& other) const {
         return row == other.row && col == other.col;
       }
+      Position operator+(Position const& other) const {return {row+other.row,col+other.col};}
+      Position operator-(Position const& other) const {return {row-other.row,col-other.col};}
     };
     std::ostream& operator<<(std::ostream& os,Position const& pos) {
       os << "{row:" << pos.row << ",col:" << pos.col << "}";
