@@ -48,25 +48,81 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::parsing::Lines;
+using aoc::xy::Vector;
+struct MachineConfig {
+  /*
+   Button A: X+94, Y+34
+   Button B: X+22, Y+67
+   Prize: X=8400, Y=5400
+   */
+  Vector da{};
+  Vector db{};
+  Vector target{};
+};
+using MachineConfigs = std::vector<MachineConfig>;
+std::ostream& operator<<(std::ostream& os,MachineConfig const& mc) {
+  std::cout << "da:" << mc.da << " db:" << mc.db << " target:" << mc.target;
+  return os;
+}
+std::ostream& operator<<(std::ostream& os,MachineConfigs const& mcs) {
+  std::cout << "machine configs:";
+  for (auto const& mc : mcs) std::cout << NL << T << mc;
+  return os;
+}
+using Model = MachineConfigs;
+
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
   auto input = Splitter{in};
-  auto lines = input.lines();
-  if (lines.size()>1) {
+  auto sections = input.sections();
+  int section_count{};
+  for (auto const& lines : sections) {
+    result.push_back({});
+    std::cout << NL << T << "sections[" << section_count++ << "]";
     std::cout << NL << T << lines.size() << " lines";
     for (int i=0;i<lines.size();++i) {
       auto line = lines[i];
       std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
+      
+      switch (i) {
+        case 0:;
+        case 1: {
+          auto groups = line.groups(R"(Button (\w): X\+(\d+), Y\+(\d+))");
+          std::cout << NL << T << std::quoted(line.str()) << " --> groups:" << groups.size();
+          if (groups.size()==3) {
+            auto caption = groups[0];
+            auto dx = groups[1];
+            auto dy = groups[2];
+            if (caption.str() == "A") {
+              result.back().da = {std::stoi(dx),std::stoi(dy)};
+            }
+            else if (caption.str() == "B") {
+              result.back().db = {std::stoi(dx),std::stoi(dy)};
+            }
+            else {
+              std::cerr << NL << "PARSE ERROR: Unknown button caption:" << std::quoted(caption.str());
+            }
+          }
+          else {
+            std::cerr << NL << "PARSE ERROR: Not a button config entry:" << std::quoted(line.str());
+          }
+        } break;
+        case 2: {
+          auto groups = line.groups(R"(Prize: X=(\d+), Y=(\d+))");
+          if (groups.size()==2) {
+            auto dx = groups[0];
+            auto dy = groups[1];
+            result.back().target = {std::stoi(dx),std::stoi(dy)};
+          }
+          else {
+            std::cerr << NL << "PARSE ERROR: Not a prize config entry:" << std::quoted(line.str());
+          }
+        } break;
+        default: {std::cerr << "PARSE ERROR: Unexpected line index:" << i;} break;
+      }
     }
-  }
-  else {
-    // single line
-    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    result.push_back(input.trim());
   }
   return result;
 }
@@ -79,6 +135,8 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << NL << "model:" << model;
+      
     }
     return result;
   }
@@ -115,7 +173,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11,10,21,20};
+  std::vector<int> states = {11};
   for (auto state : states) {
     switch (state) {
       case 11: {

@@ -19,6 +19,7 @@ namespace aoc {
   namespace parsing {
     using Line = std::string;
     using Lines = std::vector<Line>;
+    using Sections = std::vector<Lines>;
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -26,6 +27,23 @@ namespace aoc {
          std::istreambuf_iterator<char>(is)
         ,std::istreambuf_iterator<char>()
       } {};
+      
+      std::vector<std::vector<Splitter>> sections() {
+        std::vector<std::vector<Splitter>> result;
+        std::istringstream is{m_s};
+        result.push_back({});
+        Line line{};
+        while (std::getline(is,line)) {
+          if (line.size() == 0) {
+            result.push_back({});
+          }
+          else {
+            result.back().push_back(line);
+          }
+        }
+        return result;
+      }
+      
       std::vector<Splitter> lines() const {
         std::vector<Splitter> result{};
         std::istringstream is{m_s};
@@ -74,6 +92,37 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+  }
+
+  namespace xy {
+    struct Vector {
+      int x{};
+      int y{};
+      bool operator<(const Vector& other) const {
+        return std::tie(x, y) < std::tie(other.x, other.y);
+      }
+      bool operator==(const Vector& other) const {
+        return x == other.x && y == other.y;
+      }
+      Vector operator+(Vector const& other) const {return {x+other.x,x+other.y};}
+      Vector operator-(Vector const& other) const {return {x-other.x,y-other.y};}
+    };
+    std::ostream& operator<<(std::ostream& os,Vector const& pos) {
+      os << "{x:" << pos.x << ",y:" << pos.y << "}";
+      return os;
+    }
+    using Vectors = std::vector<Vector>;
+    std::ostream& operator<<(std::ostream& os,Vectors const& positions) {
+      int count{};
+      os << "{";
+      for (auto const& pos : positions) {
+        if (count++>0) os << ",";
+        os << pos;
+      }
+      os << "}";
+      return os;
+    }
+
   }
 
   namespace grid {
