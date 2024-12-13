@@ -130,7 +130,7 @@ Model parse(auto& in) {
 using Args = std::vector<std::string>;
 
 struct State {
-  int x, y;
+  Integer x, y;
   Result cost;
   int a_push_count{};
   int b_push_count{};
@@ -143,21 +143,16 @@ std::ostream& operator<<(std::ostream& os,State state) {
   return os;
 }
 
-// Dijkstra's algorithm
-Result find_min_cost(const MachineConfig& config) {
-    std::cout << NL << "find_min_cost:" << config;
+using Seen = std::map<Result,std::vector<State>>;
+Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,Seen& seen) {
+//    std::cout << NL << "find_min_cost:" << config;
     int const COST_A = 3;
     int const COST_B = 1;
   
     std::priority_queue<State, std::vector<State>, std::greater<State>> pq;
-
-    // Visited set to avoid revisiting states
     std::set<std::pair<int, int>> visited;
-
-    // Initial state
     pq.push({0, 0, 0, 0, 0});
 
-    int const PUSH_LIMIT{100};
     while (!pq.empty()) {
 //        std::cout << NL << T << "pq:" << pq.size();
         State current = pq.top();
@@ -165,19 +160,21 @@ Result find_min_cost(const MachineConfig& config) {
 //        std::cout << NL << T << T << "current:" << current;
 
       if (current.a_push_count > PUSH_LIMIT or current.b_push_count > PUSH_LIMIT) {
-          std::cout << NL << T << T << "SKIP PUSH LIMIT:";
-          std::cout << " a_push_count:" << current.a_push_count << " b_push_count:" << current.b_push_count;
+//          std::cout << NL << T << T << "SKIP PUSH LIMIT:";
+//          std::cout << " a_push_count:" << current.a_push_count << " b_push_count:" << current.b_push_count;
           continue;
         }
 
         if (current.x == config.target.x and current.y == config.target.y) {
             std::cout << NL << T << T << "FOUND:" << current;
+            seen[current.cost].push_back(current);
             return current.cost;
         }
 
         if (visited.count({current.x, current.y}) > 0) {
             continue;
         }
+      
         visited.insert({current.x, current.y});
       
         // Passed target
@@ -190,7 +187,6 @@ Result find_min_cost(const MachineConfig& config) {
           continue;
         }
 
-      
         // Press Button A
         auto new_x_a = current.x + config.da.x;
         auto new_y_a = current.y + config.da.y;
@@ -214,6 +210,75 @@ Result find_min_cost(const MachineConfig& config) {
     return -1; // failed
 }
 
+Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool is_part_2) {
+  Seen seen{};
+  if (is_part_2) {
+    // Shoot, this is actually an algebraic problem?
+    // Each config has a soluton given by wether the two equation system has an ineteger solution?
+    /*
+     Button A: X+94, Y+34
+     Button B: X+22, Y+67
+     Prize: X=8400, Y=5400
+     */
+    // {8400,5400} = m*{94  ,34} +   n{22   ,67}
+    // {x   ,y}    = m*{da_x,da_y} + n*{db_x,db_y}
+    
+    // x = m*da_x + n*db_x
+    // y = m*da_y + n*db_y
+    
+    // Eliminate m
+    // x*da_y = m*da_x*da_y + n*db_x*da_y
+    // y*da_x = m*da_x*da_y + n*db_y*da_x
+    // So,...
+    // x*da_y - y*da_x = m*da_x*da_y - m*da_x*da_y + n*db_x*da_y - n*db_y*da_x
+    // n = (x*da_y - y*da_x) / (db_x*da_y - db_y*da_x)
+    
+    // Eliminate n
+    // x*db_y = m*da_x*db_y + n*db_x*db_y
+    // y*db_x = m*da_y*db_x + n*db_y*db_x
+    // x*db_y - y*db_x = m*da_x*db_y - m*da_y*db_x  + n*db_x*db_y - n*db_y*db_x
+    // m = (x*db_y - y*db_x) / (da_x*db_y - da_y*db_x)
+    
+    auto [da,db,xy] = config;
+    auto [da_x,da_y] = da;
+    auto [db_x,db_y] = db;
+    auto [x,y] = xy;
+    Integer m_num = (x*db_y - y*db_x);
+    Integer m_denom = (da_x*db_y - da_y*db_x);
+    Integer n_num = (x*da_y - y*da_x);
+    Integer n_denom = (db_x*da_y - db_y*da_x);
+    
+    Integer m{};
+    Integer n{};
+
+    if (m_denom == 0) throw std::runtime_error("Sorry, Zero denominator when solving for B press count");
+    if (n_denom == 0) throw std::runtime_error("Sorry, Zero denominator when solving for A press count");
+    if (m_num % m_denom == 0) {
+      // Integer solution
+      m = m_num / m_denom;
+      std::cout << NL << T << "A press count:" << m;
+    }
+    else {
+      std::cout << NL << "No Integer solution for A press count for " << config;
+      return -1;
+    }
+    if (n_num % n_denom == 0) {
+      // Integer solution
+      n = n_num / n_denom;
+      std::cout << NL << T << "B press count:" << n;
+    }
+    else {
+      std::cout << NL << "No Integer solution for B press count for " << config;
+      return -1;
+    }
+    auto cost = 3*m + n;
+    return cost;
+  }
+  else {
+    return find_min_cost(config, PUSH_LIMIT, seen);
+  }
+        
+}
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -225,7 +290,7 @@ namespace part1 {
       std::cout << NL << "model:" << model;
       for (auto const& mc : model) {
         std::cout << NL << "processing:" << mc;
-        if (auto cost = find_min_cost(mc);cost >= 0) {
+        if (auto cost = find_min_cost(mc,100,false);cost >= 0) {
           std::cout << " --> min cost:" << cost;
           acc += cost;
         }
@@ -241,10 +306,35 @@ namespace part1 {
 
 namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    Integer K{10000000000000LL};
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
+      Result acc{};
       auto model = parse(in);
+      for (auto const& mc : model) {
+        // Assume there is a cycle in the search space.
+        // That is from push 1 to push 'cycle' the cost is the same
+        // as from cycle+1 to 2*cycle.
+        // If this is true we can calculate the best cost fro the first cycle.
+        // And then just add that cost for each cycle until
+        // we have a remaning push count to try at target?
+        // We are seaching for {m,n} so that target = m*da + n*db.
+        // With the cost = 3*m + n we want the {m,n} that gives us the lowest cost possible.
+        // How do we find a cycle?
+        // For a push count cycle we get 2*best(cycle) == best(2*cycle).
+        
+        MachineConfig mc_p2 = {mc.da,mc.db,{mc.target.x+K,mc.target.y+K}};
+        std::cout << NL << "processing:" << mc_p2;
+        if (auto cost = find_min_cost(mc_p2,10000,true);cost >= 0) {
+          std::cout << " --> min cost:" << cost;
+          acc += cost;
+        }
+        else {
+          std::cout << " --> FAILED ";
+        }
+      }
+      result = acc;
     }
     return result;
   }
@@ -270,7 +360,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11,10};
+  std::vector<int> states = {11,10,21,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -317,8 +407,10 @@ int main(int argc, char *argv[]) {
   For my input:
 
    ANSWERS
-   duration:92ms answer[Part 1 Example] 480
-   duration:3173ms answer[Part 1     ] 39290
+   duration:91ms answer[Part 1 Example] 480
+   duration:2977ms answer[Part 1     ] 39290
+   duration:0ms answer[Part 2 Example] 875318608908
+   duration:17ms answer[Part 2     ] 73458657399094
    
   */
   return 0;

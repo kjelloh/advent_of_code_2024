@@ -96,8 +96,8 @@ namespace aoc {
 
   namespace xy {
     struct Vector {
-      int x{};
-      int y{};
+      int64_t x{};
+      int64_t y{};
       bool operator<(const Vector& other) const {
         return std::tie(x, y) < std::tie(other.x, other.y);
       }
@@ -106,6 +106,8 @@ namespace aoc {
       }
       Vector operator+(Vector const& other) const {return {x+other.x,x+other.y};}
       Vector operator-(Vector const& other) const {return {x-other.x,y-other.y};}
+      template <typename T>
+      Vector operator*(T scalar) const {return {scalar * x,scalar * y};}
     };
     std::ostream& operator<<(std::ostream& os,Vector const& pos) {
       os << "{x:" << pos.x << ",y:" << pos.y << "}";
