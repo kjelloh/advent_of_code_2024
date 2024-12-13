@@ -129,14 +129,111 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+struct State {
+  int x, y;
+  Result cost;
+  int a_push_count{};
+  int b_push_count{};
+  bool operator>(const State& other) const {
+      return cost > other.cost;
+  }
+};
+std::ostream& operator<<(std::ostream& os,State state) {
+  std::cout << "state:" << "x:" << state.x << " y:" << state.y << " cost:" << state.cost;
+  return os;
+}
+
+// Dijkstra's algorithm
+Result find_min_cost(const MachineConfig& config) {
+    std::cout << NL << "find_min_cost:" << config;
+    int const COST_A = 3;
+    int const COST_B = 1;
+  
+    std::priority_queue<State, std::vector<State>, std::greater<State>> pq;
+
+    // Visited set to avoid revisiting states
+    std::set<std::pair<int, int>> visited;
+
+    // Initial state
+    pq.push({0, 0, 0, 0, 0});
+
+    int const PUSH_LIMIT{100};
+    while (!pq.empty()) {
+//        std::cout << NL << T << "pq:" << pq.size();
+        State current = pq.top();
+        pq.pop();
+//        std::cout << NL << T << T << "current:" << current;
+
+      if (current.a_push_count > PUSH_LIMIT or current.b_push_count > PUSH_LIMIT) {
+          std::cout << NL << T << T << "SKIP PUSH LIMIT:";
+          std::cout << " a_push_count:" << current.a_push_count << " b_push_count:" << current.b_push_count;
+          continue;
+        }
+
+        if (current.x == config.target.x and current.y == config.target.y) {
+            std::cout << NL << T << T << "FOUND:" << current;
+            return current.cost;
+        }
+
+        if (visited.count({current.x, current.y}) > 0) {
+            continue;
+        }
+        visited.insert({current.x, current.y});
+      
+        // Passed target
+        if (current.x > config.target.x or current.y > config.target.y) {
+          continue;
+        }
+
+        // Passed button press limit
+        if (current.x > config.target.x or current.y > config.target.y) {
+          continue;
+        }
+
+      
+        // Press Button A
+        auto new_x_a = current.x + config.da.x;
+        auto new_y_a = current.y + config.da.y;
+        auto new_cost_a = current.cost + COST_A;
+
+        // Check if we need to visit this position
+        if (visited.count({new_x_a, new_y_a}) == 0) {
+          pq.push({new_x_a, new_y_a, new_cost_a,current.a_push_count+1,current.b_push_count});
+        }
+
+        // Press Button B
+        auto new_x_b = current.x + config.db.x;
+        auto new_y_b = current.y + config.db.y;
+        auto new_cost_b = current.cost + COST_B;
+
+        // Check if we need to visit this position
+        if (visited.count({new_x_b, new_y_b}) == 0) {
+            pq.push({new_x_b, new_y_b, new_cost_b,current.a_push_count,current.b_push_count + 1});
+        }
+    }
+    return -1; // failed
+}
+
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
+      Result acc{};
       auto model = parse(in);
       std::cout << NL << "model:" << model;
-      
+      for (auto const& mc : model) {
+        std::cout << NL << "processing:" << mc;
+        if (auto cost = find_min_cost(mc);cost >= 0) {
+          std::cout << " --> min cost:" << cost;
+          acc += cost;
+        }
+        else {
+          std::cout << " --> FAILED ";
+        }
+      }
+      result = acc;
     }
     return result;
   }
@@ -173,7 +270,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11};
+  std::vector<int> states = {11,10};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -218,8 +315,11 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
+
+   ANSWERS
+   duration:92ms answer[Part 1 Example] 480
+   duration:3173ms answer[Part 1     ] 39290
+   
   */
   return 0;
 }
