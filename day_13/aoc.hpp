@@ -124,7 +124,75 @@ namespace aoc {
       os << "}";
       return os;
     }
+  
+    class Solver {
+    public:
+      // rhs = m * coeffA + n * coeffB --> integer {m,n}?
 
+      // xy = m*da + n*db
+      // x = m*da_x + n*db_x
+      // y = m*da_y + n*db_y
+      
+      // Eliminate m
+      // x*da_y = m*da_x*da_y + n*db_x*da_y
+      // y*da_x = m*da_x*da_y + n*db_y*da_x
+      // So,...
+      // x*da_y - y*da_x = m*da_x*da_y - m*da_x*da_y + n*db_x*da_y - n*db_y*da_x
+      // n = (x*da_y - y*da_x) / (db_x*da_y - db_y*da_x)
+      
+      // Eliminate n
+      // x*db_y = m*da_x*db_y + n*db_x*db_y
+      // y*db_x = m*da_y*db_x + n*db_y*db_x
+      // x*db_y - y*db_x = m*da_x*db_y - m*da_y*db_x  + n*db_x*db_y - n*db_y*db_x
+      // m = (x*db_y - y*db_x) / (da_x*db_y - da_y*db_x)
+
+      Solver(const Vector& rhs, const Vector& coeffA, const Vector& coeffB)
+      : rhs_(rhs), coeffA_(coeffA), coeffB_(coeffB) {}
+      
+      // Solve the system and return a pair {m, n}
+      std::optional<std::pair<int64_t, int64_t>> solve() {
+        // Unpack the components of the vectors
+        int64_t x = rhs_.x, y = rhs_.y;
+        int64_t da_x = coeffA_.x, da_y = coeffA_.y;
+        int64_t db_x = coeffB_.x, db_y = coeffB_.y;
+                
+        // Calculate m's and n's numerators and denominators
+        int64_t m_num = (x * db_y - y * db_x);
+        int64_t m_denom = (da_x * db_y - da_y * db_x);
+
+        if (m_denom == 0) {
+          throw std::runtime_error("Zero denominator when solving for {m,n}");
+        }
+
+        int64_t n_num = (x * da_y - y * da_x);
+        int64_t n_denom = -m_denom;
+
+        // Check if m and n are integer solutions
+        try {
+          int64_t m = solve_for_scalar(m_num, m_denom, "m");
+          int64_t n = solve_for_scalar(n_num, n_denom, "n");
+          return std::make_pair(m, n);
+        }
+        catch (...) {
+        }
+        return std::nullopt;
+
+      }
+      
+    private:
+      Vector rhs_;      // Right-hand side vector (xy)
+      Vector coeffA_;   // Coefficients for vector A (da)
+      Vector coeffB_;   // Coefficients for vector B (db)
+      
+      // Helper function to solve for a scalar (m or n)
+      int64_t solve_for_scalar(int64_t numerator, int64_t denominator, const std::string& scalar_name) {
+        if (numerator % denominator == 0) {
+          return numerator / denominator;
+        } else {
+          throw std::runtime_error("No integer solution for " + scalar_name + " press count.");
+        }
+      }
+    };
   }
 
   namespace grid {

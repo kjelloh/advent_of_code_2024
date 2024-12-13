@@ -222,7 +222,8 @@ Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool i
      */
     // {8400,5400} = m*{94  ,34} +   n{22   ,67}
     // {x   ,y}    = m*{da_x,da_y} + n*{db_x,db_y}
-    
+
+    // xy = m*da + n*db
     // x = m*da_x + n*db_x
     // y = m*da_y + n*db_y
     
@@ -238,46 +239,18 @@ Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool i
     // y*db_x = m*da_y*db_x + n*db_y*db_x
     // x*db_y - y*db_x = m*da_x*db_y - m*da_y*db_x  + n*db_x*db_y - n*db_y*db_x
     // m = (x*db_y - y*db_x) / (da_x*db_y - da_y*db_x)
-    
-    auto [da,db,xy] = config;
-    auto [da_x,da_y] = da;
-    auto [db_x,db_y] = db;
-    auto [x,y] = xy;
-    Integer m_num = (x*db_y - y*db_x);
-    Integer m_denom = (da_x*db_y - da_y*db_x);
-    Integer n_num = (x*da_y - y*da_x);
-    Integer n_denom = (db_x*da_y - db_y*da_x);
-    
-    Integer m{};
-    Integer n{};
 
-    if (m_denom == 0) throw std::runtime_error("Sorry, Zero denominator when solving for B press count");
-    if (n_denom == 0) throw std::runtime_error("Sorry, Zero denominator when solving for A press count");
-    if (m_num % m_denom == 0) {
-      // Integer solution
-      m = m_num / m_denom;
-      std::cout << NL << T << "A press count:" << m;
+    auto [da,db,xy] = config;
+    aoc::xy::Solver solver{xy,da,db}; // solve for {m,n} in: xy = m*da + n*db;
+    if (auto omn = solver.solve()) {
+      auto const& [m,n] = *omn;
+      return 3*m+n;
     }
-    else {
-      std::cout << NL << "No Integer solution for A press count for " << config;
-      return -1;
-    }
-    if (n_num % n_denom == 0) {
-      // Integer solution
-      n = n_num / n_denom;
-      std::cout << NL << T << "B press count:" << n;
-    }
-    else {
-      std::cout << NL << "No Integer solution for B press count for " << config;
-      return -1;
-    }
-    auto cost = 3*m + n;
-    return cost;
+    return -1;
   }
   else {
     return find_min_cost(config, PUSH_LIMIT, seen);
   }
-        
 }
 
 namespace part1 {
@@ -405,12 +378,12 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-
+      
    ANSWERS
    duration:91ms answer[Part 1 Example] 480
-   duration:2977ms answer[Part 1     ] 39290
+   duration:3035ms answer[Part 1     ] 39290
    duration:0ms answer[Part 2 Example] 875318608908
-   duration:17ms answer[Part 2     ] 73458657399094
+   duration:18ms answer[Part 2     ] 73458657399094
    
   */
   return 0;
