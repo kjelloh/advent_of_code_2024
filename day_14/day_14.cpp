@@ -129,6 +129,20 @@ Grid to_grid(Robots const& robots,auto width,auto height) {
   return result;
 }
 
+Vector to_bottom_right(Robots const& robots) {
+  Vector result{};
+  auto [p_max,_] = std::accumulate(robots.begin(), robots.end(), Robot{},[](auto acc,auto const& robot){
+    auto [p,v] = robot;
+    Vector max_p = {std::max(acc.first.x,p.x),std::max(acc.first.y,p.y)};
+    acc.first = max_p;
+    return acc;
+  });
+  auto width = p_max.x+1;
+  auto height = p_max.y+1;
+  result = {width,height};
+  return result;
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -207,6 +221,22 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      auto [width,height] = to_bottom_right(model);
+      std::cout << NL << to_grid(model, width, height);
+      // Step and display until the user can identify a cristmas tree :)
+      Result acc{};
+      auto transformed = model;
+      while (true) {
+        std::cout << NL << "Press <Enter> do display next robot arrangement:";
+        aoc::raw::Line line{};
+        std::getline(std::cin,line);
+        if (line == "q") break;
+        ++acc;
+        std::cout << NL << "after step:" << acc;
+        transformed = to_stepped(transformed, width, height, 1);
+        std::cout << NL << to_grid(transformed,width,height);
+      }
+      result = acc;
     }
     return result;
   }
@@ -232,7 +262,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {10};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 11: {
