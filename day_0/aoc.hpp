@@ -16,10 +16,21 @@
 #include <map>
 
 namespace aoc {
-  namespace parsing {
+  namespace raw {
+    auto const NL = "\n";
+    auto const T = "\t";
+    auto const NT = "\n\t";
     using Line = std::string;
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
+    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
+      for (auto const& line : lines) {
+        os << NL << line;
+      }
+      return os;
+    }
+  }
+  namespace parsing {
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -32,7 +43,7 @@ namespace aoc {
         std::vector<std::vector<Splitter>> result;
         std::istringstream is{m_s};
         result.push_back({});
-        Line line{};
+        aoc::raw::Line line{};
         while (std::getline(is,line)) {
           if (line.size() == 0) {
             result.push_back({});
@@ -227,7 +238,6 @@ namespace aoc {
   
     class Grid {
     public:
-
         Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
 
         // Returns the height of the grid
@@ -254,13 +264,48 @@ namespace aoc {
             }
             return std::nullopt;
         }
-      bool contains(Position const& pos) const {
-        return at(pos).has_value();
-      }
+        char& at(Position const& pos) {
+          if (on_map(pos)) {
+              return grid_[pos.row][pos.col];
+          }
+          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+        }
+      
+        char operator[](Position const pos) const {
+          if (auto och = at(pos)) return *och;
+          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+        }
+
+        std::optional<std::string> at_row(int r) const {
+          if (r < height()) {
+            return grid_[r];
+          }
+          return std::nullopt;
+        }
+      
+        std::string operator[](int r) const {
+          if (auto orow = at_row(r)) return *orow;
+          else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
+        }
+
+        bool contains(Position const& pos) const {
+          return at(pos).has_value();
+        }
 
     private:
         std::vector<std::string> grid_;
     };
+  
+    std::ostream& operator<<(std::ostream& os,Grid const& grid) {
+      os << raw::NL << raw::T;
+      for (int col=0;col<grid.width();++col) {
+        os << (col%10);
+      }
+      for (int row=0;row<grid.height();++row) {
+        os << raw::NL << row << ":" << raw::T << *grid.at_row(row);
+      }
+      return os;
+    }
   
     using Path = Positions;
     using Visited = std::map<Position, std::vector<Path>>;
