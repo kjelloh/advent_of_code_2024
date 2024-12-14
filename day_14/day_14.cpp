@@ -95,7 +95,23 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
-Robots to_stepped(Robots const& robots,auto width,auto height,int const STEPS) {
+Robot to_stepped(Robot const& robot,auto width,auto height,int const STEPS) {
+  Robot result{robot};
+  auto [p,v] = robot;
+  auto [x,y] = p;
+  auto [vx,vy] = v;
+  
+  auto end_x = (x + STEPS*vx) % width; // Wrap around
+  if (end_x<0) end_x += width;
+  auto end_y = (y + STEPS*vy) % height;
+  if (end_y<0) end_y += height;
+  result.first.x = end_x;
+  result.first.y = end_y;
+  
+  return result;
+}
+
+Robots to_stepped(Robots& robots,auto width,auto height,int const STEPS) {
   Robots result{robots};
   std::for_each(result.begin(), result.end(), [width,height,STEPS](Robot& robot){
     
@@ -291,20 +307,20 @@ namespace part2 {
       auto model = parse(in);
       auto [width,height] = to_bottom_right(model);
       std::cout << NL << to_grid(model, width, height);
-      std::pair<int,int> config{3987,219};
-      auto transformed = to_stepped(model, width, height, config.first);
-      Result acc{config.first};
-      while (true) {
-        ++acc;
-        std::cout << NL << acc;
-        transformed = to_stepped(transformed, width, height, 1);
-        Graph graph{transformed};
-        auto orhphan_count = graph.orphan_count();
-        std::cout << std::format(" step,orphans {},{}",acc,orhphan_count);
-        if (orhphan_count < config.second) break; // All connected
+      // Each robot travels the same path over and over.
+      // Maybe it visist only a subset of all possble positions in its path?
+      std::set<Robot> seen{};
+      auto robot = model.front();
+      for (int i=0;i<100000;++i) {
+        auto next_robot = to_stepped(robot, width, height, 1);
+        if (seen.contains(next_robot)) break;
+        seen.insert(next_robot);
+        robot = next_robot;
       }
-      std::cout << NL << to_grid(transformed, width, height);
-      result = acc;
+      std::cout << NL << "seen:" << seen.size(); // 10403 == 103*101 == ALL grid positions :(
+      exit(-1);
+      
+      
     }
     return result;
   }
