@@ -48,6 +48,7 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = Integer;
 
 using aoc::xy::Vector;
+using aoc::xy::Vectors;
 using Robot = std::pair<Vector,Vector>;
 using Robots = std::vector<Robot>;
 std::ostream& operator<<(std::ostream& os,Robot const& robot) {
@@ -212,24 +213,77 @@ namespace part1 {
 }
 
 namespace part2 {
-  Result to_ghosted_count(Robots const& robots,auto width,auto height) {
-    Result result{};
-    auto ghosted_col = width / 2; // 11 -> 6, 101 -> 51
-    auto ghosted_row = height / 2; // 7 -> 4, 103 -> 52
-    
-    for (auto const& robot : robots) {
-      auto [p,v] = robot;
-      auto [col,row] = p;
 
-      if (col < ghosted_col and row < ghosted_row) continue;
-      if (col > ghosted_col and row < ghosted_row) continue;
-      if (col < ghosted_col and row > ghosted_row) continue;
-      if (col > ghosted_col and row > ghosted_row) continue;
-      ++result;
+  class Graph {
+  public:
+    using AdjacencyList = std::map<Vector, std::vector<Vector>>;
+  private:
+    AdjacencyList adjacencyList;
+
+  public:
+    
+    // Constructor: Build graph from Robots
+    Graph(const std::vector<std::pair<Vector, Vector>>& robots) {
+      for (const auto& robot : robots) {
+        addVertex(robot.first); // Add position as a vertex
+      }
+      auto to_neighbours = [this](Vector const& pos) -> Vectors {
+        Vectors result{};
+        for (int dx=-1;dx<=1;++dx) {
+          for (int dy=-1;dy<=1;++dy) {
+            if (dx!=0 and dy!=0) {
+              Vector dp{dx,dy};
+              result.push_back({pos + dp});
+            }
+          }
+        }
+        return result;
+      };
+      for (auto const& [curr,_] : adjacencyList) {
+        for (auto const& neighbour : to_neighbours(curr)) {
+          if (this->adjacencyList.contains(neighbour)) {
+            addEdge(curr, neighbour);
+          }
+        }
+      }
     }
     
-    return result;
-  }
+    // Add a vertex
+    void addVertex(const Vector& v) {
+      if (adjacencyList.find(v) == adjacencyList.end()) {
+        adjacencyList[v] = {}; // Initialize empty adjacency list
+      }
+    }
+    
+    // Add an edge (bidirectional)
+    void addEdge(const Vector& v1, const Vector& v2) {
+      addVertex(v1);
+      addVertex(v2);
+      adjacencyList[v1].push_back(v2);
+      adjacencyList[v2].push_back(v1);
+    }
+    
+    int orphan_count() {
+      int result{};
+      for (auto const& [pos,adjacent] : this->adjacencyList) {
+        if (adjacent.size()==0) ++result;
+      }
+      return result;
+    }
+    
+    // Print the graph
+    void printGraph() const {
+      for (const auto& [vertex, neighbors] : adjacencyList) {
+        std::cout << "Vertex (" << vertex.x << ", " << vertex.y << ") -> ";
+        for (const auto& neighbor : neighbors) {
+          std::cout << "(" << neighbor.x << ", " << neighbor.y << ") ";
+        }
+        std::cout << "\n";
+      }
+    }
+        
+  };
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -237,19 +291,18 @@ namespace part2 {
       auto model = parse(in);
       auto [width,height] = to_bottom_right(model);
       std::cout << NL << to_grid(model, width, height);
-      // Step and display until the user can identify a cristmas tree :)
-      Result acc{};
-      auto transformed = model;
+      std::pair<int,int> config{3987,219};
+      auto transformed = to_stepped(model, width, height, config.first);
+      Result acc{config.first};
       while (true) {
         ++acc;
         std::cout << NL << acc;
         transformed = to_stepped(transformed, width, height, 1);
-        if (auto ghost_count = to_ghosted_count(transformed,width,height);ghost_count>0) {
-          std::cout << " between quadrants:" << ghost_count;
-          if (ghost_count == 4) break;
-        }
+        Graph graph{transformed};
+        auto orhphan_count = graph.orphan_count();
+        std::cout << std::format(" step,orphans {},{}",acc,orhphan_count);
+        if (orhphan_count < config.second) break; // All connected
       }
-      std::cout << "at step:" << acc;
       std::cout << NL << to_grid(transformed, width, height);
       result = acc;
     }
