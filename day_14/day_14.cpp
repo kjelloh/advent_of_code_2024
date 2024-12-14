@@ -42,9 +42,7 @@ std::optional<std::filesystem::path> get_working_dir() {
   return result;
 }
 
-auto const NL = "\n";
-auto const T = "\t";
-auto const NT = "\n\t";
+using namespace aoc::raw;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
@@ -96,6 +94,41 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+Robots to_stepped(Robots const& robots,auto width,auto height,int const STEPS) {
+  Robots result{robots};
+  std::for_each(result.begin(), result.end(), [width,height,STEPS](Robot& robot){
+    
+    auto [p,v] = robot;
+    auto [x,y] = p;
+    auto [vx,vy] = v;
+    
+    auto end_x = (x + STEPS*vx) % width; // Wrap around
+    if (end_x<0) end_x += width;
+    auto end_y = (y + STEPS*vy) % height;
+    if (end_y<0) end_y += height;
+    
+    std::cout << NL << T << "robot:" << robot << " --> ";
+            
+    robot.first.x = end_x;
+    robot.first.y = end_y;
+    
+    std::cout << robot;
+  });
+  return result;
+}
+
+using aoc::grid::Grid;
+Grid to_grid(Robots const& robots,auto width,auto height) {
+  aoc::grid::Grid result{std::vector<std::string>(height,std::string(width,'.'))};
+  for (auto const& [p,v] : robots) {
+    aoc::grid::Position pos{static_cast<int>(p.y),static_cast<int>(p.x)};
+    auto& ch = result.at(pos);
+    if (ch >= '0' and ch <= '9') ch += 1;
+    else ch = '1';
+  }
+  return result;
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -114,40 +147,34 @@ namespace part1 {
       auto width = p_max.x+1;
       auto height = p_max.y+1;
       std::cout << NL << "width:" << width << " height:" << height;
+      std::cout << NL << to_grid(model, width, height);
+
+      if (false) {
+        // Test
+        int const STEPS{1};
+        auto transformed = to_stepped(model, width, height, STEPS);
+//        std::cout << NL << "transformed:" << transformed;
+        std::cout << NL << to_grid(transformed,width,height);
+        return 0;
+      }
       
       int const STEPS{100};
-      auto transformed = model;
-      std::for_each(transformed.begin(), transformed.end(), [width,height,STEPS](Robot& robot){
-        
-        auto [p,v] = robot;
-        auto [x,y] = p;
-        auto [vx,vy] = v;
-        
-        auto end_x = (x + STEPS*vx) % width; // Wrap around
-        if (end_x<0) end_x += width;
-        auto end_y = (y + STEPS*vy) % height;
-        if (end_y<0) end_y += height;
-        
-        std::cout << NL << T << "robot:" << robot << " --> ";
-                
-        robot.first.x = end_x;
-        robot.first.y = end_y;
-        
-        std::cout << robot;
-      });
-      std::cout << NL << "transformed:" << transformed;
+      auto transformed = to_stepped(model, width, height, STEPS);
+//      std::cout << NL << "transformed:" << transformed;
+      std::cout << NL << to_grid(transformed,width,height);
 
+      
       std::array<Result,4> acc{};
       auto in_quadrant = [width,height](Robot const& robot,int ix){
         // assume odd width and height
-        auto ghosted_x = (width+1) / 2; // 11 -> 6, 101 -> 51
-        auto ghosted_y = (height+1) / 2; // 7 -> 4, 103 -> 52
+        auto ghosted_col = width / 2; // 11 -> 6, 101 -> 51
+        auto ghosted_row = height / 2; // 7 -> 4, 103 -> 52
         auto [p,v] = robot;
-        auto [px,py] = p;
-        if (px < ghosted_x and py < ghosted_y and ix ==1) return true;
-        if (px > ghosted_x and py < ghosted_y and ix ==3) return true;
-        if (px < ghosted_x and py > ghosted_y and ix ==2) return true;
-        if (px > ghosted_x and py > ghosted_y and ix ==4) return true;
+        auto [col,row] = p;
+        if (col < ghosted_col and row < ghosted_row and ix ==1) return true;
+        if (col > ghosted_col and row < ghosted_row and ix ==2) return true;
+        if (col < ghosted_col and row > ghosted_row and ix ==3) return true;
+        if (col > ghosted_col and row > ghosted_row and ix ==4) return true;
         return false;
       };
 
@@ -205,7 +232,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11};
+  std::vector<int> states = {10};
   for (auto state : states) {
     switch (state) {
       case 11: {
