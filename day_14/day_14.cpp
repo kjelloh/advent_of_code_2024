@@ -175,21 +175,10 @@ namespace part1 {
       auto height = p_max.y+1;
       std::cout << NL << "width:" << width << " height:" << height;
       std::cout << NL << to_grid(model, width, height);
-
-      if (false) {
-        // Test
-        int const STEPS{1};
-        auto transformed = to_stepped(model, width, height, STEPS);
-//        std::cout << NL << "transformed:" << transformed;
-        std::cout << NL << to_grid(transformed,width,height);
-        return 0;
-      }
       
       int const STEPS{100};
       auto transformed = to_stepped(model, width, height, STEPS);
-//      std::cout << NL << "transformed:" << transformed;
       std::cout << NL << to_grid(transformed,width,height);
-
       
       std::array<Result,4> acc{};
       auto in_quadrant = [width,height](Robot const& robot,int ix){
@@ -319,14 +308,15 @@ namespace part2 {
       // Maybe it visist only a subset of all possble positions in its path?
       auto transformed = model;
       for (int i=0;true;++i) {
-        if (i % 10000) std::cout << NL << i;
+//        if (i % 1000 == 0) std::cout << NL << i;
         transformed = to_stepped(transformed, width, height, 1); // try i steps
         if (no_overlaps(transformed)) {
           result = i+1;
           break;
         }
       }
-      if (result > 0) {
+      if (result and *result > 0) {
+        std::cout << NL << NL << "SUCCESS after " << *result << " steps";
         std::cout << NL << to_grid(transformed, width, height);
       }
     }
@@ -354,7 +344,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {20};
+  std::vector<int> states = {11,10,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -399,8 +389,11 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
-  */
+
+   duration:1ms answer[Part 1 Example] 12
+   duration:34ms answer[Part 1     ] 222208000
+   duration:625ms answer[Part 2     ] 7623
+   
+   */
   return 0;
 }
