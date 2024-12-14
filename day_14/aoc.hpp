@@ -268,7 +268,12 @@ namespace aoc {
           if (on_map(pos)) {
               return grid_[pos.row][pos.col];
           }
-          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is non on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+        }
+      
+        char operator[](Position const pos) const {
+          if (auto och = at(pos)) return *och;
+          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
         }
 
         std::optional<std::string> at_row(int r) const {
