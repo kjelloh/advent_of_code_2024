@@ -300,6 +300,14 @@ namespace part2 {
         
   };
 
+  bool no_overlaps(Robots const& robots) {
+    std::map<Vector,Result> seen{}; // Count overlaps
+    for (auto const& robot : robots) {
+      if (++seen[robot.first] > 1) return false;
+    }
+    return true;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -309,18 +317,18 @@ namespace part2 {
       std::cout << NL << to_grid(model, width, height);
       // Each robot travels the same path over and over.
       // Maybe it visist only a subset of all possble positions in its path?
-      std::set<Robot> seen{};
-      auto robot = model.front();
-      for (int i=0;i<100000;++i) {
-        auto next_robot = to_stepped(robot, width, height, 1);
-        if (seen.contains(next_robot)) break;
-        seen.insert(next_robot);
-        robot = next_robot;
+      auto transformed = model;
+      for (int i=0;true;++i) {
+        if (i % 10000) std::cout << NL << i;
+        transformed = to_stepped(transformed, width, height, 1); // try i steps
+        if (no_overlaps(transformed)) {
+          result = i+1;
+          break;
+        }
       }
-      std::cout << NL << "seen:" << seen.size(); // 10403 == 103*101 == ALL grid positions :(
-      exit(-1);
-      
-      
+      if (result > 0) {
+        std::cout << NL << to_grid(transformed, width, height);
+      }
     }
     return result;
   }
