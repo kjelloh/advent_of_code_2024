@@ -238,7 +238,6 @@ namespace aoc {
   
     class Grid {
     public:
-
         Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
 
         // Returns the height of the grid
@@ -272,11 +271,16 @@ namespace aoc {
           throw std::runtime_error(std::format("Sorry, grid pos({},{}) is non on map width:{}, height:{}",pos.row,pos.col,width(),height()));
         }
 
-        std::optional<std::string> at_row(auto row) const {
-          if (on_map({row,0})) {
-            return grid_[row];
+        std::optional<std::string> at_row(int r) const {
+          if (r < height()) {
+            return grid_[r];
           }
           return std::nullopt;
+        }
+      
+        std::string operator[](int r) const {
+          if (auto orow = at_row(r)) return *orow;
+          else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
         }
 
         bool contains(Position const& pos) const {

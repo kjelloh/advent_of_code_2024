@@ -107,7 +107,7 @@ Robots to_stepped(Robots const& robots,auto width,auto height,int const STEPS) {
     auto end_y = (y + STEPS*vy) % height;
     if (end_y<0) end_y += height;
     
-    std::cout << NL << T << "robot:" << robot << " --> ";
+//    std::cout << NL << T << "robot:" << robot << " --> ";
             
     robot.first.x = end_x;
     robot.first.y = end_y;
@@ -117,6 +117,7 @@ Robots to_stepped(Robots const& robots,auto width,auto height,int const STEPS) {
   return result;
 }
 
+using aoc::grid::Position;
 using aoc::grid::Grid;
 Grid to_grid(Robots const& robots,auto width,auto height) {
   aoc::grid::Grid result{std::vector<std::string>(height,std::string(width,'.'))};
@@ -216,6 +217,47 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  using Visited = std::set<Position>;
+//  bool dfs(int x, int y, int startX, int startY, Grid const& grid, Visited& visited, int parentX, int parentY) {
+  bool dfs(Position const& curr, Position const& start, Grid const& grid, Visited& visited, Position const& prev) {
+
+    const int dx[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+    const int dy[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+    
+    auto [x,y] = curr;
+    auto [startX,startY] = start;
+    auto [parentX,parentY] = prev;
+    // Mark the current position as visited
+    visited.insert({x,y});
+    
+    // Traverse all 8 possible directions
+    for (int dir = 0; dir < 8; ++dir) {
+      int nx = x + dx[dir];
+      int ny = y + dy[dir];
+      
+      // Check if the next position is valid and not empty
+      if (grid.on_map({nx, ny}) && grid[nx][ny] != '.') {
+        // If the position is the starting point and we've traversed at least 4 steps, we've found a loop
+        if (nx == startX && ny == startY && (x != startX || y != startY)) {
+          return true;
+        }
+        
+        // If the next position hasn't been visited, continue DFS
+        if (!visited.contains({nx,ny})) {
+          if (dfs({nx, ny}, {startX, startY}, grid, visited, {x, y})) {
+            return true;
+          }
+        } else if (nx != parentX || ny != parentY) {
+          // If it's visited and not the parent, we've found a loop
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -227,14 +269,17 @@ namespace part2 {
       Result acc{};
       auto transformed = model;
       while (true) {
-        std::cout << NL << "Press <Enter> do display next robot arrangement:";
-        aoc::raw::Line line{};
-        std::getline(std::cin,line);
-        if (line == "q") break;
         ++acc;
-        std::cout << NL << "after step:" << acc;
+        std::cout << NL << acc;
         transformed = to_stepped(transformed, width, height, 1);
-        std::cout << NL << to_grid(transformed,width,height);
+        auto grid = to_grid(transformed, width, height);
+        auto [xy,_] = transformed[0];
+        Position start{static_cast<int>(xy.y),static_cast<int>(xy.x)};
+        Visited visited{};
+        if (dfs(start, start, grid, visited, Position{-1, -1})) {
+          std::cout << NL << grid;
+          break;
+        };
       }
       result = acc;
     }
