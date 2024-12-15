@@ -31,6 +31,12 @@ namespace aoc {
     }
   }
   namespace parsing {
+    class Splitter; // Forward
+    using Line = Splitter;
+    using Lines = std::vector<Splitter>;
+    using Section = Lines;
+    using Sections = std::vector<Section>;
+  
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -103,6 +109,21 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+    aoc::raw::Line to_raw(Line const& line) {return line.str();}
+    aoc::raw::Lines to_raw(Lines const& lines) {
+      aoc::raw::Lines result{};
+      std::ranges::transform(lines,std::back_inserter(result),[](Line const& line){
+        return to_raw(line);
+      });
+      return result;
+    }
+    aoc::raw::Sections to_raw(Sections const& sections) {
+      aoc::raw::Sections result{};
+      std::ranges::transform(sections,std::back_inserter(result),[](Section const& section){
+        return to_raw(section);
+      });
+    }
+
   }
 
   namespace xy {

@@ -48,26 +48,28 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::parsing::Lines;
+
+using aoc::grid::Grid;
+using Moves = aoc::raw::Line;
+struct Model {
+  Grid grid{{}};
+  Moves moves{};
+};
+
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  std::cout << model.grid << " moves:" << std::quoted(model.moves);
+  return os;
+}
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
-  Model result{};
   auto input = Splitter{in};
-  auto lines = input.lines();
-  if (lines.size()>1) {
-    std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
-  }
-  else {
-    // single line
-    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    result.push_back(input.trim());
-  }
+  auto sections = input.sections();
+  Moves moves = std::accumulate(sections[1].begin(), sections[1].end(), Moves{},[](Moves acc,auto const& line){
+    acc += aoc::parsing::to_raw(line);
+    return acc;
+  });
+  Model result{aoc::parsing::to_raw(sections[0]),moves};
   return result;
 }
 
@@ -79,6 +81,7 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << NL << model;
     }
     return result;
   }
