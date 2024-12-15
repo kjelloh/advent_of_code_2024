@@ -133,6 +133,44 @@ Direction to_direction(Move move) {
   }
 }
 
+std::pair<Position,Position> to_range_to_shift(Direction dir,Simulation const& sim) {
+  auto end = sim.pos-dir; // range end pos is after robot pos
+  auto begin = sim.pos; // start at robot pos
+  std::pair<Position,Position> result{end,end};
+  while (true) {
+    auto candidate = begin + dir; // peek ahead
+    auto ch = sim.grid.at(candidate); // peek
+    if (ch =='#') break; // candidate is invalid
+    begin = candidate; // 'O' or '.' OK
+    if (ch == '.') {
+      result.first = begin;
+      break; // begin refers to empty spot 'O'
+    }
+    // 'O' continue
+  }
+  return result;
+}
+
+Simulation& to_next(Simulation& curr,Move move) {
+  auto dir = to_direction(move);
+  auto range_to_shift = to_range_to_shift(dir,curr);
+  auto begin = range_to_shift.first; // end if empty or the emtpy pos to push into
+  auto end = range_to_shift.second; // one 'after' '@'
+
+  if (begin==end) return curr; // empty range
+
+  auto iter = begin;
+  // as-if for (iter=begin,iter!=end-1,++iter) for adjacent shift
+  while (iter-dir != end) {
+    // Will shift all 'O' and the '@'
+    curr.grid.at(iter) = curr.grid.at(iter - dir);
+    iter = iter - dir;
+  }
+  curr.grid.at(curr.pos) = '.'; // erease old '@' pos
+  curr.pos = iter+dir; // moved in dir
+  return curr;
+}
+
 namespace test {
   struct LogEntry {
     char move;
@@ -154,7 +192,7 @@ namespace test {
   using State = std::pair<Simulation,LogEntry>;
 
   std::ostream& operator<<(std::ostream& os,State const& state) {
-    std::cout << " simulated robot:" << state.first.pos;
+    std::cout << NL << T << "Evaluated" << T << "Expected";
     std::cout << NL << std::make_pair(state.first.grid, state.second.grid);
     return os;
   }
@@ -181,54 +219,6 @@ namespace test {
   //     begin
   //     end
 
-  std::pair<Position,Position> to_range_to_shift(Direction dir,Simulation const& sim) {
-    std::cout << NL << T << "to_range_to_shift";
-    auto end = sim.pos-dir; // range end pos is after robot pos
-    auto begin = sim.pos; // start at robot pos
-    std::pair<Position,Position> result{end,end};
-    while (true) {
-      auto candidate = begin + dir; // peek ahead
-      std::cout << " candidate:" << candidate;
-      auto ch = sim.grid.at(candidate); // peek
-      if (ch =='#') break; // candidate is invalid
-      begin = candidate; // 'O' or '.' OK
-      if (ch == '.') {
-        result.first = begin;
-        break; // begin refers to empty spot 'O'
-      }
-      // 'O' continue
-    }
-    std::cout << " begin:" << result.first << " end:" << result.second;
-    return result;
-  }
-
-  Simulation& to_next(Simulation& curr,Move move) {
-    std::cout << NL << T << "to_next";
-    auto dir = to_direction(move);
-    auto range_to_shift = to_range_to_shift(dir,curr);
-    // shift in negative dir the range [begin,end[
-    // iter = begin;
-    // We shift [iter+1] -> [iter] as long as [iter+1] != end
-    // Edge case for empty range [end,end[
-    
-    auto begin = range_to_shift.first; // begin == end if no shift shall take place
-    auto end = range_to_shift.second; // end
-    if (begin==end) return curr;
-    // while iter,iter+1 is valid
-    auto iter = begin;
-    while (iter-dir != end) {
-      std::cout << NL << T << "iter:" << iter << " <-- iter+1:" << (iter-dir);
-      curr.grid.at(iter) = curr.grid.at(iter - dir);
-      iter = iter - dir;
-    }
-    // We know we have shifted 1 step
-    // iter is end+dir
-    curr.grid.at(curr.pos) = '.'; // erease old '@' pos
-    curr.pos = iter+dir; // moved in dir
-    std::cout << NL << "curr:" << NL << curr;
-    return curr;
-  }
-
   bool test0() {
     bool result{};
     Result expected{104};
@@ -252,14 +242,13 @@ namespace test {
       auto start = starts[0];
       Simulation curr{start,model.grid};
       for (int i=0;i<log.size()-1;++i) {
-        std::cout << NL << NL << "step[" << i << "] " << log[i];
+        std::cout << NL << NL << "step[" << i << "]";
+        if (i>0) std::cout << NL << T << "After move " << model.moves[i-1];
         State state{curr,log[i]};
-        std::cout << NL << NL << state;
+        std::cout << NL << state;
         result = result and (curr.grid == log[i].grid);
-        std::cout << NL << "RESULT SO FAR:" << to_result(curr.grid);
         if (not result) break;
         char move = model.moves[i];
-        std::cout << NL << T << "move:" << move << " logged move:" << log[i+1].move;
         if (move != log[i+1].move) break;
         curr = to_next(curr,move);
       }
@@ -284,7 +273,6 @@ namespace test {
       Simulation curr{start,model.grid};
       for (int i=0;i<model.moves.size();++i) {
         Move move = model.moves[i];
-        std::cout << NL << NL << "step[" << i << "] " << move;
         curr = to_next(curr,move);
       }
       std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
@@ -303,7 +291,7 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      std::cout << NL << model;
+      
       if (model.grid.width() == 8) {
         bool test_result{};
         auto log_file_path = to_working_dir_path("example.log");
@@ -315,14 +303,27 @@ namespace part1 {
         else {
           std::cerr << NL << "Sorry, no log file" << log_file_path;
         }
-        return (test_result)?0:-1;
+        std::cout << NL;
+        if (test_result) std::cout << " passed";
+        else std::cout << "FAILED";
       }
       if (model.grid.width() == 10) {
-        test::test2(model);
+         test::test2(model);
       }
-      else {
-        // Full puzzle
-        test::test2(model);
+      if (model.grid.width() >= 8) {
+        // Full puzzle for example and full puzzle
+        auto starts = model.grid.find_all('@');
+        if (starts.size()==1) {
+          auto start = starts[0];
+          Simulation curr{start,model.grid};
+          std::cout << NL << NL << "Before:" << NL << curr;
+          for (int i=0;i<model.moves.size();++i) {
+            Move move = model.moves[i];
+            curr = to_next(curr,move);
+          }
+          result = to_result(curr.grid);
+          std::cout << NL << NL << "After:" << NL << curr;
+        }
       }
     }
     return result;
@@ -350,7 +351,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {10};
+  std::vector<int> states = {11,12,10};
   for (auto state : states) {
     switch (state) {
       case 101: {
@@ -406,8 +407,12 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
   For my input:
-  ANSWERS
-   ...
+
+   ANSWERS
+   duration:3ms answer[Part 1 Example] 2028
+   duration:2ms answer[Part 1 Example 2] 10092
+   duration:15ms answer[Part 1     ] 1471826
+   
   */
   return 0;
 }
