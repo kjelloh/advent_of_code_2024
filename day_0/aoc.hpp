@@ -31,6 +31,12 @@ namespace aoc {
     }
   }
   namespace parsing {
+    class Splitter; // Forward
+    using Line = Splitter;
+    using Lines = std::vector<Splitter>;
+    using Section = Lines;
+    using Sections = std::vector<Section>;
+  
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -103,6 +109,21 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+    aoc::raw::Line to_raw(Line const& line) {return line.str();}
+    aoc::raw::Lines to_raw(Lines const& lines) {
+      aoc::raw::Lines result{};
+      std::ranges::transform(lines,std::back_inserter(result),[](Line const& line){
+        return to_raw(line);
+      });
+      return result;
+    }
+    aoc::raw::Sections to_raw(Sections const& sections) {
+      aoc::raw::Sections result{};
+      std::ranges::transform(sections,std::back_inserter(result),[](Section const& section){
+        return to_raw(section);
+      });
+    }
+
   }
 
   namespace xy {
@@ -207,25 +228,26 @@ namespace aoc {
   }
 
   namespace grid {
+  
 
-    struct Position {
+    struct Vector {
       int row{};
       int col{};
-      bool operator<(const Position& other) const {
+      bool operator<(const Vector& other) const {
         return std::tie(row, col) < std::tie(other.row, other.col);
       }
-      bool operator==(const Position& other) const {
+      bool operator==(const Vector& other) const {
         return row == other.row && col == other.col;
       }
-      Position operator+(Position const& other) const {return {row+other.row,col+other.col};}
-      Position operator-(Position const& other) const {return {row-other.row,col-other.col};}
+      Vector operator+(Vector const& other) const {return {row+other.row,col+other.col};}
+      Vector operator-(Vector const& other) const {return {row-other.row,col-other.col};}
     };
-    std::ostream& operator<<(std::ostream& os,Position const& pos) {
+    std::ostream& operator<<(std::ostream& os,Vector const& pos) {
       os << "{row:" << pos.row << ",col:" << pos.col << "}";
       return os;
     }
-    using Positions = std::vector<Position>;
-    std::ostream& operator<<(std::ostream& os,Positions const& positions) {
+    using Vectors = std::vector<Vector>;
+    std::ostream& operator<<(std::ostream& os,Vectors const& positions) {
       int count{};
       os << "{";
       for (auto const& pos : positions) {
@@ -236,6 +258,15 @@ namespace aoc {
       return os;
     }
   
+    using Position = Vector;
+    using Positions = Vectors;
+    using Direction = Vector;
+  
+    Direction const UP{-1,0};
+    Direction const DOWN{1,0};
+    Direction const LEFT{0,-1};
+    Direction const RIGHT{0,1};
+
     class Grid {
     public:
         Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
@@ -287,9 +318,35 @@ namespace aoc {
           if (auto orow = at_row(r)) return *orow;
           else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
         }
+      
+        void for_each(auto f) const {
+          for (int row=0;row<height();++row) {
+            for (int col=0;col<width();++col) {
+              f(*this,Position{row,col});
+            }
+          }
+        }
+      
+        Positions find_all(char ch) const {
+          Positions result{};
+          auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
+            if (grid.at(pos) == ch) result.push_back(pos);
+          };
+          for_each(push_back_matched);
+          return result;
+        }
 
         bool contains(Position const& pos) const {
           return at(pos).has_value();
+        }
+      
+        bool operator==(Grid const& other) const {
+          bool result{true};
+          auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
+            result = result and (this->at(pos) == other.at(pos));
+          };
+          this->for_each(all_equal);
+          return result;
         }
 
     private:
@@ -304,6 +361,34 @@ namespace aoc {
       for (int row=0;row<grid.height();++row) {
         os << raw::NL << row << ":" << raw::T << *grid.at_row(row);
       }
+      return os;
+    }
+  
+    using GridPair = std::pair<Grid,Grid>;
+    std::ostream& operator<<(std::ostream& os,GridPair const& gg) {
+      os << raw::NL << raw::T;
+      for (int col=0;col<gg.first.width();++col) {
+        os << (col%10);
+      }
+      os << raw::T;
+      for (int col=0;col<gg.second.width();++col) {
+        os << (col%10);
+      }
+      std::pair<std::string,std::string> indent{std::string(gg.first.height(),' '),std::string(gg.second.height(),' ')};
+      auto max_height = std::max(gg.first.height(),gg.second.height());
+      for (int row=0;row<static_cast<int>(max_height);++row) {
+        os << raw::NL << row << ":" << raw::T;
+        if (row < gg.first.height()) os << *gg.first.at_row(row);
+        else {
+          os << indent.first;
+        }
+        os << raw::T;
+        if (row < gg.second.height()) os << *gg.second.at_row(row);
+        else {
+          os << indent.first;
+        }
+      }
+
       return os;
     }
   
