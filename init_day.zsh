@@ -29,6 +29,8 @@ cp -nv "$TEMPLATE_FOLDER/CMakeLists.txt" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/init_tool_chain.zsh" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/pull_data.zsh" "$NEW_FOLDER/"
 touch "$NEW_FOLDER/example.txt"
+touch "$NEW_FOLDER/example.log"
+
 
 # Create a day.txt file in the new sub-folder with the provided day number
 echo "$DAY_NUMBER" > "$NEW_FOLDER/day.txt"
@@ -42,7 +44,7 @@ cd "$NEW_FOLDER" || exit 1
 
 # Stage the specified files for Git if they are not already tracked
 if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    for file in "CMakeLists.txt" "day_$DAY_NUMBER.cpp" "aoc.hpp"; do
+    for file in "CMakeLists.txt" "day_$DAY_NUMBER.cpp" "aoc.hpp" "example.txt" "example.log"; do
         if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
             git add "$file"
             echo "Added $file to Git index."
