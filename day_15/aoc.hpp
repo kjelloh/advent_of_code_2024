@@ -228,25 +228,26 @@ namespace aoc {
   }
 
   namespace grid {
+  
 
-    struct Position {
+    struct Vector {
       int row{};
       int col{};
-      bool operator<(const Position& other) const {
+      bool operator<(const Vector& other) const {
         return std::tie(row, col) < std::tie(other.row, other.col);
       }
-      bool operator==(const Position& other) const {
+      bool operator==(const Vector& other) const {
         return row == other.row && col == other.col;
       }
-      Position operator+(Position const& other) const {return {row+other.row,col+other.col};}
-      Position operator-(Position const& other) const {return {row-other.row,col-other.col};}
+      Vector operator+(Vector const& other) const {return {row+other.row,col+other.col};}
+      Vector operator-(Vector const& other) const {return {row-other.row,col-other.col};}
     };
-    std::ostream& operator<<(std::ostream& os,Position const& pos) {
+    std::ostream& operator<<(std::ostream& os,Vector const& pos) {
       os << "{row:" << pos.row << ",col:" << pos.col << "}";
       return os;
     }
-    using Positions = std::vector<Position>;
-    std::ostream& operator<<(std::ostream& os,Positions const& positions) {
+    using Vectors = std::vector<Vector>;
+    std::ostream& operator<<(std::ostream& os,Vectors const& positions) {
       int count{};
       os << "{";
       for (auto const& pos : positions) {
@@ -257,6 +258,15 @@ namespace aoc {
       return os;
     }
   
+    using Position = Vector;
+    using Positions = Vectors;
+    using Direction = Vector;
+  
+    Direction const UP{-1,0};
+    Direction const DOWN{1,0};
+    Direction const LEFT{0,-1};
+    Direction const RIGHT{0,1};
+
     class Grid {
     public:
         Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}

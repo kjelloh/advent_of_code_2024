@@ -117,6 +117,22 @@ std::ostream& operator<<(std::ostream& os,Simulation const& sim) {
   return os;
 }
 
+using aoc::grid::Direction;
+using aoc::grid::UP;
+using aoc::grid::DOWN;
+using aoc::grid::LEFT;
+using aoc::grid::RIGHT;
+
+Direction to_direction(Move move) {
+  switch (move) {
+    case '>' : return RIGHT;
+    case '<' : return LEFT;
+    case '^' : return UP;
+    case 'v' : return DOWN;
+      throw std::runtime_error(std::format("Sorry, Unknown move '{}'",move));
+  }
+}
+
 namespace test {
   struct LogEntry {
     char move;
@@ -158,8 +174,58 @@ namespace test {
     return result;
   }
 
+  // return range to shift [begin,end[
+  // The range includes the robot position
+  // "##@.O..#" <
+  //     |
+  //     begin
+  //     end
+
+  std::pair<Position,Position> to_range_to_shift(Direction dir,Simulation const& sim) {
+    std::cout << NL << T << "to_range_to_shift";
+    auto end = sim.pos-dir; // range end pos is after robot pos
+    auto begin = sim.pos; // start at robot pos
+    std::pair<Position,Position> result{end,end};
+    while (true) {
+      auto candidate = begin + dir; // peek ahead
+      std::cout << " candidate:" << candidate;
+      auto ch = sim.grid.at(candidate); // peek
+      if (ch =='#') break; // candidate is invalid
+      begin = candidate; // 'O' or '.' OK
+      if (ch == '.') {
+        result.first = begin;
+        break; // begin refers to empty spot 'O'
+      }
+      // 'O' continue
+    }
+    std::cout << " begin:" << result.first << " end:" << result.second;
+    return result;
+  }
+
   Simulation& to_next(Simulation& curr,Move move) {
+    std::cout << NL << T << "to_next";
+    auto dir = to_direction(move);
+    auto range_to_shift = to_range_to_shift(dir,curr);
+    // shift in negative dir the range [begin,end[
+    // iter = begin;
+    // We shift [iter+1] -> [iter] as long as [iter+1] != end
+    // Edge case for empty range [end,end[
     
+    auto begin = range_to_shift.first; // begin == end if no shift shall take place
+    auto end = range_to_shift.second; // end
+    if (begin==end) return curr;
+    // while iter,iter+1 is valid
+    auto iter = begin;
+    while (iter-dir != end) {
+      std::cout << NL << T << "iter:" << iter << " <-- iter+1:" << (iter-dir);
+      curr.grid.at(iter) = curr.grid.at(iter - dir);
+      iter = iter - dir;
+    }
+    // We know we have shifted 1 step
+    // iter is end+dir
+    curr.grid.at(curr.pos) = '.'; // erease old '@' pos
+    curr.pos = iter+dir; // moved in dir
+    std::cout << NL << "curr:" << NL << curr;
     return curr;
   }
 
@@ -193,18 +259,40 @@ namespace test {
         std::cout << NL << "RESULT SO FAR:" << to_result(curr.grid);
         if (not result) break;
         char move = model.moves[i];
-        if (move == log[i+1].move)
+        std::cout << NL << T << "move:" << move << " logged move:" << log[i+1].move;
+        if (move != log[i+1].move) break;
         curr = to_next(curr,move);
       }
+      if (result) {
+        std::cout << NL << T << "passed";
+        std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
+      }
+      else std::cout << NL << T << "FAILED";
     }
     else {
       std::cerr << NL << "failed to find unique start position";
     }
-    if (result) {
-      std::cout << NL << T << "passed";
-    }
-    else std::cout << NL << T << "FAILED";
     return result;
+  }
+
+  bool test2(Model const& model) {
+    bool result{true};
+    std::cout << NL << "TEST1";
+    auto starts = model.grid.find_all('@');
+    if (starts.size()==1) {
+      auto start = starts[0];
+      Simulation curr{start,model.grid};
+      for (int i=0;i<model.moves.size();++i) {
+        Move move = model.moves[i];
+        std::cout << NL << NL << "step[" << i << "] " << move;
+        curr = to_next(curr,move);
+      }
+      std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
+    }
+    else {
+      std::cerr << NL << "failed to find unique start position";
+    }
+    return true;
   }
 
 }
@@ -229,7 +317,13 @@ namespace part1 {
         }
         return (test_result)?0:-1;
       }
-      
+      if (model.grid.width() == 10) {
+        test::test2(model);
+      }
+      else {
+        // Full puzzle
+        test::test2(model);
+      }
     }
     return result;
   }
@@ -256,10 +350,13 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11};
-  std::vector<int> states = {101};
+  std::vector<int> states = {10};
   for (auto state : states) {
     switch (state) {
+      case 101: {
+        if (test::test0()) std::cout << NL << "passed test0";
+        else std::cout << NL << "FAILED test0";
+      } break;
       case 11: {
         auto file = to_working_dir_path("example.txt");
         std::ifstream in{file};
@@ -267,9 +364,12 @@ int main(int argc, char *argv[]) {
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
-      case 101: {
-        if (test::test0()) std::cout << NL << "passed test0";
-        else std::cout << NL << "FAILED test0";
+      case 12: {
+        auto file = to_working_dir_path("example2.txt");
+        std::ifstream in{file};
+        if (in) answers.push_back({"Part 1 Example 2",part1::solve_for(in,args)});
+        else std::cerr << "\nSORRY, no file " << file;
+        exec_times.push_back(std::chrono::system_clock::now());
       } break;
       case 10: {
         auto file = to_working_dir_path("puzzle.txt");
