@@ -64,6 +64,7 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = Integer;
 
 using aoc::grid::Grid;
+using Move = char;
 using Moves = aoc::raw::Line;
 struct Model {
   Grid grid{{}};
@@ -94,12 +95,32 @@ namespace test {
     char move;
     Grid grid;
   };
+  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+    os << "Logged Move " << entry.move << ":";
+    os << NL << entry.grid;
+    return os;
+  }
   using Log = std::vector<LogEntry>;
+  std::ostream& operator<<(std::ostream& os,Log const& log) {
+    for (auto const& entry : log) {
+      std::cout << NL << entry;
+    }
+    return os;
+  }
+
+  using State = std::pair<Grid,LogEntry>;
+
+  std::ostream& operator<<(std::ostream& os,State const& state) {
+    std::cout << NL << std::make_pair(state.first, state.second.grid);
+    return os;
+  }
+
 
   Log parse(auto& in) {
     using namespace aoc::parsing;
     auto input = Splitter{in};
     auto sections = input.sections();
+    std::cout << NL << "Log Parse:" << sections.size();
     Log result{};
     std::ranges::transform(sections,std::back_inserter(result),[](Section section){
       auto move = *(section[0].str().rbegin()+1);
@@ -109,9 +130,22 @@ namespace test {
     return result;
   }
 
+  Grid& to_next(Grid& curr,Move move) {
+    return curr;
+  }
+
   bool test1(Model const& model,Log const& log) {
     bool result{};
     std::cout << NL << "TEST1";
+    auto curr = model.grid;
+    for (int i=0;i<log.size()-1;++i) {
+      std::cout << NL << NL << "step[" << i << "] " << log[i];
+      State state{curr,log[i]};
+      std::cout << NL << state;
+      char move = model.moves[i];
+      if (move == log[i+1].move)
+      curr = to_next(curr,move);
+    }
     if (result) std::cout << NL << T << "passed";
     else std::cout << NL << T << "FAILED";
     return result;

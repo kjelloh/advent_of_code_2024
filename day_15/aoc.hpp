@@ -328,6 +328,34 @@ namespace aoc {
       return os;
     }
   
+    using GridPair = std::pair<Grid,Grid>;
+    std::ostream& operator<<(std::ostream& os,GridPair const& gg) {
+      os << raw::NL << raw::T;
+      for (int col=0;col<gg.first.width();++col) {
+        os << (col%10);
+      }
+      os << raw::T;
+      for (int col=0;col<gg.second.width();++col) {
+        os << (col%10);
+      }
+      std::pair<std::string,std::string> indent{std::string(gg.first.height(),' '),std::string(gg.second.height(),' ')};
+      auto max_height = std::max(gg.first.height(),gg.second.height());
+      for (int row=0;row<static_cast<int>(max_height);++row) {
+        os << raw::NL << row << ":" << raw::T;
+        if (row < gg.first.height()) os << *gg.first.at_row(row);
+        else {
+          os << indent.first;
+        }
+        os << raw::T;
+        if (row < gg.second.height()) os << *gg.second.at_row(row);
+        else {
+          os << indent.first;
+        }
+      }
+
+      return os;
+    }
+  
     using Path = Positions;
     using Visited = std::map<Position, std::vector<Path>>;
   
