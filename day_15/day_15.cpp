@@ -24,6 +24,9 @@
 #include <regex>
 #include <filesystem>
 
+using aoc::raw::NL;
+using aoc::raw::T;
+
 // Try to read the path to the actual working directory
 // from a text file at the location where we execute
 std::optional<std::filesystem::path> get_working_dir() {
@@ -42,9 +45,20 @@ std::optional<std::filesystem::path> get_working_dir() {
   return result;
 }
 
-auto const NL = "\n";
-auto const T = "\t";
-auto const NT = "\n\t";
+std::filesystem::path to_working_dir_path(std::string const& file_name) {
+  static std::optional<std::filesystem::path> cached{};
+  if (not cached) {
+    cached = "../..";
+    if (auto dir = get_working_dir()) {
+      cached = *dir;
+    }
+    else {
+      std::cout << NL << "No working directory path configured";
+    }
+    std::cout << NL << "Using working_dir " << *cached;
+  }
+  return *cached / file_name;
+}
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
@@ -75,6 +89,36 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+namespace test {
+  struct LogEntry {
+    char move;
+    Grid grid;
+  };
+  using Log = std::vector<LogEntry>;
+
+  Log parse(auto& in) {
+    using namespace aoc::parsing;
+    auto input = Splitter{in};
+    auto sections = input.sections();
+    Log result{};
+    std::ranges::transform(sections,std::back_inserter(result),[](Section section){
+      auto move = *(section[0].str().rbegin()+1);
+      section.erase(section.begin());
+      return LogEntry{move,Grid{to_raw(section)}};
+    });
+    return result;
+  }
+
+  bool test1(Model const& model,Log const& log) {
+    bool result{};
+    std::cout << NL << "TEST1";
+    if (result) std::cout << NL << T << "passed";
+    else std::cout << NL << T << "FAILED";
+    return result;
+  }
+
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -82,6 +126,20 @@ namespace part1 {
     if (in) {
       auto model = parse(in);
       std::cout << NL << model;
+      if (model.grid.width() == 8) {
+        bool test_result{};
+        auto log_file_path = to_working_dir_path("example.log");
+        std::ifstream in{log_file_path};
+        if (in) {
+          auto log = test::parse(in);
+          test_result = test::test1(model,log);
+        }
+        else {
+          std::cerr << NL << "Sorry, no log file" << log_file_path;
+        }
+        return (test_result)?0:-1;
+      }
+      
     }
     return result;
   }
@@ -105,45 +163,36 @@ int main(int argc, char *argv[]) {
     args.push_back(argv[i]);
   }
 
-  std::filesystem::path working_dir{"../.."};
-  if (auto dir = get_working_dir()) {
-    working_dir = *dir;
-  }
-  else {
-    std::cout << NL << "No working directory path configured";
-  }
-  std::cout << NL << "Using working_dir " << working_dir;
-
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11,10,21,20};
+  std::vector<int> states = {11};
   for (auto state : states) {
     switch (state) {
       case 11: {
-        std::filesystem::path file{working_dir / "example.txt"};
+        auto file = to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
       case 10: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
+        auto file = to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
       case 21: {
-        std::filesystem::path file{working_dir / "example.txt"};
+        auto file = to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
       } break;
       case 20: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
+        auto file = to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
