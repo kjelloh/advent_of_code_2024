@@ -308,9 +308,35 @@ namespace aoc {
           if (auto orow = at_row(r)) return *orow;
           else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
         }
+      
+        void for_each(auto f) const {
+          for (int row=0;row<height();++row) {
+            for (int col=0;col<width();++col) {
+              f(*this,Position{row,col});
+            }
+          }
+        }
+      
+        Positions find_all(char ch) const {
+          Positions result{};
+          auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
+            if (grid.at(pos) == ch) result.push_back(pos);
+          };
+          for_each(push_back_matched);
+          return result;
+        }
 
         bool contains(Position const& pos) const {
           return at(pos).has_value();
+        }
+      
+        bool operator==(Grid const& other) const {
+          bool result{true};
+          auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
+            result = result and (this->at(pos) == other.at(pos));
+          };
+          this->for_each(all_equal);
+          return result;
         }
 
     private:

@@ -64,6 +64,7 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = Integer;
 
 using aoc::grid::Grid;
+using aoc::grid::Position;
 using Move = char;
 using Moves = aoc::raw::Line;
 struct Model {
@@ -90,6 +91,32 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+struct Simulation {
+  Position pos{};
+  Grid grid;
+};
+
+Result to_gps_coordinate(Position const& pos) {
+  return 100*pos.row + pos.col;
+}
+
+Result to_result(Grid const& grid) {
+  Result result{};
+  auto lanterns = grid.find_all('O');
+  result = std::accumulate(lanterns.begin(), lanterns.end(), result,[](auto acc,Position const& pos){
+    acc += to_gps_coordinate(pos);
+    return acc;
+  });
+  return result;
+}
+
+
+std::ostream& operator<<(std::ostream& os,Simulation const& sim) {
+  std::cout << " pos:" << sim.pos;
+  std::cout << NL << sim.grid;
+  return os;
+}
+
 namespace test {
   struct LogEntry {
     char move;
@@ -108,10 +135,11 @@ namespace test {
     return os;
   }
 
-  using State = std::pair<Grid,LogEntry>;
+  using State = std::pair<Simulation,LogEntry>;
 
   std::ostream& operator<<(std::ostream& os,State const& state) {
-    std::cout << NL << std::make_pair(state.first, state.second.grid);
+    std::cout << " simulated robot:" << state.first.pos;
+    std::cout << NL << std::make_pair(state.first.grid, state.second.grid);
     return os;
   }
 
@@ -130,23 +158,51 @@ namespace test {
     return result;
   }
 
-  Grid& to_next(Grid& curr,Move move) {
+  Simulation& to_next(Simulation& curr,Move move) {
+    
     return curr;
   }
 
-  bool test1(Model const& model,Log const& log) {
+  bool test0() {
     bool result{};
+    Result expected{104};
+    char const* s = R"(#######
+#...O..
+#......)";
+    aoc::parsing::Splitter input{s};
+    Grid grid{aoc::parsing::to_raw(input.lines())};
+    std::cout << NL << grid;
+    auto grid_gps = to_result(grid);
+    std::cout << NL << T << "grid_gps:" << grid_gps << " expected:" << expected;
+    result = (to_result(grid) == expected);
+    return result;
+  }
+
+  bool test1(Model const& model,Log const& log) {
+    bool result{true};
     std::cout << NL << "TEST1";
-    auto curr = model.grid;
-    for (int i=0;i<log.size()-1;++i) {
-      std::cout << NL << NL << "step[" << i << "] " << log[i];
-      State state{curr,log[i]};
-      std::cout << NL << state;
-      char move = model.moves[i];
-      if (move == log[i+1].move)
-      curr = to_next(curr,move);
+    auto starts = model.grid.find_all('@');
+    if (starts.size()==1) {
+      auto start = starts[0];
+      Simulation curr{start,model.grid};
+      for (int i=0;i<log.size()-1;++i) {
+        std::cout << NL << NL << "step[" << i << "] " << log[i];
+        State state{curr,log[i]};
+        std::cout << NL << NL << state;
+        result = result and (curr.grid == log[i].grid);
+        std::cout << NL << "RESULT SO FAR:" << to_result(curr.grid);
+        if (not result) break;
+        char move = model.moves[i];
+        if (move == log[i+1].move)
+        curr = to_next(curr,move);
+      }
     }
-    if (result) std::cout << NL << T << "passed";
+    else {
+      std::cerr << NL << "failed to find unique start position";
+    }
+    if (result) {
+      std::cout << NL << T << "passed";
+    }
     else std::cout << NL << T << "FAILED";
     return result;
   }
@@ -201,7 +257,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {11};
-  std::vector<int> states = {11};
+  std::vector<int> states = {101};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -210,6 +266,10 @@ int main(int argc, char *argv[]) {
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
         exec_times.push_back(std::chrono::system_clock::now());
+      } break;
+      case 101: {
+        if (test::test0()) std::cout << NL << "passed test0";
+        else std::cout << NL << "FAILED test0";
       } break;
       case 10: {
         auto file = to_working_dir_path("puzzle.txt");
