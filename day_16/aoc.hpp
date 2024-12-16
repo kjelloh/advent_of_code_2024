@@ -22,6 +22,12 @@
 namespace aoc {
 
   namespace raw {
+  
+    template <typename T>
+    int sign(T value) {
+        return (value > T(0)) - (value < T(0));
+    }
+  
     auto const NL = "\n";
     auto const T = "\t";
     auto const NT = "\n\t";
@@ -50,16 +56,22 @@ namespace aoc {
         ,std::istreambuf_iterator<char>()
       } {};
       
+      // Groups lins into sections separate by one or more empty lines
+      // That is, no empty sections are created.
       std::vector<std::vector<Splitter>> sections() {
         std::vector<std::vector<Splitter>> result;
         std::istringstream is{m_s};
-        result.push_back({});
         aoc::raw::Line line{};
+        bool wait_start_section{true};
         while (std::getline(is,line)) {
           if (line.size() == 0) {
-            result.push_back({});
+            wait_start_section = true;
           }
           else {
+            if (wait_start_section) {
+              result.push_back({}); // non empty line marks new section
+              wait_start_section = false;
+            }
             result.back().push_back(line);
           }
         }
@@ -89,12 +101,12 @@ namespace aoc {
         }
         return result;
       }
-      Splitter trim() {
+      Splitter trim() const {
           auto start = std::find_if_not(m_s.begin(), m_s.end(), ::isspace);
           auto end = std::find_if_not(m_s.rbegin(), m_s.rend(), ::isspace).base();
           return std::string(start, end);
       }
-      std::vector<Splitter> groups(std::string const& regexPattern) {
+      std::vector<Splitter> groups(std::string const& regexPattern) const {
           std::vector<Splitter> result;
           std::regex pattern(regexPattern);
           std::smatch matches;
@@ -128,7 +140,39 @@ namespace aoc {
         return to_raw(section);
       });
     }
-
+  }
+  
+  namespace graph {
+    template <typename Vertex>
+    class Graph {
+    public:
+      using Vertices = std::set<Vertex>;
+      using AdjList = std::map<Vertex,Vertices>;
+      Graph(Vertices const& vertices) {
+        for (auto const& v : vertices) {
+          add_vertex(v);
+        }
+      }
+      void add_vertex(Vertex const& v) {m_adj.insert({v,{}});}
+      void add_edge(Vertex const& v1,Vertex const& v2) {
+        m_adj[v1].insert(v2);
+      }
+      AdjList const& adj() const {return m_adj;}
+      auto size() const {return adj().size();}
+    private:
+      AdjList m_adj{};
+    };
+  
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
+      std::cout << "vertices:" << graph.size();
+      for (auto const& adjacency : graph.adj()) {
+        std::cout << raw::NL << raw::T << adjacency.first << " --> " << adjacency.second;
+      }
+      
+      return os;
+    }
+  
   }
 
   namespace xy {
@@ -230,11 +274,9 @@ namespace aoc {
         }
       }
     };
-  }
+  } // namespace xy
 
   namespace grid {
-  
-
     struct Vector {
       int row{};
       int col{};
@@ -246,23 +288,36 @@ namespace aoc {
       }
       Vector operator+(Vector const& other) const {return {row+other.row,col+other.col};}
       Vector operator-(Vector const& other) const {return {row-other.row,col-other.col};}
+      int cross(const Vector& other) const {
+          return row * other.col - col * other.row;
+      }
     };
-    std::ostream& operator<<(std::ostream& os,Vector const& pos) {
-      os << "{row:" << pos.row << ",col:" << pos.col << "}";
+    std::ostream& operator<<(std::ostream& os,Vector const& v) {
+      os << "{row:" << v.row << ",col:" << v.col << "}";
       return os;
     }
     using Vectors = std::vector<Vector>;
-    std::ostream& operator<<(std::ostream& os,Vectors const& positions) {
+    using Seen = std::set<Vector>; // Easy lookup
+
+    // Concept to restrict to specific containers of Vector
+    template <typename T>
+    concept IterableVectors =
+        (std::is_same_v<T, std::vector<Vector>> || std::is_same_v<T, std::set<Vector>>);
+  
+    // operator<< for any iterable 'vectors' of Vector elements
+    template <typename Vectors>
+    requires IterableVectors<Vectors>
+    std::ostream& operator<<(std::ostream& os, const Vectors& vectors) {
       int count{};
-      os << "{";
-      for (auto const& pos : positions) {
+      os << "[";
+      for (auto const& v : vectors) {
         if (count++>0) os << ",";
-        os << pos;
+        os << v;
       }
-      os << "}";
+      os << "]";
       return os;
     }
-  
+
     using Position = Vector;
     using Positions = Vectors;
     using Direction = Vector;
@@ -408,10 +463,10 @@ namespace aoc {
         };
     }
   
-    std::set<Position> to_flood_fill(Grid const& grid,Position start) {
-      std::set<Position> result{};
+    Seen to_flood_fill(Grid const& grid,Position start) {
+      Seen result{};
       std::deque<Position> q{};
-      std::set<Position> visited{};
+      Seen visited{};
       if (grid.on_map(start)) {
         q.push_back(start);
         char ch = *grid.at(start);

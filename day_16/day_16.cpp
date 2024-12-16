@@ -26,6 +26,10 @@ using aoc::raw::NL;
 using aoc::raw::T;
 using aoc::raw::NT;
 using aoc::grid::Grid;
+using aoc::grid::Position;
+using aoc::grid::Positions;
+using aoc::grid::Direction;
+using aoc::grid::Path;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
@@ -41,6 +45,19 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+std::set<Position> to_junctions(std::set<Position> const& reachable,auto to_neighbours) {
+  std::set<Position> result{};
+  for (auto const& pos : reachable) {
+    int count{};
+    for (auto const& adj : to_neighbours(pos)) {
+      if (not reachable.contains(adj)) continue;
+      ++count;
+    }
+    if (count > 2) result.insert(pos);
+  }
+  return result;
+}
+
 namespace test {
 
   struct LogEntry {
@@ -48,16 +65,26 @@ namespace test {
     Result score{};
     std::optional<Result> steps{};
     std::optional<Result> turns{};
+    bool operator==(LogEntry const& other) const {
+      bool result{true};
+      result = result and grid == other.grid;
+      result = result and score == other.score;
+      result = result and (steps and other.steps)?steps.value() == other.steps.value():true;
+      result = result and (turns and other.turns)?turns.value() == other.turns.value():true;
+      return result;
+    }
   };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
-    os << "Exptected:" << " score:" << entry.score;
+    os << " score:" << entry.score;
     os << " steps:";
     if (entry.steps) os << *entry.steps;
-    else os << "?";
+    else
+      os << "?";
     os << " turns:";
     if (entry.turns) os << *entry.turns;
     else os << "?";
+    os << NL << "Grid:" << NL << entry.grid;
     return os;
   }
   using LogEntries = std::vector<LogEntry>;
@@ -68,12 +95,67 @@ namespace test {
     return os;
   }
 
+  struct Outcome {
+    LogEntry expected;
+    LogEntry deduced;
+  };
+
+  std::ostream& operator<<(std::ostream& os,Outcome const& outcome) {
+    std::ostringstream expected_os{};
+    expected_os << outcome.expected;
+    std::ostringstream deduced_os{};
+    deduced_os << outcome.deduced;
+    aoc::raw::Lines expected_lines{};
+    aoc::raw::Lines deduced_lines{};
+    std::istringstream expected_is{expected_os.str()};
+    std::istringstream deduced_is{deduced_os.str()};
+    aoc::raw::Line line{};
+    while (std::getline(expected_is,line)) expected_lines.push_back(line);
+    while (std::getline(deduced_is,line)) deduced_lines.push_back(line);
+    auto max_lines = std::max(expected_lines.size(),deduced_lines.size());
+    std::size_t
+    last_width{};
+    std::cout << NL << "Expected " << T << "Deduced";
+    for (int i=0;i<max_lines;++i) {
+      std::cout << NL;
+      if (i==0) {
+        std::cout << NL << T << "Expected:" << expected_lines[i];
+        std::cout << NL << T << " Deduced:" << deduced_lines[i];
+      }
+      else {
+        if (i<expected_lines.size()) {
+          std::cout << expected_lines[i];
+          last_width = expected_lines[i].size();
+        }
+        else {
+          std::cout << std::string(last_width,' ');
+        }
+        std::cout << T;
+        if (i < deduced_lines.size()) {
+          std::cout << deduced_lines[i];
+        }
+      }
+    }
+    if (outcome.deduced == outcome.expected) {
+      std::cout << NL << "SAME OK!";
+    }
+    else {
+      
+    }
+    return os;
+  }
+  
   LogEntries parse(auto& in) {
     std::cout << NL << T << "test::parse";
     LogEntries result{};
     using namespace aoc::parsing;
     auto input = Splitter{in};
     auto sections = input.sections();
+    for (int i=0;i<sections.size();++i) {
+      auto const& section = sections[i];
+      using aoc::raw::operator<<;
+      std::cout << NL << std::format("sections[{}]:{}",i,section.size()) << to_raw(section);
+    }
     // example: "a score of only 7036"
     // example: "36 steps"
     // example: "turning 90 degrees a total of 7 times"
@@ -90,7 +172,7 @@ namespace test {
         std::cout << " --> steps:" << steps;
         auto turns = std::stoi(groups[3]);
         std::cout << " --> turns:" << turns;
-        result.push_back({to_raw(sections[1]),score,steps,turns});
+        result.push_back({Grid{to_raw(sections[1])},score,steps,turns});
       }
     }
     if (result.size()==0){
@@ -111,19 +193,111 @@ namespace test {
     return std::nullopt;
   }
 
+  using Reachable = std::set<Position>;
+  using Segments = std::vector<aoc::grid::Path>;
+  Segments to_segments(Position const& start,Reachable const& reachable,Reachable const& junctions) {
+    std::cout << NL << "to_segments";
+    Segments result{};
+    aoc::graph::Graph<Position> graph{reachable};
+    std::cout << NL << graph;
+    return result;
+  }
+
+  aoc::grid::Path to_best_path(Grid const& grid,Position const& start,Position const& end) {
+    aoc::grid::Path result{};
+    
+    return result;
+  }
+
+  Path to_marked_path(Position start,Grid const& grid,auto is_path_mark) {
+    Path result{};
+    std::deque<Position> q{};
+    aoc::grid::Seen visited{};
+    if (grid.on_map(start)) {
+      q.push_back(start);
+      char ch = *grid.at(start);
+      visited.insert(start);
+      result.push_back(start);
+      while (not q.empty()) {
+        auto curr = q.front();q.pop_front();
+        for (auto const& next : default_neighbors(curr)) {
+          if (not grid.on_map(next)) continue;
+          if (visited.contains(next)) continue;
+          if (not is_path_mark(*grid.at(next))) continue;
+          q.push_back(next);
+          visited.insert(next);
+          result.push_back(next);
+        }
+      }
+    }
+    return result;
+  }
+
+  using Turns = std::vector<std::pair<Position,char>>;
+  std::ostream& operator<<(std::ostream& os,Turns const& turns) {
+    for (auto const& [pos,ch] : turns) {
+      std::cout << NL << T << pos << " " << ch;
+    }
+    return os;
+  }
+  Turns to_turns(Path const& path) {
+    Turns result{};
+    auto start = path.front();
+    Position before_start{start.row,start.col-1};
+    Direction after = path[1] - path[0];
+    Direction before = path[0] - before_start;
+    for (int i=1;i<path.size();++i) {
+      if (i>1) {
+        after = path[i] - path[i-1];
+        before = path[i-1] - path[i-2];
+      }
+      switch (aoc::raw::sign(before.cross(after))) {
+        case -1: result.push_back({path[i-1],'R'}); break; // negative (clockwise) 'sweep' as in turn before -> after
+//        case  0: result.push_back({path[i-1],'-'}); break; // No turn
+        case  1: result.push_back({path[i-1],'L'}); break; // positive (counter clockwise) 'sweep' as in turn before -> after
+      }
+    }
+    return result;
+  }
+
+  Result to_score(Path const& best_path,Turns const& turns) {
+    std::cout << NL << "to_score";
+    Result result{};
+    auto turn_count = turns.size();
+    auto step_count = (best_path.size()-1); // steps one less than count
+    result = turn_count*1000 + step_count;
+    return result;
+  }
+
+
   std::optional<Result> test1(auto& in, auto& log_in,Args args) {
     std::cout << NL << NL << "test1";
     auto model = ::parse(in);
     auto log = test::parse(log_in);
+    
     auto starts = model.find_all('S');
     auto start = starts[0];
-    auto grid = model;
-    grid.at(start) = '.';
-    auto visited = aoc::grid::to_flood_fill(grid,starts[0]);
-    for (auto const& pos : visited) {
-      grid.at(pos) = ' ';
+
+    if (log.size() == 1) {
+      // Extract the exposed solution path from log
+      auto expected = log[0];
+      auto deduced_path = to_marked_path(start, expected.grid, [](char ch){
+        std::set<char> const PATH_MARK{'S','<','^','>','v','E'};
+        return PATH_MARK.contains(ch);
+      });
+      std::cout << NL << "Deduced path:" << deduced_path;
+      auto deduced_turns = to_turns(deduced_path);
+      std::cout << NL << "Deduced turns:" << deduced_turns;
+      auto deduced_score = to_score(deduced_path,deduced_turns);
+      std::cout << NL << "deduced score:" << deduced_score;
+      LogEntry deduced{expected.grid,deduced_score,deduced_path.size()-1
+        ,deduced_turns.size()};
+      Outcome outcome{expected,deduced};
+      std::cout << NL << outcome;
     }
-    std::cout << NL << "Walked all over is:" << NL << grid;
+    else {
+      std::cout << NL << "UNEXPECTED: Read Log has more that one entry, entires:" << log.size();
+    }
     return std::nullopt;
   }
 
@@ -136,6 +310,19 @@ namespace part1 {
     if (in) {
       auto model = parse(in);
       std::cout << NL << model;
+      auto starts = model.find_all('S');
+      auto start = starts[0];
+      auto grid = model;
+      grid.at(start) = '.';
+      auto reachable = aoc::grid::to_flood_fill(grid,starts[0]);
+      for (auto const& pos : reachable) {
+        grid.at(pos) = ' ';
+      }
+      std::cout << NL << "After 'Walked all over' is:" << NL << grid;
+      auto junctions = to_junctions(reachable,aoc::grid::default_neighbors);
+      std::cout << NL << "junctions:" << junctions.size() << " out of reachable:" << reachable.size();
+      // junctions:962 out of reachable:10116
+      
     }
     return result;
   }
@@ -162,7 +349,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,112,11};
+  std::vector<int> states = {111};
   for (auto state : states) {
     switch (state) {
       case 0: {
