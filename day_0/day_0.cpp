@@ -28,39 +28,6 @@ using aoc::raw::NL;
 using aoc::raw::T;
 using aoc::raw::NT;
 
-// Try to read the path to the actual working directory
-// from a text file at the location where we execute
-std::optional<std::filesystem::path> get_working_dir() {
-  std::optional<std::filesystem::path> result{};
-    
-  std::ifstream workingDirFile("working_dir.txt");
-
-  std::string workingDir;
-  std::getline(workingDirFile, workingDir); // Read the directory path
-  std::filesystem::path dirPath{workingDir};
-
-  if (std::filesystem::exists(dirPath) and std::filesystem::is_directory(dirPath)) {
-    // Return the directory path as a std::filesystem::path
-    result = std::filesystem::path(workingDir);
-  }
-  return result;
-}
-
-std::filesystem::path to_working_dir_path(std::string const& file_name) {
-  static std::optional<std::filesystem::path> cached{};
-  if (not cached) {
-    cached = "../..";
-    if (auto dir = get_working_dir()) {
-      cached = *dir;
-    }
-    else {
-      std::cout << NL << "No working directory path configured";
-    }
-    std::cout << NL << "Using working_dir " << *cached;
-  }
-  return *cached / file_name;
-}
-
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
 using Model = aoc::raw::Lines;
@@ -90,15 +57,19 @@ using Args = std::vector<std::string>;
 
 namespace test {
 
-  using LogEntry = std::string;
+  // Adapt to expected for day puzzle
+  struct LogEntry {
+    bool operator==(LogEntry const& other) const {
+      bool result{true};
+      return result;
+    }
+  };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
     return os;
   }
-  using LogEntries = std::vector<LogEntry>;
-  std::ostream& operator<<(std::ostream& os,LogEntries const& log) {
-    return os;
-  }
+
+  using LogEntries = aoc::test::LogEntries<LogEntry>;
 
   LogEntries parse(auto& in) {
     std::cout << NL << T << "test::parse";
@@ -126,10 +97,15 @@ namespace test {
   }
 
   std::optional<Result> test1(auto& in, auto& log_in,Args args) {
+    std::optional<Result> result{};
     std::cout << NL << NL << "test1";
-    auto model = ::parse(in);
-    auto log = test::parse(log_in);
-    return std::nullopt;
+    if (in) {
+      auto model = ::parse(in);
+      if (log_in) {
+        auto log = test::parse(log_in);
+      }
+    }
+    return result;
   }
 
 }
@@ -173,33 +149,33 @@ int main(int argc, char *argv[]) {
         answers.push_back({"test0",test::test0(args)});
       } break;
       case 111: {
-        auto log_file = to_working_dir_path("example.log");
+        auto log_file = aoc::to_working_dir_path("example.log");
         std::ifstream log_in{log_file};
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
         else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
       } break;
       case 11: {
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 10: {
-        auto file = to_working_dir_path("puzzle.txt");
+        auto file = aoc::to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 21: {
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 20: {
-        auto file = to_working_dir_path("puzzle.txt");
+        auto file = aoc::to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;

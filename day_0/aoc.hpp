@@ -14,9 +14,20 @@
 #include <regex>
 #include <functional>
 #include <map>
+#include <fstream>
+#include <filesystem>
+#include <set>
+#include <deque>
 
 namespace aoc {
+
   namespace raw {
+  
+    template <typename T>
+    int sign(T value) {
+        return (value > T(0)) - (value < T(0));
+    }
+  
     auto const NL = "\n";
     auto const T = "\t";
     auto const NT = "\n\t";
@@ -45,16 +56,22 @@ namespace aoc {
         ,std::istreambuf_iterator<char>()
       } {};
       
+      // Groups lins into sections separate by one or more empty lines
+      // That is, no empty sections are created.
       std::vector<std::vector<Splitter>> sections() {
         std::vector<std::vector<Splitter>> result;
         std::istringstream is{m_s};
-        result.push_back({});
         aoc::raw::Line line{};
+        bool wait_start_section{true};
         while (std::getline(is,line)) {
           if (line.size() == 0) {
-            result.push_back({});
+            wait_start_section = true;
           }
           else {
+            if (wait_start_section) {
+              result.push_back({}); // non empty line marks new section
+              wait_start_section = false;
+            }
             result.back().push_back(line);
           }
         }
@@ -84,12 +101,12 @@ namespace aoc {
         }
         return result;
       }
-      Splitter trim() {
+      Splitter trim() const {
           auto start = std::find_if_not(m_s.begin(), m_s.end(), ::isspace);
           auto end = std::find_if_not(m_s.rbegin(), m_s.rend(), ::isspace).base();
           return std::string(start, end);
       }
-      std::vector<Splitter> groups(std::string const& regexPattern) {
+      std::vector<Splitter> groups(std::string const& regexPattern) const {
           std::vector<Splitter> result;
           std::regex pattern(regexPattern);
           std::smatch matches;
@@ -123,7 +140,39 @@ namespace aoc {
         return to_raw(section);
       });
     }
-
+  }
+  
+  namespace graph {
+    template <typename Vertex>
+    class Graph {
+    public:
+      using Vertices = std::set<Vertex>;
+      using AdjList = std::map<Vertex,Vertices>;
+      Graph(Vertices const& vertices) {
+        for (auto const& v : vertices) {
+          add_vertex(v);
+        }
+      }
+      void add_vertex(Vertex const& v) {m_adj.insert({v,{}});}
+      void add_edge(Vertex const& v1,Vertex const& v2) {
+        m_adj[v1].insert(v2);
+      }
+      AdjList const& adj() const {return m_adj;}
+      auto size() const {return adj().size();}
+    private:
+      AdjList m_adj{};
+    };
+  
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
+      std::cout << "vertices:" << graph.size();
+      for (auto const& adjacency : graph.adj()) {
+        std::cout << raw::NL << raw::T << adjacency.first << " --> " << adjacency.second;
+      }
+      
+      return os;
+    }
+  
   }
 
   namespace xy {
@@ -225,11 +274,9 @@ namespace aoc {
         }
       }
     };
-  }
+  } // namespace xy
 
   namespace grid {
-  
-
     struct Vector {
       int row{};
       int col{};
@@ -241,23 +288,36 @@ namespace aoc {
       }
       Vector operator+(Vector const& other) const {return {row+other.row,col+other.col};}
       Vector operator-(Vector const& other) const {return {row-other.row,col-other.col};}
+      int cross(const Vector& other) const {
+          return row * other.col - col * other.row;
+      }
     };
-    std::ostream& operator<<(std::ostream& os,Vector const& pos) {
-      os << "{row:" << pos.row << ",col:" << pos.col << "}";
+    std::ostream& operator<<(std::ostream& os,Vector const& v) {
+      os << "{row:" << v.row << ",col:" << v.col << "}";
       return os;
     }
     using Vectors = std::vector<Vector>;
-    std::ostream& operator<<(std::ostream& os,Vectors const& positions) {
+    using Seen = std::set<Vector>; // Easy lookup
+
+    // Concept to restrict to specific containers of Vector
+    template <typename T>
+    concept IterableVectors =
+        (std::is_same_v<T, std::vector<Vector>> || std::is_same_v<T, std::set<Vector>>);
+  
+    // operator<< for any iterable 'vectors' of Vector elements
+    template <typename Vectors>
+    requires IterableVectors<Vectors>
+    std::ostream& operator<<(std::ostream& os, const Vectors& vectors) {
       int count{};
-      os << "{";
-      for (auto const& pos : positions) {
+      os << "[";
+      for (auto const& v : vectors) {
         if (count++>0) os << ",";
-        os << pos;
+        os << v;
       }
-      os << "}";
+      os << "]";
       return os;
     }
-  
+
     using Position = Vector;
     using Positions = Vectors;
     using Direction = Vector;
@@ -393,8 +453,6 @@ namespace aoc {
     }
   
     using Path = Positions;
-    using Visited = std::map<Position, std::vector<Path>>;
-  
     // Helper Functions for Specific Use Case
     std::vector<Position> default_neighbors(Position const& pos) {
         return {
@@ -403,6 +461,29 @@ namespace aoc {
             {pos.row, pos.col - 1}, // Left
             {pos.row, pos.col + 1}  // Right
         };
+    }
+  
+    Seen to_flood_fill(Grid const& grid,Position start) {
+      Seen result{};
+      std::deque<Position> q{};
+      Seen visited{};
+      if (grid.on_map(start)) {
+        q.push_back(start);
+        char ch = *grid.at(start);
+        visited.insert(start);
+        while (not q.empty()) {
+          auto curr = q.front();q.pop_front();
+          for (auto const& next : default_neighbors(curr)) {
+            if (not grid.on_map(next)) continue;
+            if (visited.contains(next)) continue;
+            if (grid.at(next) != ch) continue;
+            q.push_back(next);
+            visited.insert(next);
+          }
+        }
+      }
+      result = visited;
+      return result;
     }
 
   } // namespace grid
@@ -469,6 +550,109 @@ namespace aoc {
     }
 
   }
+
+  // Try to read the path to the actual working directory
+  // from a text file at the location where we execute
+  std::optional<std::filesystem::path> get_working_dir() {
+    std::optional<std::filesystem::path> result{};
+      
+    std::ifstream workingDirFile("working_dir.txt");
+
+    std::string workingDir;
+    std::getline(workingDirFile, workingDir); // Read the directory path
+    std::filesystem::path dirPath{workingDir};
+
+    if (std::filesystem::exists(dirPath) and std::filesystem::is_directory(dirPath)) {
+      // Return the directory path as a std::filesystem::path
+      result = std::filesystem::path(workingDir);
+    }
+    return result;
+  }
+
+  std::filesystem::path to_working_dir_path(std::string const& file_name) {
+    static std::optional<std::filesystem::path> cached{};
+    if (not cached) {
+      cached = "../..";
+      if (auto dir = get_working_dir()) {
+        cached = *dir;
+      }
+      else {
+        std::cout << raw::NL << "No working directory path configured";
+      }
+      std::cout << raw::NL << "Using working_dir " << *cached;
+    }
+    return *cached / file_name;
+  }
+
+  namespace test {
+  
+    using raw::NL;
+    using raw::T;
+    
+    template <class LogEntry>
+    using LogEntries = std::vector<LogEntry>;
+  
+    template <class LogEntry>
+    std::ostream& operator<<(std::ostream& os,LogEntries<LogEntry> const& log) {
+      for (auto const& entry : log) {
+        os << NL << entry;
+      }
+      return os;
+    }
+
+    template <class LogEntry>
+    struct Outcome {
+      LogEntry expected;
+      LogEntry computed;
+    };
+
+    template <class LogEntry>
+    std::ostream& operator<<(std::ostream& os,Outcome<LogEntry> const& outcome) {
+      std::ostringstream expected_os{};
+      expected_os << outcome.expected;
+      std::ostringstream computed_os{};
+      computed_os << outcome.computed;
+      aoc::raw::Lines expected_lines{};
+      aoc::raw::Lines computed_lines{};
+      std::istringstream expected_is{expected_os.str()};
+      std::istringstream computed_is{computed_os.str()};
+      aoc::raw::Line line{};
+      while (std::getline(expected_is,line)) expected_lines.push_back(line);
+      while (std::getline(computed_is,line)) computed_lines.push_back(line);
+      auto max_lines = std::max(expected_lines.size(),computed_lines.size());
+      std::size_t
+      last_width{};
+      std::cout << NL << "Expected " << T << "Computed";
+      for (int i=0;i<max_lines;++i) {
+        std::cout << NL;
+        if (i==0) {
+          std::cout << NL << T << "Expected:" << expected_lines[i];
+          std::cout << NL << T << " Computed:" << computed_lines[i];
+        }
+        else {
+          if (i<expected_lines.size()) {
+            std::cout << expected_lines[i];
+            last_width = expected_lines[i].size();
+          }
+          else {
+            std::cout << std::string(last_width,' ');
+          }
+          std::cout << T;
+          if (i < computed_lines.size()) {
+            std::cout << computed_lines[i];
+          }
+        }
+      }
+      if (outcome.computed == outcome.expected) {
+        std::cout << NL << "COMPUTED is equal to EXPECTED OK";
+      }
+      else {
+        std::cout << NL << "COMPUTED and EXPECTED - DIFFERS...";
+      }
+      return os;
+    }
+  } // namespace test
+
 } // namespace aoc
 
 #endif /* aoc_hpp */
