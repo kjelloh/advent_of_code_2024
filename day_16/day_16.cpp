@@ -79,7 +79,6 @@ namespace test {
     // example: "turning 90 degrees a total of 7 times"
     
     // example2: "the best paths cost 11048 points"
-    
     auto line = sections[0][0];
     std::cout << NL << T << line.str();
     {
@@ -116,6 +115,15 @@ namespace test {
     std::cout << NL << NL << "test1";
     auto model = ::parse(in);
     auto log = test::parse(log_in);
+    auto starts = model.find_all('S');
+    auto start = starts[0];
+    auto grid = model;
+    grid.at(start) = '.';
+    auto visited = aoc::grid::to_flood_fill(grid,starts[0]);
+    for (auto const& pos : visited) {
+      grid.at(pos) = ' ';
+    }
+    std::cout << NL << "Walked all over is:" << NL << grid;
     return std::nullopt;
   }
 

@@ -16,7 +16,8 @@
 #include <map>
 #include <fstream>
 #include <filesystem>
-
+#include <set>
+#include <deque>
 
 namespace aoc {
 
@@ -397,8 +398,6 @@ namespace aoc {
     }
   
     using Path = Positions;
-    using Visited = std::map<Position, std::vector<Path>>;
-  
     // Helper Functions for Specific Use Case
     std::vector<Position> default_neighbors(Position const& pos) {
         return {
@@ -407,6 +406,29 @@ namespace aoc {
             {pos.row, pos.col - 1}, // Left
             {pos.row, pos.col + 1}  // Right
         };
+    }
+  
+    std::set<Position> to_flood_fill(Grid const& grid,Position start) {
+      std::set<Position> result{};
+      std::deque<Position> q{};
+      std::set<Position> visited{};
+      if (grid.on_map(start)) {
+        q.push_back(start);
+        char ch = *grid.at(start);
+        visited.insert(start);
+        while (not q.empty()) {
+          auto curr = q.front();q.pop_front();
+          for (auto const& next : default_neighbors(curr)) {
+            if (not grid.on_map(next)) continue;
+            if (visited.contains(next)) continue;
+            if (grid.at(next) != ch) continue;
+            q.push_back(next);
+            visited.insert(next);
+          }
+        }
+      }
+      result = visited;
+      return result;
     }
 
   } // namespace grid
