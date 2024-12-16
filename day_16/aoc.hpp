@@ -14,8 +14,12 @@
 #include <regex>
 #include <functional>
 #include <map>
+#include <fstream>
+#include <filesystem>
+
 
 namespace aoc {
+
   namespace raw {
     auto const NL = "\n";
     auto const T = "\t";
@@ -469,6 +473,40 @@ namespace aoc {
     }
 
   }
+
+  // Try to read the path to the actual working directory
+  // from a text file at the location where we execute
+  std::optional<std::filesystem::path> get_working_dir() {
+    std::optional<std::filesystem::path> result{};
+      
+    std::ifstream workingDirFile("working_dir.txt");
+
+    std::string workingDir;
+    std::getline(workingDirFile, workingDir); // Read the directory path
+    std::filesystem::path dirPath{workingDir};
+
+    if (std::filesystem::exists(dirPath) and std::filesystem::is_directory(dirPath)) {
+      // Return the directory path as a std::filesystem::path
+      result = std::filesystem::path(workingDir);
+    }
+    return result;
+  }
+
+  std::filesystem::path to_working_dir_path(std::string const& file_name) {
+    static std::optional<std::filesystem::path> cached{};
+    if (not cached) {
+      cached = "../..";
+      if (auto dir = get_working_dir()) {
+        cached = *dir;
+      }
+      else {
+        std::cout << raw::NL << "No working directory path configured";
+      }
+      std::cout << raw::NL << "Using working_dir " << *cached;
+    }
+    return *cached / file_name;
+  }
+
 } // namespace aoc
 
 #endif /* aoc_hpp */

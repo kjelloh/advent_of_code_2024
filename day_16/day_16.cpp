@@ -18,71 +18,24 @@
 #include <algorithm> // E.g., std::find, std::all_of,...
 #include <numeric> // E.g., std::accumulate
 #include <limits> // E.g., std::numeric_limits
-#include <fstream>
 #include <format>
 #include <optional>
 #include <regex>
-#include <filesystem>
 
 using aoc::raw::NL;
 using aoc::raw::T;
 using aoc::raw::NT;
-
-// Try to read the path to the actual working directory
-// from a text file at the location where we execute
-std::optional<std::filesystem::path> get_working_dir() {
-  std::optional<std::filesystem::path> result{};
-    
-  std::ifstream workingDirFile("working_dir.txt");
-
-  std::string workingDir;
-  std::getline(workingDirFile, workingDir); // Read the directory path
-  std::filesystem::path dirPath{workingDir};
-
-  if (std::filesystem::exists(dirPath) and std::filesystem::is_directory(dirPath)) {
-    // Return the directory path as a std::filesystem::path
-    result = std::filesystem::path(workingDir);
-  }
-  return result;
-}
-
-std::filesystem::path to_working_dir_path(std::string const& file_name) {
-  static std::optional<std::filesystem::path> cached{};
-  if (not cached) {
-    cached = "../..";
-    if (auto dir = get_working_dir()) {
-      cached = *dir;
-    }
-    else {
-      std::cout << NL << "No working directory path configured";
-    }
-    std::cout << NL << "Using working_dir " << *cached;
-  }
-  return *cached / file_name;
-}
+using aoc::grid::Grid;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::raw::Lines;
+using Model = Grid;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
-  Model result{};
   auto input = Splitter{in};
   auto lines = input.lines();
-  if (lines.size()>1) {
-    std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
-  }
-  else {
-    // single line
-    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    result.push_back(input.trim());
-  }
+  Model result{to_raw(lines)};
   return result;
 }
 
@@ -90,13 +43,28 @@ using Args = std::vector<std::string>;
 
 namespace test {
 
-  using LogEntry = std::string;
+  struct LogEntry {
+    Grid grid;
+    Result score{};
+    std::optional<Result> steps{};
+    std::optional<Result> turns{};
+  };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+    os << "Exptected:" << " score:" << entry.score;
+    os << " steps:";
+    if (entry.steps) os << *entry.steps;
+    else os << "?";
+    os << " turns:";
+    if (entry.turns) os << *entry.turns;
+    else os << "?";
     return os;
   }
   using LogEntries = std::vector<LogEntry>;
   std::ostream& operator<<(std::ostream& os,LogEntries const& log) {
+    for (auto const& entry : log) {
+      os << NL << entry;
+    }
     return os;
   }
 
@@ -105,18 +73,37 @@ namespace test {
     LogEntries result{};
     using namespace aoc::parsing;
     auto input = Splitter{in};
-    auto lines = input.lines();
-    if (lines.size()>1) {
-      std::cout << NL << T << lines.size() << " lines";
-      for (int i=0;i<lines.size();++i) {
-        auto line = lines[i];
-        std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+    auto sections = input.sections();
+    // example: "a score of only 7036"
+    // example: "36 steps"
+    // example: "turning 90 degrees a total of 7 times"
+    
+    // example2: "the best paths cost 11048 points"
+    
+    auto line = sections[0][0];
+    std::cout << NL << T << line.str();
+    {
+      auto groups = line.groups("(\\d+)\\D+?(\\d+)\\D+?(\\d+)\\D+?(\\d+)");
+      if (groups.size()==4) {
+        auto score = std::stoi(groups[0]);
+        std::cout << " --> score:" << score;
+        auto steps = std::stoi(groups[1]);
+        std::cout << " --> steps:" << steps;
+        auto turns = std::stoi(groups[3]);
+        std::cout << " --> turns:" << turns;
+        result.push_back({to_raw(sections[1]),score,steps,turns});
       }
     }
-    else {
-      // single line
-      std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
+    if (result.size()==0){
+      auto groups = line.groups("(\\d+)");
+      if (groups.size()==1) {
+        auto score = std::stoi(groups[0]);
+        std::cout << " --> score:" << score;
+        result.push_back({to_raw(sections[1]),score});
+      }
+
     }
+    std::cout << NL << result;
     return result;
   }
 
@@ -140,6 +127,7 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << NL << model;
     }
     return result;
   }
@@ -166,40 +154,48 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11};
+  std::vector<int> states = {0,111,112,11};
   for (auto state : states) {
     switch (state) {
       case 0: {
         answers.push_back({"test0",test::test0(args)});
       } break;
       case 111: {
-        auto log_file = to_working_dir_path("example.log");
+        auto log_file = aoc::to_working_dir_path("example.log");
         std::ifstream log_in{log_file};
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
+        std::ifstream in{file};
+        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
+        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
+      } break;
+      case 112: {
+        auto log_file = aoc::to_working_dir_path("example2.log");
+        std::ifstream log_in{log_file};
+        auto file = aoc::to_working_dir_path("example2.txt");
         std::ifstream in{file};
         if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
         else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
       } break;
       case 11: {
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 10: {
-        auto file = to_working_dir_path("puzzle.txt");
+        auto file = aoc::to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 21: {
-        auto file = to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 20: {
-        auto file = to_working_dir_path("puzzle.txt");
+        auto file = aoc::to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
