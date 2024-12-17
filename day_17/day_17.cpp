@@ -74,7 +74,7 @@ std::string to_op_name(Op op) {
 //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
     case bxc: return "bxc";break;
 //
-//  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a program outputs multiple values, they are separated by commas.)
+//  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
     case out: return "out";break;
 //
 //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
@@ -93,11 +93,12 @@ std::ostream& operator<<(std::ostream& os,Statement const& statement) {
   std::cout << "{" << statement.first << ":" << to_op_name(statement.first) << "," << statement.second << "}";
   return os;
 }
-using Program = std::vector<Statement>;
-std::ostream& operator<<(std::ostream& os,Program const& program) {
-  std::cout << "program:";
-  for (auto const& statement : program) {
-    std::cout << NL << T << statement;
+using Memory = std::vector<int>;
+std::ostream& operator<<(std::ostream& os,Memory const& memory) {
+  std::cout << "Memory:" << memory.size();
+  for (int i=0;i<memory.size();++i) {
+    if (i>0) std::cout << ',';
+    std::cout << memory[i];
   }
   return os;
 }
@@ -123,8 +124,8 @@ std::string to_op_description(Op op) {
 //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
     case bxc: return "The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)";break;
 //
-//  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a program outputs multiple values, they are separated by commas.)
-    case out: return "The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a program outputs multiple values, they are separated by commas.)";break;
+//  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
+    case out: return "The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)";break;
 //
 //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
     case bdv: return "The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)";break;
@@ -137,17 +138,70 @@ std::string to_op_description(Op op) {
 }
 
 struct CPU {
-  Registers reg{};
-  std::string operator()(Statement const& statement) {
+  Registers m_reg{};
+  Memory m_mem{};
+  int ip() {return m_reg['I'];}
+  CPU(Registers reg,int ip,Memory const& mem) : m_reg{reg},m_mem{mem} {
+    m_reg['I'] = ip;
+  }
+  
+  int next() {
+    auto ip = m_reg['I'];
+    ++m_reg['I'];
+    return m_mem[ip];
+  }
+  int eval(int combo) {
+    int result{};
+    std::cout << "eval(" << combo << ")";
+    //    Combo operands 0 through 3 represent literal values 0 through 3.
+    //    Combo operand 4 represents the value of register A.
+    //    Combo operand 5 represents the value of register B.
+    //    Combo operand 6 represents the value of register C.
+    //    Combo operand 7 is reserved and will not appear in valid programs.
+    switch (combo) {
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+        result = combo;
+        std::cout << " literal ";
+        break;
+
+      case 4:
+        result = m_reg['A'];
+        std::cout << " 'A' ";
+        break;
+      case 5:
+        result = m_reg['B'];
+        std::cout << " 'B' ";
+        break;
+      case 6:
+        result = m_reg['C'];
+        std::cout << " 'C' ";
+        break;
+
+      case 7:
+        throw std::runtime_error("Sorry, combo 7 is not valid");break;
+    }
+    std::cout << " --> " << result;
+    return result;
+  }
+  std::string operator++() {
     std::string result{};
-    auto [op,operand] = statement;
-    std::cout << NL << "execute:" << statement;
+    if (ip() >= m_mem.size()) return "";
+    auto op = to_op(next());
+    auto x = next();
+    std::cout << NL << "execute:" << op << " " << x;
+    auto val = eval(x);
     switch (op) {
-        
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        int numerator = m_reg['A'];
+        auto denominator = 1 << val;
+        auto y = numerator / denominator;
+        m_reg['A'] = y;
+        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
       } break;
         
         //
@@ -160,7 +214,9 @@ struct CPU {
         //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
       case bst: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        auto y = val % 8;
+        m_reg['B'] = y;
+        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
@@ -175,7 +231,7 @@ struct CPU {
         std::cout << NL << T << "NOT YET IMPLEMENTED";
       } break;
         //
-        //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a program outputs multiple values, they are separated by commas.)
+        //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
       case out: {
         std::cout << NL << to_op_description(op);
         std::cout << NL << T << "NOT YET IMPLEMENTED";
@@ -199,22 +255,25 @@ struct CPU {
     }
     return result;
   }
-  bool operator==(CPU const& other) const = default;
+  bool operator==(CPU const& other) const {
+    return (m_reg == other.m_reg);
+  }
 };
 std::ostream& operator<<(std::ostream& os,CPU const& cpu) {
   std::cout << "cpu:";
-  std::cout << cpu.reg;
+  std::cout << cpu.m_reg;
   return os;
 }
 
 struct Computer {
-  CPU cpu{};
-  Program prog{};
+  Memory m_mem;
+  CPU m_cpu;
+  Computer(Registers reg,Memory const& memory) : m_mem{memory},m_cpu{reg,0,m_mem} {}
   Result run() {
     Result result{};
-    std::cout << NL << "run:" << cpu << " on " << prog;
-    for (auto const& statement : prog) {
-      result += cpu(statement);
+    std::cout << NL << "run:" << m_cpu << " on " << m_mem;
+    while (m_cpu.ip()<m_mem.size()) {
+      result += ++m_cpu;
     }
     return result;
   }
@@ -223,17 +282,17 @@ struct Computer {
 
 std::ostream& operator<<(std::ostream& os,Computer const& pc) {
   std::cout << "pc:";
-  std::cout << pc.cpu << pc.prog;
+  std::cout << pc.m_cpu << pc.m_mem;
   return os;
 }
 
 struct Model {
   Registers registers{};
-  Program program{};
+  Memory memory{};
 };
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
-  std::cout << "model:" << model.registers << model.program;
+  std::cout << "model:" << model.registers << model.memory;
   return os;
 }
 
@@ -262,7 +321,7 @@ namespace test {
 
   // Adapt to expected for day puzzle
   struct LogEntry {
-    Computer pc{};
+    Computer pc;
     std::optional<Result> output{};
     bool operator==(LogEntry const& other) const {
       bool result{true};
@@ -314,17 +373,15 @@ namespace test {
     std::optional<Result> result{};
     std::cout << NL << NL << "test0";
     std::ifstream log_in{aoc::to_working_dir_path("example0.log")};
-    if (log_in) {
+    if (true) {
+      // If register C contains 9, the Memory 2,6 would set register B to 1.
+      Registers reg{{'C',9}};
+      Memory memory{2,6};
+      Computer pc{reg,memory};
+      auto output = pc.run();
+    }
+    else if (log_in) {
       auto model = test::parse0(log_in);
-      {
-        // If register C contains 9, the program 2,6 would set register B to 1.
-        Registers reg{{'C',9}};
-        CPU cpu{reg};
-        Statement statement{to_op(2),6};
-        Program program{{statement}};
-        Computer pc{cpu,program};
-        auto output = pc.run();
-      }
     }
     return result;
   }
@@ -375,7 +432,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11,10};
+  std::vector<int> states = {0};
   for (auto state : states) {
     switch (state) {
       case 0: {
