@@ -36,7 +36,7 @@ namespace aoc {
     using Sections = std::vector<Lines>;
     std::ostream& operator<<(std::ostream& os,Lines const& lines) {
       for (auto const& line : lines) {
-        os << NL << line;
+        os << raw::NL << line;
       }
       return os;
     }
@@ -585,29 +585,26 @@ namespace aoc {
   }
 
   namespace test {
+    template <class T>
+    using LogEntries = std::vector<T>;
   
-    using raw::NL;
-    using raw::T;
-    
-    template <class LogEntry>
-    using LogEntries = std::vector<LogEntry>;
-  
-    template <class LogEntry>
-    std::ostream& operator<<(std::ostream& os,LogEntries<LogEntry> const& log) {
+    template <class T>
+    std::ostream& operator<<(std::ostream& os,LogEntries<T> const& log) {
       for (auto const& entry : log) {
-        os << NL << entry;
+        os << raw::NL << entry;
       }
       return os;
     }
 
-    template <class LogEntry>
+    template <class T>
     struct Outcome {
-      LogEntry expected;
-      LogEntry computed;
+      T expected;
+      T computed;
+      bool accepted() const {return computed == expected;};
     };
 
-    template <class LogEntry>
-    std::ostream& operator<<(std::ostream& os,Outcome<LogEntry> const& outcome) {
+    template <class T>
+    std::ostream& operator<<(std::ostream& os,Outcome<T> const& outcome) {
       std::ostringstream expected_os{};
       expected_os << outcome.expected;
       std::ostringstream computed_os{};
@@ -622,12 +619,12 @@ namespace aoc {
       auto max_lines = std::max(expected_lines.size(),computed_lines.size());
       std::size_t
       last_width{};
-      std::cout << NL << "Expected " << T << "Computed";
+      std::cout << raw::NL << "Expected " << raw::T << "Computed";
       for (int i=0;i<max_lines;++i) {
-        std::cout << NL;
+        std::cout << raw::NL;
         if (i==0) {
-          std::cout << NL << T << "Expected:" << expected_lines[i];
-          std::cout << NL << T << " Computed:" << computed_lines[i];
+          std::cout << raw::NL << raw::T << "Expected:" << expected_lines[i];
+          std::cout << raw::NL << raw::T << " Computed:" << computed_lines[i];
         }
         else {
           if (i<expected_lines.size()) {
@@ -637,17 +634,17 @@ namespace aoc {
           else {
             std::cout << std::string(last_width,' ');
           }
-          std::cout << T;
+          std::cout << raw::T;
           if (i < computed_lines.size()) {
             std::cout << computed_lines[i];
           }
         }
       }
-      if (outcome.computed == outcome.expected) {
-        std::cout << NL << "COMPUTED is equal to EXPECTED OK";
+      if (outcome.accepted()) {
+        std::cout << raw::NL << "COMPUTED is equal to EXPECTED OK";
       }
       else {
-        std::cout << NL << "COMPUTED and EXPECTED - DIFFERS...";
+        std::cout << raw::NL << "COMPUTED and EXPECTED - DIFFERS...";
       }
       return os;
     }

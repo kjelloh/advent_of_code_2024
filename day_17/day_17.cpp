@@ -33,7 +33,12 @@ using Result = std::string;
 
 using Registers = std::map<char,int>;
 std::ostream& operator<<(std::ostream& os,Registers const& registers) {
-  std::cout << "registers:";
+  os << " registers:";
+  int count{};
+  for (auto const& [l,x] : registers) {
+    if (count++>0) os << ',';
+    os << " reg['" << l << "'] : " << x;
+  }
   
   return os;
 }
@@ -87,18 +92,18 @@ std::string to_op_name(Op op) {
   }
 }
 
-using Statement = std::pair<Op,int>;
-std::ostream& operator<<(std::ostream& os,Statement const& statement) {
-  std::cout << "statement:";
-  std::cout << "{" << statement.first << ":" << to_op_name(statement.first) << "," << statement.second << "}";
-  return os;
-}
+//using Statement = std::pair<Op,int>;
+//std::ostream& operator<<(std::ostream& os,Statement const& statement) {
+//  os << "statement:";
+//  os << "{" << statement.first << ":" << to_op_name(statement.first) << "," << statement.second << "}";
+//  return os;
+//}
 using Memory = std::vector<int>;
 std::ostream& operator<<(std::ostream& os,Memory const& memory) {
-  std::cout << "Memory:" << memory.size();
+  os << " memory:" << memory.size() << " ";
   for (int i=0;i<memory.size();++i) {
-    if (i>0) std::cout << ',';
-    std::cout << memory[i];
+    if (i>0) os << ',';
+    os << memory[i];
   }
   return os;
 }
@@ -152,7 +157,7 @@ struct CPU {
   }
   int eval(int combo) {
     int result{};
-    std::cout << "eval(" << combo << ")";
+    std::cout << " eval(" << combo << ")";
     //    Combo operands 0 through 3 represent literal values 0 through 3.
     //    Combo operand 4 represents the value of register A.
     //    Combo operand 5 represents the value of register B.
@@ -181,7 +186,7 @@ struct CPU {
         break;
 
       case 7:
-        throw std::runtime_error("Sorry, combo 7 is not valid");break;
+        result = -1; // signal invalid
     }
     std::cout << " --> " << result;
     return result;
@@ -190,15 +195,15 @@ struct CPU {
     std::string result{};
     if (ip() >= m_mem.size()) return "";
     auto op = to_op(next());
-    auto x = next();
-    std::cout << NL << "execute:" << op << " " << x;
-    auto val = eval(x);
+    auto literal = next();
+    std::cout << NL << "execute:" << op << " " << literal;
+    auto combo = eval(literal);
     switch (op) {
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
         std::cout << NL << to_op_description(op);
         int numerator = m_reg['A'];
-        auto denominator = 1 << val;
+        auto denominator = 1 << combo;
         auto y = numerator / denominator;
         m_reg['A'] = y;
         std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
@@ -208,13 +213,15 @@ struct CPU {
         //  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
       case bxl: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        auto y = m_reg['B'] xor literal;
+        m_reg['B'] = y;
+        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
       case bst: {
         std::cout << NL << to_op_description(op);
-        auto y = val % 8;
+        auto y = combo % 8;
         m_reg['B'] = y;
         std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
@@ -222,31 +229,48 @@ struct CPU {
         //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
       case jnz: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        if (m_reg['A'] > 0) {
+          m_reg['I'] = literal;
+          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
+        }
+        else {
+          std::cout << NL << T << " NOP";
+        }
       } break;
         //
         //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
       case bxc: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        auto y = m_reg['B'] xor m_reg['C'];
+        m_reg['B'] = y;
+        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
       case out: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        auto y = combo % 8;
+        result.push_back('0'+y);
       } break;
         //
         //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
       case bdv: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        int numerator = m_reg['A'];
+        auto denominator = 1 << combo;
+        auto y = numerator / denominator;
+        m_reg['B'] = y;
+        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
       case cdv: {
         std::cout << NL << to_op_description(op);
-        std::cout << NL << T << "NOT YET IMPLEMENTED";
+        int numerator = m_reg['A'];
+        auto denominator = 1 << combo;
+        auto y = numerator / denominator;
+        m_reg['C'] = y;
+        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
       } break;
         
       default: {
@@ -256,12 +280,19 @@ struct CPU {
     return result;
   }
   bool operator==(CPU const& other) const {
-    return (m_reg == other.m_reg);
+    // Eqhaul if all 'our' keys are in other and have the same value
+    return std::all_of(m_reg.begin(), m_reg.end(),[&other](auto const& entry){
+      if (entry.first == 'I') return true; // Ignore Register 'I'
+      if (other.m_reg.contains(entry.first)) {
+        return (other.m_reg.at(entry.first) == entry.second);
+      }
+      return false;
+    });
   }
 };
 std::ostream& operator<<(std::ostream& os,CPU const& cpu) {
-  std::cout << "cpu:";
-  std::cout << cpu.m_reg;
+  os << "cpu:";
+  os << cpu.m_reg;
   return os;
 }
 
@@ -273,16 +304,21 @@ struct Computer {
     Result result{};
     std::cout << NL << "run:" << m_cpu << " on " << m_mem;
     while (m_cpu.ip()<m_mem.size()) {
-      result += ++m_cpu;
+      if (auto output = ++m_cpu;output.size()>0) {
+        if (result.size()>0) result.push_back(',');
+        result += output;
+      }
     }
     return result;
   }
-  bool operator==(Computer const& other) const = default;
+  bool operator==(Computer const& other) const {
+    return m_cpu == other.m_cpu;
+  }
 };
 
 std::ostream& operator<<(std::ostream& os,Computer const& pc) {
-  std::cout << "pc:";
-  std::cout << pc.m_cpu << pc.m_mem;
+  os << "pc:";
+  os << pc.m_cpu << pc.m_mem;
   return os;
 }
 
@@ -292,7 +328,7 @@ struct Model {
 };
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
-  std::cout << "model:" << model.registers << model.memory;
+  os << "model:" << model.registers << model.memory;
   return os;
 }
 
@@ -303,11 +339,29 @@ Model parse(auto& in) {
   auto input = Splitter{in};
   auto sections = input.sections();
   if (sections.size()==2) {
+    Registers registers{};
+    Memory memory{};
     for (int i=0;i<sections.size();++i) {
       std::cout << NL << "------ section " << i << " -------";
-      auto const& section = sections[i];
-      std::cout << to_raw(section);
+      std::cout << to_raw(sections[i]);
+      if (i==0) {
+        for (auto const& line : sections[0]) {
+          auto const& [left,right] = line.split(':');
+          char name = left.str().back();
+          auto val = std::stoi(right.trim().str());
+          registers[name] = val;
+        }
+      }
+      else {
+        auto line = sections[1][0];
+        auto const& [left,right] = line.split(':');
+        auto program = right.trim().str();
+        for (int i=0;i<program.size();++i) {
+          if (i%2==0) memory.push_back(program[i]-'0');
+        }
+      }
     }
+    result = Model{registers,memory};
   }
   else {
     std::cerr << "Sorry, Expected two sections but got " << sections.size();
@@ -321,21 +375,27 @@ namespace test {
 
   // Adapt to expected for day puzzle
   struct LogEntry {
-    Computer pc;
+    Computer before;
+    std::optional<Computer> after{};
     std::optional<Result> output{};
     bool operator==(LogEntry const& other) const {
       bool result{true};
-      result = result and (pc == other.pc);
+      result = result and (after and other.after)?*after == *other.after:true;
       result = result and (output and other.output)?(*output==*other.output):true;
       return result;
     }
   };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
-    std::cout << NL << "log entry:";
-    std::cout << entry.pc;
-    if (entry.output) std::cout << *entry.output;
-    else std::cout << "?";
+    os << " log entry:";
+    os << NL << T << " before:" << entry.before;
+    os << NL << T << " after:";
+    if (entry.after) os << *entry.after;
+    else os << "?";
+    os << NL << T << " output:";
+    if (entry.output) os << std::quoted(*entry.output);
+    else os << "?";
+    return os;
   }
 
   using LogEntries = aoc::test::LogEntries<LogEntry>;
@@ -348,24 +408,94 @@ namespace test {
     auto lines = input.lines();
     std::cout << NL << T << lines.size() << " lines";
     for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+      auto raw_line = to_raw(lines[i]);
+      std::cout << NL << T << T << "line[" << i << "]:" << raw_line.size() << " " << std::quoted(raw_line);
+      //        If register C contains 9, the program 2,6 would set register B to 1.
+      //        If register A contains 10, the program 5,0,5,1,5,4 would output 0,1,2.
+      //        If register A contains 2024, the program 0,1,5,4,3,0 would output 4,2,5,6,7,7,7,7,3,1,0 and leave 0 in register A.
+      //        If register B contains 29, the program 1,7 would set register B to 26.
+      //        If register B contains 2024 and register C contains 43690, the program 4,0 would set register B to 44354
+
+      Registers reg_before{};
+      {
+        std::regex pattern(R"(register ([A-Z]) contains (\d+))");
+        // Create a regex iterator to iterate over all matches
+        auto words_begin = std::sregex_iterator(raw_line.begin(), raw_line.end(), pattern);
+        auto words_end = std::sregex_iterator();
+
+        // Iterate through the matches and print results
+        for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
+          std::smatch match = *i;
+          std::cout << NL << "Match found:";
+          std::cout << NL << "Register: " << match[1];
+          std::cout << NL << "Value: " << match[2];
+          reg_before[match[1].str().front()] = std::stoi(match[2].str());
+        }
+      }
+      Memory memory{};
+      {
+        std::regex pattern(R"(the program ([\d,]+))");
+        std::smatch match{};
+        if (std::regex_search(raw_line,match,pattern)) {
+          std::string const program = match[1];
+          std::cout << NL << "program:" << std::quoted(program);
+          for (int i=0;i<program.size();++i) {
+            if (i%2==0) memory.push_back(program[i]-'0');
+          }
+          using ::operator<<; // Bring in for alias Memory (will not trigger ADL to look in global namespace)
+          std::cout << NL << "memory:" << memory;
+        }
+      }
+      Registers reg_after{};
+      {
+        std::regex pattern(R"(would set register ([A-Z]) to (\d+))");
+        std::smatch match{};
+        if (std::regex_search(raw_line,match,pattern)) {
+          std::cout << NL << "Match found:";
+          std::cout << NL << "Register: " << match[1];
+          std::cout << NL << "Value: " << match[2];
+          reg_after[match[1].str().front()] = std::stoi(match[2].str());
+        }
+      }
+      {
+        std::regex pattern(R"(leave (\d+) in register ([A-Z]))");
+        std::smatch match{};
+        if (std::regex_search(raw_line,match,pattern)) {
+          std::cout << NL << "Match found:";
+          std::cout << NL << "Register: " << match[2];
+          std::cout << NL << "Value: " << match[1];
+          reg_after[match[2].str().front()] = std::stoi(match[1].str());
+        }
+      }
+      Result output{};
+      {
+        std::regex pattern(R"(would output ([\d,]+))");
+        std::smatch match{};
+        if (std::regex_search(raw_line,match,pattern)) {
+          output = match[1].str();
+          std::cout << NL << "output:" << std::quoted(output);
+        }
+      }
+      Computer before{reg_before,memory};
+      Computer after{reg_after,memory};
+      LogEntry entry{before};
+      if (reg_after.size()>0) entry.after = Computer{reg_after,memory};
+      if (output.size()>0) entry.output = output;
+      result.push_back(entry);
     }
+//    using aoc::test::operator<<;
+//    std::cout << NL << "test::parse0:" << result.size() << result;
     return result;
   }
 
-  LogEntries parse1(auto& in) {
+  LogEntry parse1(auto& in,auto& log_in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
     using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto lines = input.lines();
-    std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
-    }
-    return result;
+    auto model = ::parse(in);
+    Computer computer{model.registers,model.memory};
+    auto log_input = Splitter{log_in}.trim();
+    LogEntry entry{computer,{},to_raw(log_input)};
+    return entry;
   }
 
 
@@ -373,7 +503,7 @@ namespace test {
     std::optional<Result> result{};
     std::cout << NL << NL << "test0";
     std::ifstream log_in{aoc::to_working_dir_path("example0.log")};
-    if (true) {
+    if (false) {
       // If register C contains 9, the Memory 2,6 would set register B to 1.
       Registers reg{{'C',9}};
       Memory memory{2,6};
@@ -381,7 +511,31 @@ namespace test {
       auto output = pc.run();
     }
     else if (log_in) {
-      auto model = test::parse0(log_in);
+      auto log = test::parse0(log_in);
+      bool failed{};
+      int count{};
+      for (auto const& logged : log) {
+        std::cout << NL << "--------------------";
+        std::cout << NL << "processing:" << logged;
+        Computer pc{logged.before};
+        auto output = pc.run();
+        LogEntry computed{logged.before,pc,output};
+        std::cout << NL << "--------------------";
+        std::cout << computed;
+        if ((logged.after and computed.after) and  (*logged.after != *computed.after)) {
+          std::cout << NL << "logged.after DIFFERS from computed.after - FAILED";
+          failed = true;
+          break;
+        }
+        if ((logged.output and computed.output) and (*logged.output != *computed.output)) {
+          std::cout << NL << "logged.output DIFFERS from computed.output - FAILED";
+          failed = true;
+          break;
+        }
+        std::cout << NL << "logged == computed OK";
+      }
+      if (failed) result = "FAILED";
+      else result = "passed";
     }
     return result;
   }
@@ -389,11 +543,18 @@ namespace test {
   std::optional<Result> test1(auto& in, auto& log_in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
-    if (in) {
-      auto model = ::parse(in);
-      if (log_in) {
-        auto log = test::parse1(log_in);
+    if (in and log_in) {
+      bool failed{};
+      auto log = parse1(in,log_in);
+      auto pc = log.before;
+      auto output = pc.run();
+      std::cout << NL << "logged.output:" << std::quoted(*log.output);
+      std::cout << NL << "computed.output:" << std::quoted(output);
+      if (output != log.output) {
+        failed = true;
       }
+      if (failed) result = "FAILED";
+      else result = "passed";
     }
     return result;
   }
@@ -406,6 +567,9 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      Computer pc{model.registers,model.memory};
+      auto output = pc.run();
+      result = output;
     }
     return result;
   }
@@ -432,7 +596,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0};
+  std::vector<int> states = {0,111,11,10};
   for (auto state : states) {
     switch (state) {
       case 0: {
