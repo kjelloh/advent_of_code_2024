@@ -31,7 +31,7 @@ using aoc::raw::NT;
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = std::string;
 
-using Registers = std::map<char,int>;
+using Registers = std::map<char,Integer>;
 std::ostream& operator<<(std::ostream& os,Registers const& registers) {
   os << " registers:";
   int count{};
@@ -145,7 +145,7 @@ std::string to_op_description(Op op) {
 struct CPU {
   Registers m_reg{};
   Memory m_mem{};
-  int ip() {return m_reg['I'];}
+  Integer ip() {return m_reg['I'];}
   CPU(Registers reg,int ip,Memory const& mem) : m_reg{reg},m_mem{mem} {
     m_reg['I'] = ip;
   }
@@ -155,9 +155,9 @@ struct CPU {
     ++m_reg['I'];
     return m_mem[ip];
   }
-  int eval(int combo) {
-    int result{};
-    std::cout << " eval(" << combo << ")";
+  Integer eval(int combo) {
+    Integer result{};
+//    std::cout << " eval(" << combo << ")";
     //    Combo operands 0 through 3 represent literal values 0 through 3.
     //    Combo operand 4 represents the value of register A.
     //    Combo operand 5 represents the value of register B.
@@ -169,26 +169,26 @@ struct CPU {
       case 2:
       case 3:
         result = combo;
-        std::cout << " literal ";
+//        std::cout << " literal ";
         break;
 
       case 4:
         result = m_reg['A'];
-        std::cout << " 'A' ";
+//        std::cout << " 'A' ";
         break;
       case 5:
         result = m_reg['B'];
-        std::cout << " 'B' ";
+//        std::cout << " 'B' ";
         break;
       case 6:
         result = m_reg['C'];
-        std::cout << " 'C' ";
+//        std::cout << " 'C' ";
         break;
 
       case 7:
         result = -1; // signal invalid
     }
-    std::cout << " --> " << result;
+//    std::cout << " --> " << result;
     return result;
   }
   std::string operator++() {
@@ -196,81 +196,81 @@ struct CPU {
     if (ip() >= m_mem.size()) return "";
     auto op = to_op(next());
     auto literal = next();
-    std::cout << NL << "execute:" << op << " " << literal;
+//    std::cout << NL << "execute:" << op << " " << literal;
     auto combo = eval(literal);
     switch (op) {
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
-        std::cout << NL << to_op_description(op);
-        int numerator = m_reg['A'];
+//        std::cout << NL << to_op_description(op);
+        auto numerator = m_reg['A'];
         auto denominator = 1 << combo;
         auto y = numerator / denominator;
         m_reg['A'] = y;
-        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
+//        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
       } break;
         
         //
         //  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
       case bxl: {
-        std::cout << NL << to_op_description(op);
+//        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor literal;
         m_reg['B'] = y;
-        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
       case bst: {
-        std::cout << NL << to_op_description(op);
+//        std::cout << NL << to_op_description(op);
         auto y = combo % 8;
         m_reg['B'] = y;
-        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
       case jnz: {
-        std::cout << NL << to_op_description(op);
+//        std::cout << NL << to_op_description(op);
         if (m_reg['A'] > 0) {
           m_reg['I'] = literal;
-          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
+//          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
         }
         else {
-          std::cout << NL << T << " NOP";
+//          std::cout << NL << T << " NOP";
         }
       } break;
         //
         //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
       case bxc: {
-        std::cout << NL << to_op_description(op);
+//        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor m_reg['C'];
         m_reg['B'] = y;
-        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
+//        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
       case out: {
-        std::cout << NL << to_op_description(op);
+//        std::cout << NL << to_op_description(op);
         auto y = combo % 8;
         result.push_back('0'+y);
       } break;
         //
         //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
       case bdv: {
-        std::cout << NL << to_op_description(op);
-        int numerator = m_reg['A'];
+//        std::cout << NL << to_op_description(op);
+        auto numerator = m_reg['A'];
         auto denominator = 1 << combo;
         auto y = numerator / denominator;
         m_reg['B'] = y;
-        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
       case cdv: {
-        std::cout << NL << to_op_description(op);
-        int numerator = m_reg['A'];
+//        std::cout << NL << to_op_description(op);
+        auto numerator = m_reg['A'];
         auto denominator = 1 << combo;
         auto y = numerator / denominator;
         m_reg['C'] = y;
-        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
+//        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
       } break;
         
       default: {
@@ -343,7 +343,7 @@ Model parse(auto& in) {
     Memory memory{};
     for (int i=0;i<sections.size();++i) {
       std::cout << NL << "------ section " << i << " -------";
-      std::cout << to_raw(sections[i]);
+      std::cout << to_raw(sections[i]) << std::flush;
       if (i==0) {
         for (auto const& line : sections[0]) {
           auto const& [left,right] = line.split(':');
@@ -559,6 +559,55 @@ namespace test {
     return result;
   }
 
+  std::optional<Result> test2(auto& in,Integer adjusted_A,Args args) {
+    std::optional<Result> result{};
+    std::cout << NL << NL << "test1";
+    if (in) {
+      bool found{false};
+      auto model = ::parse(in);
+      {
+        Computer pc{model.registers,model.memory};
+        pc.m_cpu.m_reg['A'] = adjusted_A;
+        auto output = pc.run();
+        using ::operator<<;
+        std::cout << NL << "memory:" << model.memory;
+        std::cout << NL << "output:" << output;
+        // OK
+      }
+      
+//      auto guess{adjusted_A};
+      auto guess{0};
+      while (true) {
+        CPU adjusted_cpu{model.registers,0,model.memory};
+        adjusted_cpu.m_reg['A'] = guess;
+        int ix{0};
+        int count{0};
+        while (true) {
+          if (++count % 1000 == 0) std::cout << NL << count << " " << guess << " " << ix;
+          if (ix >= model.memory.size()) {
+            found = true;
+            break;
+          }
+          auto output = ++adjusted_cpu;
+          if (output.size()==0) continue;
+          if (output.back()-'0' == (model.memory[ix])) {
+            ++ix;
+            continue;
+          }
+          else {
+//            std::cout << NL << T << "output.back():" << output.back() << "  != model.memory[ix]:" << model.memory[ix];
+          }
+          break;
+        }
+        ++guess;
+        if (guess > adjusted_A) break; // give up
+      }
+      if (not found) result = "FAILED";
+      else result = "passed";
+    }
+    return result;
+  }
+
 }
 
 namespace part1 {
@@ -596,7 +645,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11,10};
+  std::vector<int> states = {2};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -620,6 +669,12 @@ int main(int argc, char *argv[]) {
         auto file = aoc::to_working_dir_path("puzzle.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
+        else std::cerr << "\nSORRY, no file " << file;
+      } break;
+      case 2: {
+        auto file = aoc::to_working_dir_path("example2.txt");
+        std::ifstream in{file};
+        if (in) answers.push_back({"Part 2 Test Example vs Adjusted A",test::test2(in,117440,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
       case 21: {
@@ -651,8 +706,12 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:8ms answer[test0] passed
+   duration:0ms answer[Part 1 Test Example vs Log] passed
+   duration:0ms answer[Part 1 Example] 4,6,3,5,6,3,5,2,1,0
+   duration:0ms answer[Part 1     ] 2,1,3,0,5,2,3,7,1
+   
+   
   */
   return 0;
 }
