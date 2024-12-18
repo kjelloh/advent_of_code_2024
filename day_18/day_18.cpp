@@ -28,66 +28,168 @@ using aoc::raw::NL;
 using aoc::raw::T;
 using aoc::raw::NT;
 
+using aoc::grid::Position;
+using aoc::grid::Positions;
+using aoc::grid::Grid;
+
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::raw::Lines;
+using Model = Positions;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
   auto input = Splitter{in};
   auto lines = input.lines();
-  if (lines.size()>1) {
-    std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
-  }
-  else {
-    // single line
-    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    result.push_back(input.trim());
+  std::cout << NL << T << lines.size() << " lines";
+  for (int i=0;i<lines.size();++i) {
+    auto line = lines[i];
+    std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+    auto const& [x,y] = line.split(',');
+    result.push_back({std::stoi(y),std::stoi(x)}); // row = y,col=x
   }
   return result;
 }
 
 using Args = std::vector<std::string>;
 
+struct Node {
+    Position pos;
+    Result cost;
+    bool operator>(Node const& other) const { return cost > other.cost; }
+};
+
+using aoc::grid::Path;
+
+Path to_best_path(Position const& start, Position const& end,Grid const& grid) {
+  Path result{};
+  
+  std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
+  std::map<Position, Result> cost_map;
+  std::map<Position, Position> previous;
+  std::set<Position> visited;
+  auto step_cost = []() {
+    return 1;
+  };
+  
+  pq.push({start, 0});
+  cost_map[start] = 0;
+  
+  while (!pq.empty()) {
+    Node current = pq.top();
+    pq.pop();
+    
+    if (current.pos == end) {
+      break;
+    }
+    
+    if (visited.count(current.pos)) {
+      continue;
+    }
+    visited.insert(current.pos);
+    
+    for (auto const& next : default_neighbors(current.pos)) {
+      if (not grid.on_map(next)) continue;
+      if (visited.contains(next)) continue;
+      if (grid.at(next) == '#') continue;
+      
+      auto new_cost = current.cost + step_cost();
+      
+      // Update if this path is better.
+      if (!cost_map.count(next) || new_cost < cost_map[next]) {
+        cost_map[next] = new_cost;
+        previous[next] = current.pos;
+        pq.push({next, new_cost});
+      }
+    }
+  }
+  
+  // Reconstruct the path.
+  for (Position at = end; at != start; at = previous[at]) {
+    result.push_back(at);
+  }
+  result.push_back(start);
+  std::reverse(result.begin(), result.end());
+  
+  return result;
+}
+
 namespace test {
 
   // Adapt to expected for day puzzle
   struct LogEntry {
+    Grid unwalked{};
+    Grid walked{};
+    int best_step_count{-1};
     bool operator==(LogEntry const& other) const {
       bool result{true};
+//      result = result and (unwalked == other.unwalked);
+//      result = result and (walked == other.walked);
+      result = result and (best_step_count == other.best_step_count);
       return result;
     }
   };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+    std::cout << NL << "log:";
+    std::cout << NL << "unwalked:" << entry.unwalked;
+    std::cout << NL << "walked:" << entry.walked;
+    std::cout << NL << "best_step_count:" << entry.best_step_count;
+
     return os;
   }
 
   using LogEntries = aoc::test::LogEntries<LogEntry>;
 
-  LogEntries parse(auto& in) {
+  LogEntry parse(auto& in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
+    LogEntry result{};
     using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto lines = input.lines();
-    if (lines.size()>1) {
-      std::cout << NL << T << lines.size() << " lines";
-      for (int i=0;i<lines.size();++i) {
-        auto line = lines[i];
-        std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+    auto sections = Splitter{in}.sections();
+    int byte_count{-1};
+    Grid unwalked_grid{{}};
+    Grid walked_grid{{}};
+    int corrupted_locations{-1};
+    int best_step_count{-1};
+    for (int i=0;i<sections.size();++i) {
+      std::cout << NL << "sections[" << i << "]" << std::flush;
+      for (auto const& line : sections[i]) {
+        std::cout << NL << line.str() << std::flush;
+        switch (i) {
+          case 0: {
+            std::regex pattern{R"(the first (\d+) bytes)"};
+            std::smatch match{};
+            if (std::regex_search(line.str(),match,pattern)) {
+              byte_count = std::stoi(match[1]);
+              std::cout << NL << T << "--> byte_count:" << byte_count;
+            }
+          } break;
+          case 1: {
+            unwalked_grid.push_back(line.str());
+          } break;
+          case 2: {
+            std::regex cl_pattern1{R"(After just (\d+) bytes)"};
+            std::regex sc_pattern{R"(would take (\d+) steps)"};
+            std::smatch match{};
+            if (std::regex_search(line.str(),match,cl_pattern1)) {
+              corrupted_locations = std::stoi(match[1]);
+              std::cout << NL << T << "--> corrupted_locations:" << corrupted_locations;
+            }
+            if (std::regex_search(line.str(),match,sc_pattern)) {
+              best_step_count = std::stoi(match[1]);
+              std::cout << NL << T << "--> best_step_count:" << best_step_count;
+            }
+          } break;
+          case 3: {
+            walked_grid.push_back(line.str());
+          } break;
+          default: {std::cerr << NL << "Sorry, parsed unexpected sections count " << sections.size();} break;
+        }
       }
     }
-    else {
-      // single line
-      std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    }
+    result.unwalked = unwalked_grid;
+    result.walked = walked_grid;
+    result.best_step_count = best_step_count;
     return result;
   }
 
@@ -103,6 +205,21 @@ namespace test {
       auto model = ::parse(in);
       if (log_in) {
         auto log = test::parse(log_in);
+        std::cout << NL << log;
+        auto const& unwalked = log.unwalked;
+        auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
+        std::cout << NL << "best_path:" << best_path;
+        auto best_step_count = best_path.size()-1;
+        std::cout << NL << "best_step_count:" << best_step_count;
+        auto computed = log.unwalked;
+        computed = aoc::grid::to_traced(computed, best_path);
+        std::cout << NL << "computed:" << computed;
+        if (best_step_count == log.best_step_count) {
+          result = best_path.size()-1;
+        }
+        else {
+          std::cout << NL << "FAILED";
+        }
       }
     }
     return result;
@@ -142,7 +259,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11};
+  std::vector<int> states = {111};
   for (auto state : states) {
     switch (state) {
       case 0: {

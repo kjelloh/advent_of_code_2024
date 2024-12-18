@@ -278,8 +278,9 @@ namespace aoc {
 
   namespace grid {
     struct Vector {
-      int row{};
-      int col{};
+      using value_type = int;
+      value_type row{};
+      value_type col{};
       bool operator<(const Vector& other) const {
         return std::tie(row, col) < std::tie(other.row, other.col);
       }
@@ -329,90 +330,102 @@ namespace aoc {
 
     class Grid {
     public:
-        Grid(std::vector<std::string> grid) : grid_(std::move(grid)) {}
-
-        // Returns the height of the grid
-        size_t height() const {
-            return grid_.size();
+      Grid& push_back(raw::Line const& row) {
+        m_grid.push_back(row);
+        return *this;
+      }
+      Grid(std::vector<std::string> grid = {}) : m_grid(std::move(grid)) {}
+      
+      // Returns the height of the grid
+      size_t height() const {
+        return m_grid.size();
+      }
+      
+      // Returns the width of the grid
+      size_t width() const {
+        return m_grid.empty() ? 0 : m_grid[0].size();
+      }
+      
+      // Checks if a position is within the bounds of the grid
+      bool on_map(Position const& pos) const {
+        auto const [row, col] = pos;
+        return (row >= 0 && row < static_cast<int>(height()) &&
+                col >= 0 && col < static_cast<int>(width()));
+      }
+      
+      // Retrieves the character at a given position, if valid
+      std::optional<char> at(Position const& pos) const {
+        if (on_map(pos)) {
+          return m_grid[pos.row][pos.col];
         }
-
-        // Returns the width of the grid
-        size_t width() const {
-            return grid_.empty() ? 0 : grid_[0].size();
+        return std::nullopt;
+      }
+      char& at(Position const& pos) {
+        if (on_map(pos)) {
+          return m_grid[pos.row][pos.col];
         }
-
-        // Checks if a position is within the bounds of the grid
-        bool on_map(Position const& pos) const {
-            auto const [row, col] = pos;
-            return (row >= 0 && row < static_cast<int>(height()) &&
-                    col >= 0 && col < static_cast<int>(width()));
+        throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+      }
+      
+      char operator[](Position const pos) const {
+        if (auto och = at(pos)) return *och;
+        throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+      }
+      
+      std::optional<std::string> at_row(int r) const {
+        if (r < height()) {
+          return m_grid[r];
         }
-
-        // Retrieves the character at a given position, if valid
-        std::optional<char> at(Position const& pos) const {
-            if (on_map(pos)) {
-                return grid_[pos.row][pos.col];
-            }
-            return std::nullopt;
-        }
-        char& at(Position const& pos) {
-          if (on_map(pos)) {
-              return grid_[pos.row][pos.col];
+        return std::nullopt;
+      }
+      
+      std::string operator[](int r) const {
+        if (auto orow = at_row(r)) return *orow;
+        else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
+      }
+      
+      void for_each(auto f) const {
+        for (int row=0;row<height();++row) {
+          for (int col=0;col<width();++col) {
+            f(*this,Position{row,col});
           }
-          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
         }
+      }
       
-        char operator[](Position const pos) const {
-          if (auto och = at(pos)) return *och;
-          throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
-        }
-
-        std::optional<std::string> at_row(int r) const {
-          if (r < height()) {
-            return grid_[r];
-          }
-          return std::nullopt;
-        }
+      Positions find_all(char ch) const {
+        Positions result{};
+        auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
+          if (grid.at(pos) == ch) result.push_back(pos);
+        };
+        for_each(push_back_matched);
+        return result;
+      }
       
-        std::string operator[](int r) const {
-          if (auto orow = at_row(r)) return *orow;
-          else throw std::runtime_error(std::format("Sorry, Row {} is outside grid height {}",r,height()));
-        }
+      bool contains(Position const& pos) const {
+        return at(pos).has_value();
+      }
       
-        void for_each(auto f) const {
-          for (int row=0;row<height();++row) {
-            for (int col=0;col<width();++col) {
-              f(*this,Position{row,col});
-            }
-          }
-        }
+      bool operator==(Grid const& other) const {
+        bool result{true};
+        auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
+          result = result and (this->at(pos) == other.at(pos));
+        };
+        this->for_each(all_equal);
+        return result;
+      }
       
-        Positions find_all(char ch) const {
-          Positions result{};
-          auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
-            if (grid.at(pos) == ch) result.push_back(pos);
-          };
-          for_each(push_back_matched);
-          return result;
-        }
-
-        bool contains(Position const& pos) const {
-          return at(pos).has_value();
-        }
+      Position top_left() const {return {0,0};}
+      Position bottom_right() const {
+        return {
+           static_cast<Position::value_type>(height()-1)
+          ,static_cast<Position::value_type>(width()-1)
+        };
+      }
       
-        bool operator==(Grid const& other) const {
-          bool result{true};
-          auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
-            result = result and (this->at(pos) == other.at(pos));
-          };
-          this->for_each(all_equal);
-          return result;
-        }
-
     private:
-        std::vector<std::string> grid_;
+      std::vector<std::string> m_grid;
     };
-  
+      
     std::ostream& operator<<(std::ostream& os,Grid const& grid) {
       os << raw::NL << raw::T;
       for (int col=0;col<grid.width();++col) {
@@ -463,6 +476,42 @@ namespace aoc {
         };
     }
   
+    const std::vector<Position> directions = {
+        {0, 1},  // Right
+        {1, 0},  // Down
+        {0, -1}, // Left
+        {-1, 0}  // Up
+    };
+
+    int to_direction_index(Position const& from, Position const& to) {
+      auto it = std::find(directions.begin(), directions.end(),to-from);
+      return (it != directions.end()) ? static_cast<int>(std::distance(directions.begin(), it)) : -1;
+    }
+
+
+    Grid& to_dir_traced(Grid& grid,Path const& path) {
+      for (int i=1;i<path.size()-1;++i) {
+        auto from = path[i];
+        auto to = path[i+1];
+        switch (to_direction_index(from, to)) {
+          case 0: grid.at(from) = '>'; break;
+          case 1: grid.at(from) = 'v'; break;
+          case 2: grid.at(from) = '<'; break;
+          case 3: grid.at(from) = '^'; break;
+          case -1: break;
+        }
+      }
+      return grid;
+    }
+
+    Grid& to_traced(Grid& grid,Path const& path) {
+      for (int i=0;i<path.size();++i) {
+        auto visited = path[i];
+        grid.at(visited) = 'O';
+      }
+      return grid;
+    }
+
     Seen to_flood_fill(Grid const& grid,Position start) {
       Seen result{};
       std::deque<Position> q{};
