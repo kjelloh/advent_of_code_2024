@@ -244,6 +244,32 @@ namespace test {
   }
 }
 
+namespace common {
+  struct Solution {
+    int byte_count;
+    Path best_path;
+    Integer best_step_count;
+  };
+  std::optional<Solution> solve_for(Model const& model,Args const& args) {
+    std::optional<Solution> result{};
+    std::cout << NL << NL << "common::solve_for";
+    int byte_count{12};
+    if (model.size()>25) byte_count = 1024;
+    if (args.size()>0) byte_count = std::stoi(args[0]);
+    auto unwalked = to_unwalked(model,byte_count);
+    auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
+    std::cout << NL << "best_path:" << best_path;
+    auto best_step_count = best_path.size()-1;
+    std::cout << NL << "best_step_count:" << best_step_count;
+    auto computed = unwalked;
+    computed = aoc::grid::to_traced(computed, best_path);
+    std::cout << NL << "computed:" << computed;
+    result = Solution(byte_count,best_path,best_step_count);
+    return result;
+  }
+
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -273,6 +299,18 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      auto solution = common::solve_for(model, args);
+      if (solution) {
+        for (int i=solution->byte_count;i<model.size();++i) {
+          auto pos = model[i];
+          auto iter = std::find(solution->best_path.begin(),solution->best_path.end(),pos);
+          if (iter != solution->best_path.end()) {
+            std::cout << NL << "FOUND:";
+            std::cout << "byte[" << i << "] will block best_path at pos:" << pos;
+            std::cout << "Answer: " << pos.col << "," << pos.row;
+          }
+        }
+      }
     }
     return result;
   }
@@ -288,7 +326,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {10};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 0: {
