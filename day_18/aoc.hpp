@@ -504,10 +504,10 @@ namespace aoc {
       return grid;
     }
 
-    Grid& to_traced(Grid& grid,Path const& path) {
-      for (int i=0;i<path.size();++i) {
-        auto visited = path[i];
-        grid.at(visited) = 'O';
+    template <typename T>
+    Grid& to_filled(Grid& grid,T const& seen,char filler = 'O') {
+      for (auto const& visited : seen) {
+        grid.at(visited) = filler;
       }
       return grid;
     }

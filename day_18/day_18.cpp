@@ -33,7 +33,7 @@ using aoc::grid::Positions;
 using aoc::grid::Grid;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using Model = Positions;
 
 Model parse(auto& in) {
@@ -55,7 +55,7 @@ using Args = std::vector<std::string>;
 
 struct Node {
     Position pos;
-    Result cost;
+    Integer cost;
     bool operator>(Node const& other) const { return cost > other.cost; }
 };
 
@@ -65,7 +65,7 @@ Path to_best_path(Position const& start, Position const& end,Grid const& grid) {
   Path result{};
   
   std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-  std::map<Position, Result> cost_map;
+  std::map<Position, Integer> cost_map;
   std::map<Position, Position> previous;
   std::set<Position> visited;
   auto step_cost = []() {
@@ -230,10 +230,10 @@ namespace test {
         auto best_step_count = best_path.size()-1;
         std::cout << NL << "best_step_count:" << best_step_count;
         auto computed = to_unwalked(model,log.byte_count);
-        computed = aoc::grid::to_traced(computed, best_path);
+        computed = aoc::grid::to_filled(computed, best_path);
         std::cout << NL << "computed:" << computed;
         if (best_step_count == log.best_step_count) {
-          result = best_path.size()-1;
+          result = std::to_string(best_path.size()-1);
         }
         else {
           std::cout << NL << "FAILED";
@@ -263,7 +263,7 @@ namespace common {
     auto best_step_count = best_path.size()-1;
     std::cout << NL << "best_step_count:" << best_step_count;
     auto computed = unwalked;
-    computed = aoc::grid::to_traced(computed, best_path);
+    computed = aoc::grid::to_filled(computed, best_path);
     std::cout << NL << "computed:" << computed;
     result = Solution(byte_count,unwalked,best_path,best_step_count);
     return result;
@@ -277,18 +277,10 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      int byte_count{12};
-      if (model.size()>24) byte_count = 1024;
-      if (args.size()>0) byte_count = std::stoi(args[0]);
-      auto unwalked = to_unwalked(model,byte_count);
-      auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
-      std::cout << NL << "best_path:" << best_path;
-      auto best_step_count = best_path.size()-1;
-      std::cout << NL << "best_step_count:" << best_step_count;
-      auto computed = unwalked;
-      computed = aoc::grid::to_traced(computed, best_path);
-      std::cout << NL << "computed:" << computed;
-      result = best_step_count;
+      auto solution = common::solve_for(model, args);
+      if (solution) {
+        result = std::to_string(solution->best_step_count);
+      }
     }
     return result;
   }
@@ -305,13 +297,17 @@ namespace part2 {
         auto unwalked = solution->unwalked;
         auto start = unwalked.top_left();
         auto end = unwalked.bottom_right();
+        std::cout << NL;
         for (int i=solution->byte_count;i<model.size();++i) {
+          if (i % 32 == 0) std::cout << '>' << i << ".." << std::flush;
           auto pos = model[i];
           unwalked.at(pos) = '#';
           auto seen = aoc::grid::to_flood_fill(unwalked, start);
           if (not seen.contains(end)) {
             std::cout << NL << "FOUND: byte[" << i << "] at " << pos << " blocks reach of end";
-            std::cout << NL << "Answer: " << pos.col << "," << pos.row;
+            std::cout << NL << aoc::grid::to_filled(unwalked,seen);
+            std::cout << NL << "Finally blcoked at " << pos;
+            result = std::format("{},{}",pos.col,pos.row); // col/x, row/y
             break;
           }
           
@@ -332,7 +328,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {20};
+  std::vector<int> states = {111,11,10,21,20};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -387,8 +383,12 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:3ms answer[Part 1 Test Example vs Log] 22
+   duration:1ms answer[Part 1 Example] 22
+   duration:74ms answer[Part 1     ] 252
+   duration:0ms answer[Part 2 Example] 6,1
+   duration:21593ms answer[Part 2     ] 5,60
+   
   */
   return 0;
 }
