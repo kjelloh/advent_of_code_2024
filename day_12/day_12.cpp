@@ -76,6 +76,7 @@ using Args = std::vector<std::string>;
 using aoc::grid::Grid;
 using aoc::grid::Position;
 using aoc::grid::Positions;
+using aoc::grid::Direction;
 
 using Region = std::pair<char,Positions>;
 using Perimeter = Positions;
@@ -197,18 +198,17 @@ namespace part1 {
 namespace part2 {
 
   // Directions for moving up, down, left, right
-  Position const RIGHT{0,1};
-  Position const DOWN{1,0};
-  Position const LEFT{0,-1};
-  Position const UP{-1,0};
-  using Direction = Position;
-  using Directions = Positions;
+  Direction const RIGHT{0,1};
+  Direction const DOWN{1,0};
+  Direction const LEFT{0,-1};
+  Direction const UP{-1,0};
+  using Directions = std::vector<Direction>;
   Directions const directions = {RIGHT,RIGHT+DOWN,DOWN,DOWN+LEFT,LEFT,LEFT+UP,UP,UP+RIGHT};
 
   struct Edge {
     Position start;
     Position end;
-    Position normal; // Normal vector for the edge
+    Direction normal; // Normal vector for the edge
     
     bool operator==(const Edge& other) const {
       return (start == other.start && end == other.end and normal == other.normal);

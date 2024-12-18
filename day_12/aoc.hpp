@@ -163,37 +163,125 @@ namespace aoc {
   }
   
   namespace graph {
-    template <typename Vertex>
-    class Graph {
+  
+    class IntGraph {
     public:
-      using Vertices = std::set<Vertex>;
-      using AdjList = std::map<Vertex,Vertices>;
-      Graph(Vertices const& vertices) {
-        for (auto const& v : vertices) {
-          add_vertex(v);
+      using Vertex = int;
+      using Adjacent = std::set<int>;
+      using AdjList = std::map<int, Adjacent>;
+      IntGraph() = default;
+      void add_vertex(int v) {m_adj[v];}
+      void add_edge(int v1, int v2) {m_adj[v1].insert(v2);}
+      void remove_edge(int v1, int v2) {m_adj[v1].erase(v2);}
+      void remove_vertex(int v) {
+        for (auto& [key, neighbors] : m_adj) {
+          neighbors.erase(v);
         }
+        m_adj.erase(v);
       }
-      void add_vertex(Vertex const& v) {m_adj.insert({v,{}});}
-      void add_edge(Vertex const& v1,Vertex const& v2) {
-        m_adj[v1].insert(v2);
+      auto size() const {return m_adj.size();}
+      size_t edge_count() const {
+        size_t count = 0;
+        for (const auto& [v, neighbors] : m_adj) {
+          count += neighbors.size();
+        }
+        return count / 2;
+      }
+      auto degree(int v) const {return m_adj.at(v).size();}
+      bool has_edge(int v1, int v2) const {
+        auto it = m_adj.find(v1);
+        return it != m_adj.end() && it->second.count(v2);
       }
       AdjList const& adj() const {return m_adj;}
-      auto size() const {return adj().size();}
     private:
-      AdjList m_adj{};
+      AdjList m_adj;
     };
   
-    template <typename T>
-    std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
+    std::ostream& operator<<(std::ostream& os,IntGraph::Adjacent const& adjacent) {
+      int count{};
+      os << '[';
+      for (auto const& v : adjacent) {
+        if (count++ > 0) std::cout << ',';
+        os << v;
+      }
+      os << ']';
+      return os;
+    }
+    std::ostream& operator<<(std::ostream& os,IntGraph const& graph) {
       std::cout << "vertices:" << graph.size();
       for (auto const& adjacency : graph.adj()) {
         std::cout << raw::NL << raw::T << adjacency.first << " --> " << adjacency.second;
       }
-      
       return os;
     }
   
-  }
+    template <typename Weight>
+    class WeightedIntGraph {
+    private:
+      IntGraph m_graph;
+      using Edge = std::pair<int,int>;
+      std::map<Edge,Weight> m_weight{};
+    public:
+      WeightedIntGraph(IntGraph graph = {}) : m_graph(std::move(graph)) {}
+      IntGraph& base() {return m_graph;}
+      IntGraph const& base() const{return m_graph;}
+      void add_edge(int v1, int v2,Weight weight) {
+        m_graph.add_edge(v1,v2);
+        m_weight[Edge{v1,v2}] = weight;
+      }
+      Weight get_weight(int v1,int v2) {
+        Edge edge{v1,v2};
+        if (m_weight.contains(edge)) {
+          return m_weight[edge];
+        }
+        else throw std::runtime_error(std::format("Sorry, get_weight failed. No edge {} -> {}",v1,v2));
+      }
+      void set_weight(int v1,int v2,Weight weight) {
+        Edge edge{v1,v2};
+        m_weight[edge] = weight;
+      }
+    };
+  
+    template <typename Graph>
+    class IntGraphMapper {
+    public:
+      using Vertex = typename Graph::Vertex;
+      using VertexToIntMap = std::unordered_map<Vertex, int>;
+      using IntToVertexMap = std::unordered_map<int, Vertex>;
+      
+      struct MappingResult {
+        IntGraph int_graph;
+        VertexToIntMap vertex_to_int;
+        IntToVertexMap int_to_vertex;
+      };
+
+      MappingResult to_mapped(Graph const& graph) const {
+        IntGraph int_graph;
+        VertexToIntMap vertex_to_int;
+        IntToVertexMap int_to_vertex;
+                
+        // Map vertices to integers
+        for (const auto& [vertex, _] : graph.adj()) {
+          if (vertex_to_int.find(vertex) == vertex_to_int.end()) {
+            auto next_id = vertex_to_int.size();
+            vertex_to_int[vertex] = next_id;
+            int_to_vertex[next_id] = vertex;
+          }
+        }
+
+        // Populate the IntGraph
+        for (auto const& [vertex, neighbors] : graph.adj()) {
+          int v1 = vertex_to_int[vertex];
+          for (const auto& neighbor : neighbors) {
+            int v2 = vertex_to_int[neighbor];
+            int_graph.add_edge(v1, v2);
+          }
+        }
+        return {int_graph, vertex_to_int, int_to_vertex};
+      }
+    };
+  
+  } // namespace graph
 
   namespace xy {
     struct Vector {
