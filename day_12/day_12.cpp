@@ -48,7 +48,7 @@ auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = Integer;
-using Model = aoc::parsing::Lines;
+using Model = aoc::raw::Lines;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
