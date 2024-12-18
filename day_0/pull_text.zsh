@@ -10,7 +10,7 @@ YEAR=$(cat ../year.txt)
 DAY_NUMBER=$(cat day.txt)
 
 # Define the output file name
-OUTPUT_FILE="day_${DAY_NUMBER}.txt"
+OUTPUT_FILE="doc.txt"
 
 # Fetch the puzzle description webpage using curl
 curl -s -H "Cookie: session=$SESSION_COOKIE" \

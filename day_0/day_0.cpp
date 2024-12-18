@@ -29,26 +29,19 @@ using aoc::raw::T;
 using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = aoc::raw::Line;
 using Model = aoc::raw::Lines;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
-  auto input = Splitter{in};
-  auto lines = input.lines();
-  if (lines.size()>1) {
-    std::cout << NL << T << lines.size() << " lines";
-    for (int i=0;i<lines.size();++i) {
-      auto line = lines[i];
-      std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+  auto sections = Splitter{in}.sections();
+  for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+    std::cout << NL << "---------- section " << sx << " ----------";
+    for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
       result.push_back(line);
     }
-  }
-  else {
-    // single line
-    std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
-    result.push_back(input.trim());
   }
   return result;
 }
@@ -71,22 +64,16 @@ namespace test {
 
   using LogEntries = aoc::test::LogEntries<LogEntry>;
 
-  LogEntries parse(auto& in) {
+  LogEntries parse(auto& doc_in) {
     std::cout << NL << T << "test::parse";
     LogEntries result{};
     using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto lines = input.lines();
-    if (lines.size()>1) {
-      std::cout << NL << T << lines.size() << " lines";
-      for (int i=0;i<lines.size();++i) {
-        auto line = lines[i];
-        std::cout << NL << T << T << "line[" << i << "]:" << line.size() << " " << std::quoted(line.str());
+    auto sections = Splitter{doc_in}.same_indent_sections();
+    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+      std::cout << NL << "---------- section " << sx << " ----------";
+      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
       }
-    }
-    else {
-      // single line
-      std::cout << NL << T << T << "input:" << input.size() << " " << std::quoted(input.str());
     }
     return result;
   }
@@ -96,13 +83,13 @@ namespace test {
     return std::nullopt;
   }
 
-  std::optional<Result> test1(auto& in, auto& log_in,Args args) {
+  std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
     if (in) {
       auto model = ::parse(in);
-      if (log_in) {
-        auto log = test::parse(log_in);
+      if (doc_in) {
+        auto log = test::parse(doc_in);
       }
     }
     return result;
@@ -135,26 +122,27 @@ namespace part2 {
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
   Args args{};
-  for (int i=0;i<argc;++i) {
+  for (int i=1;i<argc;++i) {
     args.push_back(argv[i]);
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11};
+  std::vector<int> states = {0,111,11,10,211,21,20};
+//  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
       case 0: {
         answers.push_back({"test0",test::test0(args)});
       } break;
       case 111: {
-        auto log_file = aoc::to_working_dir_path("example.log");
-        std::ifstream log_in{log_file};
+        auto doc_file = aoc::to_working_dir_path("doc.txt");
+        std::ifstream doc_in{doc_file};
         auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
-        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
+        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
+        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
       } break;
       case 11: {
         auto file = aoc::to_working_dir_path("example.txt");
@@ -167,6 +155,14 @@ int main(int argc, char *argv[]) {
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
+      } break;
+      case 211: {
+        auto doc_file = aoc::to_working_dir_path("doc.txt");
+        std::ifstream doc_in{doc_file};
+        auto file = aoc::to_working_dir_path("example.txt");
+        std::ifstream in{file};
+        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test1(in,doc_in,args)});
+        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
       } break;
       case 21: {
         auto file = aoc::to_working_dir_path("example.txt");
