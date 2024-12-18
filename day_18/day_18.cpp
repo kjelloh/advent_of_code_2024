@@ -114,10 +114,27 @@ Path to_best_path(Position const& start, Position const& end,Grid const& grid) {
   return result;
 }
 
+Grid to_unwalked(Model const& model,int byte_count) {
+  int width{7};
+  int height{7};
+  if (byte_count == 1024) {
+    width = 71;
+    height = 71;
+  }
+  std::cout << NL << "to_unwalked() width:" << width << " heigh:" << height << " byte_count:" << byte_count;
+  Grid result{aoc::raw::Lines(height,aoc::raw::Line(width,'.'))};
+  for (int i=0;i<byte_count;++i) {
+    auto pos = model[i];
+    result.at(pos) = '#';
+  }
+  return result;
+}
+
 namespace test {
 
   // Adapt to expected for day puzzle
   struct LogEntry {
+    int byte_count{-1};
     Grid unwalked{};
     Grid walked{};
     int best_step_count{-1};
@@ -133,9 +150,9 @@ namespace test {
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
     std::cout << NL << "log:";
     std::cout << NL << "unwalked:" << entry.unwalked;
+    std::cout << NL << "byte_count:" << entry.byte_count;
     std::cout << NL << "walked:" << entry.walked;
     std::cout << NL << "best_step_count:" << entry.best_step_count;
-
     return os;
   }
 
@@ -187,6 +204,7 @@ namespace test {
         }
       }
     }
+    result.byte_count = byte_count;
     result.unwalked = unwalked_grid;
     result.walked = walked_grid;
     result.best_step_count = best_step_count;
@@ -211,7 +229,7 @@ namespace test {
         std::cout << NL << "best_path:" << best_path;
         auto best_step_count = best_path.size()-1;
         std::cout << NL << "best_step_count:" << best_step_count;
-        auto computed = log.unwalked;
+        auto computed = to_unwalked(model,log.byte_count);
         computed = aoc::grid::to_traced(computed, best_path);
         std::cout << NL << "computed:" << computed;
         if (best_step_count == log.best_step_count) {
@@ -224,7 +242,6 @@ namespace test {
     }
     return result;
   }
-
 }
 
 namespace part1 {
@@ -233,6 +250,18 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      int byte_count{12};
+      if (model.size()>24) byte_count = 1024;
+      if (args.size()>0) byte_count = std::stoi(args[0]);
+      auto unwalked = to_unwalked(model,byte_count);
+      auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
+      std::cout << NL << "best_path:" << best_path;
+      auto best_step_count = best_path.size()-1;
+      std::cout << NL << "best_step_count:" << best_step_count;
+      auto computed = unwalked;
+      computed = aoc::grid::to_traced(computed, best_path);
+      std::cout << NL << "computed:" << computed;
+      result = best_step_count;
     }
     return result;
   }
@@ -252,14 +281,14 @@ namespace part2 {
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
   Args args{};
-  for (int i=0;i<argc;++i) {
+  for (int i=1;i<argc;++i) {
     args.push_back(argv[i]);
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111};
+  std::vector<int> states = {10};
   for (auto state : states) {
     switch (state) {
       case 0: {
