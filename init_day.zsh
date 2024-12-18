@@ -28,6 +28,7 @@ cp -nv "$TEMPLATE_FOLDER/aoc.hpp" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/CMakeLists.txt" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/init_tool_chain.zsh" "$NEW_FOLDER/"
 cp -nv "$TEMPLATE_FOLDER/pull_data.zsh" "$NEW_FOLDER/"
+cp -nv "$TEMPLATE_FOLDER/pull_text.zsh" "$NEW_FOLDER/"
 touch "$NEW_FOLDER/example.txt"
 touch "$NEW_FOLDER/example.log"
 
