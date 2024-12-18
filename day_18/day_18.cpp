@@ -247,6 +247,7 @@ namespace test {
 namespace common {
   struct Solution {
     int byte_count;
+    Grid unwalked;
     Path best_path;
     Integer best_step_count;
   };
@@ -264,7 +265,7 @@ namespace common {
     auto computed = unwalked;
     computed = aoc::grid::to_traced(computed, best_path);
     std::cout << NL << "computed:" << computed;
-    result = Solution(byte_count,best_path,best_step_count);
+    result = Solution(byte_count,unwalked,best_path,best_step_count);
     return result;
   }
 
@@ -301,14 +302,19 @@ namespace part2 {
       auto model = parse(in);
       auto solution = common::solve_for(model, args);
       if (solution) {
+        auto unwalked = solution->unwalked;
+        auto start = unwalked.top_left();
+        auto end = unwalked.bottom_right();
         for (int i=solution->byte_count;i<model.size();++i) {
           auto pos = model[i];
-          auto iter = std::find(solution->best_path.begin(),solution->best_path.end(),pos);
-          if (iter != solution->best_path.end()) {
-            std::cout << NL << "FOUND:";
-            std::cout << "byte[" << i << "] will block best_path at pos:" << pos;
-            std::cout << "Answer: " << pos.col << "," << pos.row;
+          unwalked.at(pos) = '#';
+          auto seen = aoc::grid::to_flood_fill(unwalked, start);
+          if (not seen.contains(end)) {
+            std::cout << NL << "FOUND: byte[" << i << "] at " << pos << " blocks reach of end";
+            std::cout << NL << "Answer: " << pos.col << "," << pos.row;
+            break;
           }
+          
         }
       }
     }
