@@ -226,8 +226,9 @@ namespace test {
   using Vertex = int;
   using Weight = std::string;
   // Graph with edges weighted with the towel used (consumed)
-  using Graph = std::unordered_map<Vertex, std::vector<std::pair<Vertex,Weight>>>;
-  Graph to_graph(const std::string& design, const std::vector<std::string>& towels) {
+  using Adjacent = std::set<std::pair<Vertex,Weight>>;
+  using Graph = std::unordered_map<Vertex, Adjacent>;
+  Graph to_graph(const std::string& design, const std::vector<std::string>& towels,bool find_all_paths) {
     Graph graph;
 
     struct State {
@@ -249,28 +250,30 @@ namespace test {
       queue.pop_front();
       seen.insert(state); // Do not revisit
       auto const& [current,path] = state;
-      if (current == design.size()-1) {
+      if (current == design.size()) {
         graph[current]; // Add the end vertex
-        if (not graph.contains(state.pos)) std::cout << NL << "BREAK on end but not in graph?" << std::flush;
-        break; // One end is enough for now
+        if (not find_all_paths) break; // One end is enough
+        else continue; // try options still in queue
       }
       for (const auto& towel : towels) {
-        if (current + towel.size() > (design.size()-1)) continue; // towel don't fit (redundant?)
+//        if (current + towel.size() > (design.size()-1)) continue; // towel don't fit (redundant?)
         if (design.substr(current, towel.size()) != towel) continue; // towel don't fit
+//        std::cout << NL << T << "current:" << current << " consumed:" << towel;
         Vertex next = current + static_cast<int>(towel.size());
 
-        if (next == design.size()-1) std::cout << NL << "End candidate found";
+//        if (next == design.size()-1) std::cout << NL << "End candidate found";
 
         auto next_path = path;
         next_path.push_back(towel);
         State next_state{next,next_path};
         if (seen.contains(next_state)) continue; // towel-step with same path already in graph
 
-        if (next == design.size()-1) std::cout << NL << "End candidate added to graph OK";
+//        std::cout << NL << T << "graph.add_edge:" << current << " --> " << next << " consumed: << " << towel;
 
-        graph[current].push_back({next, towel});
+        graph[current].insert({next, towel});
+        graph[next]; // Ensure orphan end is in graph
         queue.push_front(next_state); // Explore the next position
-        std::cout << NL << "design:" << design.size() << " next:" << next << " towel:" << towel << " new queue:" << queue.size();
+//        std::cout << NL << "design:" << design.size() << " next:" << next << " towel:" << towel << " new queue:" << queue.size();
       }
     }
     return graph;
@@ -280,8 +283,8 @@ namespace test {
   std::vector<Path> to_paths(const Graph& graph, Vertex start, Vertex end) {
 //    std::cout << NL << "to_paths(graph:" << graph.size() << ",..)" << std::flush;
 
-    std::vector<std::vector<Vertex>> allPaths;
-    std::stack<std::pair<Vertex, std::vector<Vertex>>> stack;
+    std::vector<Path> allPaths;
+    std::stack<std::pair<Vertex, Path>> stack;
     std::set<Path> seen{};
     
     stack.push({start, {start}});
@@ -290,20 +293,22 @@ namespace test {
       auto [current, path] = stack.top(); // a path to current
       stack.pop();
       if (current == end) {
+        std::cout << NL << NL << "END!";
         allPaths.push_back(path);
         continue;
       }
-      if (graph.find(current) != graph.end()) {
-        for (const auto& [neighbor, weight] : graph.at(current)) {
-          // Avoid cycles by checking if the neighbor is already in the path
-          if (std::find(path.begin(), path.end(), neighbor) == path.end()) {
-            std::vector<Vertex> newPath = path;
-            newPath.push_back(neighbor);
-            stack.push({neighbor, newPath});
-            seen.insert(newPath);
-          }
-        }
+
+      if (seen.contains(path)) continue; // already done once
+      seen.insert(path); // process each path only once
+      
+      for (const auto& [neighbor, weight] : graph.at(current)) {
+        using aoc::raw::operator<<;
+        std::vector<Vertex> newPath = path;
+        newPath.push_back(neighbor);
+        stack.push({neighbor, newPath});
+//            std::cout << NL << T << current << " --> " << neighbor << " " << weight;
       }
+
     }
 //    std::cout << NL << "to_paths END" << std::flush;
     return allPaths;
@@ -317,7 +322,7 @@ namespace test {
     using test::operator<<;
     std::cout << NL << T << "expected:" << expected;
     auto design = expected.first;
-    auto graph = to_graph(design, towels);
+    auto graph = to_graph(design, towels,false);
     auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
     std::cout << NL << "paths:" << paths.size();
     if (paths.size()>0) {
@@ -363,7 +368,7 @@ namespace part1 {
       auto model = parse(in);
       for (auto const& [dx,design] : aoc::views::enumerate(model.designs)) {
         std::cout << NL << "processing design[" << dx << "]:" << design << std::flush;
-        auto graph = test::to_graph(design, model.towels);
+        auto graph = test::to_graph(design, model.towels,false);
         std::cout << NL << "design[" << dx << "]:" << std::quoted(design);
         if (graph.contains(static_cast<test::Vertex>(design.size()-1))) {
           ++acc;
@@ -384,7 +389,92 @@ namespace part2 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
+      Integer acc{};
       auto model = parse(in);
+      for (auto const& [dx,design] : aoc::views::enumerate(model.designs)) {
+        std::cout << NL << "processing design[" << dx << "]:" << design << std::flush;
+        auto graph = test::to_graph(design, model.towels,true);
+        std::cout << NL << "design[" << dx << "]:" << std::quoted(design);
+        if (graph.contains(static_cast<test::Vertex>(design.size()-1))) {
+          auto paths = test::to_paths(graph, 0,static_cast<int>(design.size()));
+          acc += paths.size();
+          std::cout  << " paths: " << paths.size() << " acc:" << acc << std::flush;
+          for (auto const& [px,path] : aoc::views::enumerate(paths)) {
+            using aoc::raw::operator<<;
+            std::cout << NL << T << px << " " << path;
+            std::cout << " <-> ";
+            for (int i=1;i<path.size();++i) {
+              auto v1 = path[i-1];
+              auto v2 = path[i];
+              auto adj = graph[v1];
+              auto iter =  std::find_if(adj.begin(),adj.end(),[v2](auto const& entry){
+                return entry.first == v2;
+              });
+              std::cout << " " << iter->second;
+
+//              brwrr can be made in two different ways: b, r, wr, r or br, wr, r.
+              //              processing design[0]:brwrr
+              //              design[0]:"brwrr" paths: 2 acc:2
+              //                0 0,2,4 <->  br wr
+              //                1 0,1,2,4 <->  b r wr
+
+//
+//              bggr can only be made with b, g, g, and r.
+//
+//              gbbr can be made 4 different ways:
+//
+//              g, b, b, r
+//              g, b, br
+//              gb, b, r
+//              gb, br
+//              rrbgbr can be made 6 different ways:
+//
+//              r, r, b, g, b, r
+//              r, r, b, g, br
+//              r, r, b, gb, r
+//              r, rb, g, b, r
+//              r, rb, g, br
+//              r, rb, gb, r
+//              bwurrg can only be made with bwu, r, r, and g.
+//
+//              brgr can be made in two different ways: b, r, g, r or br, g, r.
+//
+//              ubwu and bbrgwb are still impossible.
+              
+//              processing design[1]:bggr
+//              design[1]:"bggr" paths: 1 acc:3
+//                0 0,1,2,3 <->  b g g
+//              processing design[2]:gbbr
+//              design[2]:"gbbr" paths: 2 acc:5
+//                0 0,2,3 <->  gb b
+//                1 0,1,2,3 <->  g b b
+//              processing design[3]:rrbgbr
+//              design[3]:"rrbgbr" paths: 4 acc:9
+//                0 0,1,3,5 <->  r rb gb
+//                1 0,1,3,4,5 <->  r rb g b
+//                2 0,1,2,3,5 <->  r r b gb
+//                3 0,1,2,3,4,5 <->  r r b g b
+//              processing design[4]:ubwu
+//              design[4]:"ubwu" Impossible
+//              processing design[5]:bwurrg
+//              design[5]:"bwurrg" paths: 1 acc:10
+//                0 0,3,4,5 <->  bwu r r
+//              processing design[6]:brgr
+//              design[6]:"brgr" paths: 2 acc:12
+//                0 0,2,3 <->  br g
+//                1 0,1,2,3 <->  b r g
+//              processing design[7]:bbrgwb
+//              design[7]:"bbrgwb" Impossible
+              
+            }
+          }
+        }
+        else {
+          std::cout  << " Impossible";
+        }
+      }
+      result = std::to_string(acc);
+
     }
     return result;
   }
@@ -400,7 +490,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {10};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 111: {

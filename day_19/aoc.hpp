@@ -98,6 +98,14 @@ namespace aoc {
       }
       return os;
     }
+    std::ostream& operator<<(std::ostream& os,std::vector<int> const& ints) {
+      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
+        if (ix>0) os << ',';
+        os << n;
+      }
+      return os;
+    }
+
   }
   namespace parsing {
     class Splitter; // Forward
