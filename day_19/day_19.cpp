@@ -23,6 +23,8 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
+#include <unordered_map>
+#include <unordered_set>
 
 using aoc::raw::NL;
 using aoc::raw::T;
@@ -30,10 +32,12 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
+using Towels = aoc::raw::Lines;
+using Designs = aoc::raw::Lines;
 
 struct Model {
-  aoc::raw::Lines towels{};
-  aoc::raw::Lines designs{};
+  Towels towels{};
+  Designs designs{};
 };
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   os << NL << "model:";
@@ -130,7 +134,6 @@ namespace test {
       towels.push_back(towel);
       if (towelMatch[1] == "two") {
         towels.push_back(towel);
-        
       }
       
       // Move past this match
@@ -148,7 +151,6 @@ namespace test {
       auto sections = Splitter{doc_in}.same_indent_sections();
       LogEntry entry{};
       std::string repaired{};
-      
       for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
         std::cout << NL << "---------- section " << sx << " ----------";
         for (auto const& [lx,line] : aoc::views::enumerate(section)) {
@@ -209,17 +211,81 @@ namespace test {
           }
         }
       }
-      std::cout << NL << "example:" << entry.example;
-      for (auto const& [ex,expected] : aoc::views::enumerate(entry.expecteds)) {
-        using test::operator<<;
-        std::cout << NL << T << ex << ": " << expected;
-      }
+      result.push_back(entry);
     }
     return result;
   }
 
-  std::optional<Result> test0(Args args) {
-    std::cout << NL << NL << "test0";
+  // A structure to represent a graph vertex.
+  struct Vertex {
+      std::string towel;
+      int position;
+      bool operator==(const Vertex& other) const {
+          return towel == other.towel && position == other.position;
+      }
+  };
+
+  // Hash function for the Vertex structure.
+  struct VertexHash {
+      std::size_t operator()(const Vertex& v) const {
+          return std::hash<std::string>()(v.towel) ^ std::hash<int>()(v.position);
+      }
+  };
+
+  // BFS function to generate the graph.
+  using Graph = std::unordered_map<Vertex, std::vector<Vertex>, VertexHash>;
+  Graph bfs_generate_graph(const std::string& design, const std::vector<std::string>& towels) {
+    Graph graph;
+    std::queue<Vertex> queue;
+    std::unordered_set<Vertex, VertexHash> visited;
+    queue.push({"", 0});
+    visited.insert({"", 0});
+    
+    while (!queue.empty()) {
+      Vertex current = queue.front();
+      queue.pop();
+      int current_pos = current.position;
+      for (const auto& towel : towels) {
+        if (design.substr(current_pos, towel.size()) == towel) {
+          Vertex next = {towel, current_pos + static_cast<int>(towel.size())};
+          graph[current].push_back(next);
+          if (visited.find(next) == visited.end()) {
+            queue.push(next);
+            visited.insert(next);
+          }
+        }
+      }
+    }
+    std::cout << NL << "Generated Graph:";
+    for (const auto& [vertex, neighbors] : graph) {
+      std::cout << NL << "Vertex (Towel: " << vertex.towel << ", Position: " << vertex.position << ") -> [";
+      for (const auto& neighbor : neighbors) {
+        std::cout << " (Towel: " << neighbor.towel << ", Position: " << neighbor.position << ")";
+      }
+    }
+    return graph;
+  }
+
+  bool fully_matched(std::string const& design,Graph const& graph) {
+    return std::any_of(graph.begin(), graph.end(), [&design](auto const& entry){
+      return (entry.first.position == (design.size()-1));
+    });
+  }
+
+  std::optional<Result> test0(Towels const&  towels,Expected const& expected) {
+    std::cout << NL << NL << "test0:" << expected;
+    using aoc::raw::operator<<;
+    std::cout << NL << T << "available towels:" << towels;
+    using test::operator<<;
+    std::cout << NL << T << "expected:" << expected;
+    auto graph = bfs_generate_graph(expected.first, towels);
+    if (fully_matched(expected.first,graph)) {
+      std::cout << NL << "MATCH
+      ";
+    }
+    else {
+      std::cout << NL << "IMPOSSIBLE";
+    }
     return std::nullopt;
   }
 
@@ -227,7 +293,17 @@ namespace test {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
     if (doc_in) {
-      auto example = test::parse(doc_in);
+      auto entries = test::parse(doc_in);
+      if (entries.size()==1) {
+        auto const& entry = entries.back();
+        auto const& towels = entry.example.towels;
+        for (auto const& expected : entry.expecteds) {
+          test0(towels,expected);
+        }
+      }
+      else {
+        std::cerr << NL << "Sorry, expected only one entry to test from parsing doc.txt";
+      }
     }
     return result;
   }
@@ -270,9 +346,6 @@ int main(int argc, char *argv[]) {
   };
   for (auto state : states) {
     switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
       case 111: {
         auto doc_file = aoc::to_working_dir_path("doc.txt");
         std::ifstream doc_in{doc_file};
