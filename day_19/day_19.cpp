@@ -227,54 +227,86 @@ namespace test {
   using Weight = std::string;
   // Graph with edges weighted with the towel used (consumed)
   using Graph = std::unordered_map<Vertex, std::vector<std::pair<Vertex,Weight>>>;
-  Graph bfs_generate_graph(const std::string& design, const std::vector<std::string>& towels) {
+  Graph to_graph(const std::string& design, const std::vector<std::string>& towels) {
     Graph graph;
-    std::queue<Vertex> queue;
-    std::unordered_set<Vertex> visited;
-    queue.push({0});
-    visited.insert({0});
-    
+
+    struct State {
+      Vertex pos;
+      std::vector<std::string> path;
+      bool operator<(State const& other) const {
+        return std::tie(pos, path) < std::tie(other.pos, other.path);
+      }
+    };
+    using Seen = std::set<State>;
+
+    std::deque<State> queue;
+    Seen seen{};
+
+    State start{0,{}};
+    queue.push_front(start);
     while (!queue.empty()) {
-      Vertex current = queue.front();
-      queue.pop();
+      State state = queue.front();
+      queue.pop_front();
+      seen.insert(state); // Do not revisit
+      auto const& [current,path] = state;
+      if (current == design.size()-1) {
+        graph[current]; // Add the end vertex
+        if (not graph.contains(state.pos)) std::cout << NL << "BREAK on end but not in graph?" << std::flush;
+        break; // One end is enough for now
+      }
       for (const auto& towel : towels) {
-        if (design.substr(current, towel.size()) == towel) {
-          Vertex next = {current + static_cast<int>(towel.size())};
-          graph[current].push_back({next,towel});
-          if (visited.find(next) == visited.end()) {
-            queue.push(next);
-            visited.insert(next);
-          }
-        }
+        if (current + towel.size() > (design.size()-1)) continue; // towel don't fit (redundant?)
+        if (design.substr(current, towel.size()) != towel) continue; // towel don't fit
+        Vertex next = current + static_cast<int>(towel.size());
+
+        if (next == design.size()-1) std::cout << NL << "End candidate found";
+
+        auto next_path = path;
+        next_path.push_back(towel);
+        State next_state{next,next_path};
+        if (seen.contains(next_state)) continue; // towel-step with same path already in graph
+
+        if (next == design.size()-1) std::cout << NL << "End candidate added to graph OK";
+
+        graph[current].push_back({next, towel});
+        queue.push_front(next_state); // Explore the next position
+        std::cout << NL << "design:" << design.size() << " next:" << next << " towel:" << towel << " new queue:" << queue.size();
       }
     }
     return graph;
   }
 
-  std::vector<std::vector<Vertex>> to_paths(const Graph& graph, Vertex start, Vertex end) {
-      std::vector<std::vector<Vertex>> allPaths;
-      std::stack<std::pair<Vertex, std::vector<Vertex>>> stack;
+  using Path = std::vector<Vertex>;
+  std::vector<Path> to_paths(const Graph& graph, Vertex start, Vertex end) {
+//    std::cout << NL << "to_paths(graph:" << graph.size() << ",..)" << std::flush;
 
-      stack.push({start, {start}});
-      while (!stack.empty()) {
-          auto [current, path] = stack.top(); // a path to current
-          stack.pop();
-          if (current == end) {
-              allPaths.push_back(path);
-              continue;
-          }
-          if (graph.find(current) != graph.end()) {
-              for (const auto& [neighbor, weight] : graph.at(current)) {
-                  // Avoid cycles by checking if the neighbor is already in the path
-                  if (std::find(path.begin(), path.end(), neighbor) == path.end()) {
-                      std::vector<Vertex> newPath = path;
-                      newPath.push_back(neighbor);
-                      stack.push({neighbor, newPath});
-                  }
-              }
-          }
+    std::vector<std::vector<Vertex>> allPaths;
+    std::stack<std::pair<Vertex, std::vector<Vertex>>> stack;
+    std::set<Path> seen{};
+    
+    stack.push({start, {start}});
+    while (!stack.empty()) {
+//      std::cout << NL << stack.size() << std::flush;
+      auto [current, path] = stack.top(); // a path to current
+      stack.pop();
+      if (current == end) {
+        allPaths.push_back(path);
+        continue;
       }
-      return allPaths;
+      if (graph.find(current) != graph.end()) {
+        for (const auto& [neighbor, weight] : graph.at(current)) {
+          // Avoid cycles by checking if the neighbor is already in the path
+          if (std::find(path.begin(), path.end(), neighbor) == path.end()) {
+            std::vector<Vertex> newPath = path;
+            newPath.push_back(neighbor);
+            stack.push({neighbor, newPath});
+            seen.insert(newPath);
+          }
+        }
+      }
+    }
+//    std::cout << NL << "to_paths END" << std::flush;
+    return allPaths;
   }
 
   std::optional<Result> test0(Towels const&  towels,Expected const& expected) {
@@ -285,7 +317,7 @@ namespace test {
     using test::operator<<;
     std::cout << NL << T << "expected:" << expected;
     auto design = expected.first;
-    auto graph = bfs_generate_graph(design, towels);
+    auto graph = to_graph(design, towels);
     auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
     std::cout << NL << "paths:" << paths.size();
     if (paths.size()>0) {
@@ -309,8 +341,6 @@ namespace test {
         for (auto const& expected : entry.expecteds) {
           if (auto answer = test0(towels,expected)) {
             acc += 1;
-            
-            
           }
         }
       }
@@ -329,9 +359,23 @@ namespace part1 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
+      Integer acc{};
       auto model = parse(in);
+      for (auto const& [dx,design] : aoc::views::enumerate(model.designs)) {
+        std::cout << NL << "processing design[" << dx << "]:" << design << std::flush;
+        auto graph = test::to_graph(design, model.towels);
+        std::cout << NL << "design[" << dx << "]:" << std::quoted(design);
+        if (graph.contains(static_cast<test::Vertex>(design.size()-1))) {
+          ++acc;
+          std::cout  << " OK : " << acc << std::flush;
+        }
+        else {
+          std::cout  << " Impossible";
+        }
+      }
+      result = std::to_string(acc);
     }
-    return result;
+    return result; // 213 too low
   }
 }
 
@@ -356,8 +400,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111
-  };
+  std::vector<int> states = {10};
   for (auto state : states) {
     switch (state) {
       case 111: {
