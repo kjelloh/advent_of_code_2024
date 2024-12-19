@@ -490,7 +490,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {20};
+  std::vector<int> states = {21};
   for (auto state : states) {
     switch (state) {
       case 111: {
