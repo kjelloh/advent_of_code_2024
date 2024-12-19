@@ -80,9 +80,16 @@ namespace test {
 
   using Expected = std::pair<aoc::raw::Line,aoc::raw::Lines>;
   std::ostream& operator<<(std::ostream& os,Expected const& expected) {
-    os << "expected:" << std::quoted(expected.first) << " from:";
-    for (auto const& [ix,line] : aoc::views::enumerate(expected.second)) {
-      std::cout << " " << ix << ":" << line;
+    os << "expected:" << std::quoted(expected.first);
+    if (expected.second.size()>0) {
+      os << " from:";
+      for (auto const& [ix,line] : aoc::views::enumerate(expected.second)) {
+        os << " " << ix << ":" << line;
+      }
+    }
+    else {
+      os << " impossible";
+      
     }
     return os;
   }
@@ -216,39 +223,24 @@ namespace test {
     return result;
   }
 
-  // A structure to represent a graph vertex.
-  struct Vertex {
-      std::string towel;
-      int position;
-      bool operator==(const Vertex& other) const {
-          return towel == other.towel && position == other.position;
-      }
-  };
-
-  // Hash function for the Vertex structure.
-  struct VertexHash {
-      std::size_t operator()(const Vertex& v) const {
-          return std::hash<std::string>()(v.towel) ^ std::hash<int>()(v.position);
-      }
-  };
-
-  // BFS function to generate the graph.
-  using Graph = std::unordered_map<Vertex, std::vector<Vertex>, VertexHash>;
+  using Vertex = int;
+  using Weight = std::string;
+  // Graph with edges weighted with the towel used (consumed)
+  using Graph = std::unordered_map<Vertex, std::vector<std::pair<Vertex,Weight>>>;
   Graph bfs_generate_graph(const std::string& design, const std::vector<std::string>& towels) {
     Graph graph;
     std::queue<Vertex> queue;
-    std::unordered_set<Vertex, VertexHash> visited;
-    queue.push({"", 0});
-    visited.insert({"", 0});
+    std::unordered_set<Vertex> visited;
+    queue.push({0});
+    visited.insert({0});
     
     while (!queue.empty()) {
       Vertex current = queue.front();
       queue.pop();
-      int current_pos = current.position;
       for (const auto& towel : towels) {
-        if (design.substr(current_pos, towel.size()) == towel) {
-          Vertex next = {towel, current_pos + static_cast<int>(towel.size())};
-          graph[current].push_back(next);
+        if (design.substr(current, towel.size()) == towel) {
+          Vertex next = {current + static_cast<int>(towel.size())};
+          graph[current].push_back({next,towel});
           if (visited.find(next) == visited.end()) {
             queue.push(next);
             visited.insert(next);
@@ -256,35 +248,51 @@ namespace test {
         }
       }
     }
-    std::cout << NL << "Generated Graph:";
-    for (const auto& [vertex, neighbors] : graph) {
-      std::cout << NL << "Vertex (Towel: " << vertex.towel << ", Position: " << vertex.position << ") -> [";
-      for (const auto& neighbor : neighbors) {
-        std::cout << " (Towel: " << neighbor.towel << ", Position: " << neighbor.position << ")";
-      }
-    }
     return graph;
   }
 
-  bool fully_matched(std::string const& design,Graph const& graph) {
-    return std::any_of(graph.begin(), graph.end(), [&design](auto const& entry){
-      return (entry.first.position == (design.size()-1));
-    });
+  std::vector<std::vector<Vertex>> to_paths(const Graph& graph, Vertex start, Vertex end) {
+      std::vector<std::vector<Vertex>> allPaths;
+      std::stack<std::pair<Vertex, std::vector<Vertex>>> stack;
+
+      stack.push({start, {start}});
+      while (!stack.empty()) {
+          auto [current, path] = stack.top(); // a path to current
+          stack.pop();
+          if (current == end) {
+              allPaths.push_back(path);
+              continue;
+          }
+          if (graph.find(current) != graph.end()) {
+              for (const auto& [neighbor, weight] : graph.at(current)) {
+                  // Avoid cycles by checking if the neighbor is already in the path
+                  if (std::find(path.begin(), path.end(), neighbor) == path.end()) {
+                      std::vector<Vertex> newPath = path;
+                      newPath.push_back(neighbor);
+                      stack.push({neighbor, newPath});
+                  }
+              }
+          }
+      }
+      return allPaths;
   }
 
   std::optional<Result> test0(Towels const&  towels,Expected const& expected) {
+    Integer count{};
     std::cout << NL << NL << "test0:" << expected;
     using aoc::raw::operator<<;
     std::cout << NL << T << "available towels:" << towels;
     using test::operator<<;
     std::cout << NL << T << "expected:" << expected;
-    auto graph = bfs_generate_graph(expected.first, towels);
-    if (fully_matched(expected.first,graph)) {
-      std::cout << NL << "MATCH
-      ";
+    auto design = expected.first;
+    auto graph = bfs_generate_graph(design, towels);
+    auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
+    std::cout << NL << "paths:" << paths.size();
+    if (paths.size()>0) {
+      return std::to_string(paths.size());
     }
     else {
-      std::cout << NL << "IMPOSSIBLE";
+      std::cout << " impossible";
     }
     return std::nullopt;
   }
@@ -292,19 +300,25 @@ namespace test {
   std::optional<Result> test1(auto& doc_in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
+    Integer acc{};
     if (doc_in) {
       auto entries = test::parse(doc_in);
       if (entries.size()==1) {
         auto const& entry = entries.back();
         auto const& towels = entry.example.towels;
         for (auto const& expected : entry.expecteds) {
-          test0(towels,expected);
+          if (auto answer = test0(towels,expected)) {
+            acc += 1;
+            
+            
+          }
         }
       }
       else {
         std::cerr << NL << "Sorry, expected only one entry to test from parsing doc.txt";
       }
     }
+    result = std::to_string(acc);
     return result;
   }
 
