@@ -84,12 +84,28 @@ namespace test {
     return std::nullopt;
   }
 
-
   using aoc::grid::Position;
   using aoc::grid::Positions;
   using aoc::grid::Grid;
   using PositionPair = std::pair<Position,Position>;
   using PositionPairs = std::vector<PositionPair>;
+  using aoc::grid::Path;
+
+  std::size_t to_saving(Path track,PositionPair cheat) {
+    std::size_t best{track.size()};
+
+    auto dir = cheat.second - cheat.first;
+    auto cut = cheat.first - dir;
+    auto cut_iter = std::find(track.begin(),track.end(),cut);
+
+    auto cheat_iter = std::find(track.begin(),track.end(),cheat.second);
+
+//    auto start_to_cut = std::distance(track.begin(), cut_iter);
+    auto cut_to_cheat = std::distance(cut_iter, cheat_iter);
+//    auto cheat_to_end = std::distance(cheat_iter, track.end());
+    return (cut_to_cheat>0)?cut_to_cheat-2:0;
+  }
+
   std::ostream& operator<<(std::ostream& os,PositionPair const& pp) {
     std::cout << "{" << pp.first << "," << pp.second << "}";
     return os;
@@ -100,18 +116,20 @@ namespace test {
     }
     return os;
   }
-  PositionPairs to_cheats(Grid const& grid) {
-    PositionPairs result{};
+  std::pair<Path,PositionPairs> to_cheats(Grid const& grid) {
+    std::pair<Path,PositionPairs> result{};
     auto start = grid.find_all('S')[0];
     auto end = grid.find_all('E')[0];
     std::cout << NL << start << " to " << end;
 
     Grid::Seen seen{};
+    Path track{};
     std::deque<Position> q{};
     q.push_back(start);
     while (not q.empty()) {
       auto curr = q.front(); // BFS
       q.pop_front();
+      track.push_back(curr);
       if (curr == end) break;
       seen.insert(curr); // no backtrack
       for (auto const& dir : aoc::grid::ortho_directions) {
@@ -123,18 +141,20 @@ namespace test {
           if (not grid.on_map(cheat)) continue;
           if (grid.at(cheat) == '#') continue;
           if (seen.contains(cheat)) continue; // no back track
-          result.push_back({cand,cheat});
+          result.second.push_back({cand,cheat});
           continue;
         }
         if (seen.contains(cand)) continue;
         q.push_back(cand);
       }
     }
+    result.first = track;
     return result;
   }
 
   std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
     std::optional<Result> result{};
+    Integer acc{};
     std::cout << NL << NL << "test1";
     if (in) {
       auto model = ::parse(in);
@@ -142,8 +162,22 @@ namespace test {
         auto log = test::parse(doc_in);
       }
       std::cout << NL << model;
-      std::cout << NL << to_cheats(model);
+      auto [track,cheats] = to_cheats(model);
+      auto computed = aoc::grid::to_dir_traced(model, track);
+      std::cout << NL << computed;
       
+//      std::cout << NL << cheats;
+      std::map<std::size_t,PositionPairs> savings{};
+      for (auto const& cheat : cheats) {
+        auto saving = to_saving(track, cheat);
+        std::cout << NL << cheat << " saving:" << saving;
+        savings[saving].push_back(cheat);
+      }
+      for (auto const& [saving,cheats] : savings) {
+        std::cout << NL << "There are " << cheats.size() << " cheats saving " << saving << " picoseconds.";
+        if (saving >= 100) acc += cheats.size();
+      }
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -183,7 +217,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111};
+  std::vector<int> states = {101};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
@@ -203,6 +237,14 @@ int main(int argc, char *argv[]) {
         std::ifstream in{file};
         if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
+      } break;
+      case 101: {
+        auto doc_file = aoc::to_working_dir_path("doc.txt");
+        std::ifstream doc_in{doc_file};
+        auto file = aoc::to_working_dir_path("puzzle.txt");
+        std::ifstream in{file};
+        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
+        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
       } break;
       case 10: {
         auto file = aoc::to_working_dir_path("puzzle.txt");
