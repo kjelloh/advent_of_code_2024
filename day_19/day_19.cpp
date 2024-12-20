@@ -229,8 +229,8 @@ namespace test {
   using Adjacent = std::set<std::pair<Vertex,Weight>>;
   using Graph = std::unordered_map<Vertex, Adjacent>;
   Graph to_graph(const std::string& design, const std::vector<std::string>& towels,bool find_all_paths) {
+    std::cout << NL << "to_graph" << std::flush;
     Graph graph;
-
     struct State {
       Vertex pos;
       std::vector<std::string> path;
@@ -276,6 +276,7 @@ namespace test {
 //        std::cout << NL << "design:" << design.size() << " next:" << next << " towel:" << towel << " new queue:" << queue.size();
       }
     }
+    std::cout << NL << "to_graph END" << std::flush;
     return graph;
   }
 
@@ -399,75 +400,20 @@ namespace part2 {
           auto paths = test::to_paths(graph, 0,static_cast<int>(design.size()));
           acc += paths.size();
           std::cout  << " paths: " << paths.size() << " acc:" << acc << std::flush;
-          for (auto const& [px,path] : aoc::views::enumerate(paths)) {
-            using aoc::raw::operator<<;
-            std::cout << NL << T << px << " " << path;
-            std::cout << " <-> ";
-            for (int i=1;i<path.size();++i) {
-              auto v1 = path[i-1];
-              auto v2 = path[i];
-              auto adj = graph[v1];
-              auto iter =  std::find_if(adj.begin(),adj.end(),[v2](auto const& entry){
-                return entry.first == v2;
-              });
-              std::cout << " " << iter->second;
-
-//              brwrr can be made in two different ways: b, r, wr, r or br, wr, r.
-              //              processing design[0]:brwrr
-              //              design[0]:"brwrr" paths: 2 acc:2
-              //                0 0,2,4 <->  br wr
-              //                1 0,1,2,4 <->  b r wr
-
-//
-//              bggr can only be made with b, g, g, and r.
-//
-//              gbbr can be made 4 different ways:
-//
-//              g, b, b, r
-//              g, b, br
-//              gb, b, r
-//              gb, br
-//              rrbgbr can be made 6 different ways:
-//
-//              r, r, b, g, b, r
-//              r, r, b, g, br
-//              r, r, b, gb, r
-//              r, rb, g, b, r
-//              r, rb, g, br
-//              r, rb, gb, r
-//              bwurrg can only be made with bwu, r, r, and g.
-//
-//              brgr can be made in two different ways: b, r, g, r or br, g, r.
-//
-//              ubwu and bbrgwb are still impossible.
-              
-//              processing design[1]:bggr
-//              design[1]:"bggr" paths: 1 acc:3
-//                0 0,1,2,3 <->  b g g
-//              processing design[2]:gbbr
-//              design[2]:"gbbr" paths: 2 acc:5
-//                0 0,2,3 <->  gb b
-//                1 0,1,2,3 <->  g b b
-//              processing design[3]:rrbgbr
-//              design[3]:"rrbgbr" paths: 4 acc:9
-//                0 0,1,3,5 <->  r rb gb
-//                1 0,1,3,4,5 <->  r rb g b
-//                2 0,1,2,3,5 <->  r r b gb
-//                3 0,1,2,3,4,5 <->  r r b g b
-//              processing design[4]:ubwu
-//              design[4]:"ubwu" Impossible
-//              processing design[5]:bwurrg
-//              design[5]:"bwurrg" paths: 1 acc:10
-//                0 0,3,4,5 <->  bwu r r
-//              processing design[6]:brgr
-//              design[6]:"brgr" paths: 2 acc:12
-//                0 0,2,3 <->  br g
-//                1 0,1,2,3 <->  b r g
-//              processing design[7]:bbrgwb
-//              design[7]:"bbrgwb" Impossible
-              
-            }
-          }
+//          for (auto const& [px,path] : aoc::views::enumerate(paths)) {
+//            using aoc::raw::operator<<;
+//            std::cout << NL << T << px << " " << path;
+//            std::cout << " <-> ";
+//            for (int i=1;i<path.size();++i) {
+//              auto v1 = path[i-1];
+//              auto v2 = path[i];
+//              auto adj = graph[v1];
+//              auto iter =  std::find_if(adj.begin(),adj.end(),[v2](auto const& entry){
+//                return entry.first == v2;
+//              });
+//              std::cout << " " << iter->second;
+//            }
+//          }
         }
         else {
           std::cout  << " Impossible";
@@ -490,7 +436,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {21};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 111: {
