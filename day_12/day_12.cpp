@@ -222,14 +222,13 @@ namespace part2 {
         return normal < other.normal;
     }
   };
+  using Edges = std::vector<Edge>;
 
   std::ostream& operator<<(std::ostream& os,Edge const& edge) {
     auto const& [start,end,normal] = edge;
     os << "edge{start:" << start << ",end:" << end << ",normal:" << normal << "}";
     return os;
   }
-
-  using Edges = std::vector<Edge>;
 
   std::ostream& operator<<(std::ostream& os,Edges const& edges) {
     std::cout << "edges[";
@@ -265,6 +264,7 @@ namespace part2 {
     return {end,start,reversed_normal};
   }
 
+  // Remove all 'internal edges'
   Edges to_perimeter_grid_pos_edges(Edges const& edges) {
     std::cout << NL << "to_perimeter_grid_pos_edges(edges" << edges.size() << ")";
     Edges result{};
@@ -363,6 +363,84 @@ namespace part2 {
       }
   };
 
+  // Implementation of algorithm to find the 'cycle' (in our case the perimeter)
+  // that we expect the edges to be part of.
+  // Uses an algorithm called  Hierholzer's Algorithm
+  std::vector<Edge> findEulerianCycle(const std::vector<Edge>& edges) {
+      // Adjacency list: Position -> vector of (neighbor Position, weight Normal)
+      std::map<Position, std::vector<std::pair<Position, Direction>>> graph;
+
+      // Build the graph (using only the provided edges as-is)
+      for (const auto& edge : edges) {
+          graph[edge.start].emplace_back(edge.end, edge.normal);
+      }
+
+      // Verify that all nodes have even degrees
+      for (const auto& [node, neighbors] : graph) {
+          if (neighbors.size() % 2 != 0) {
+              throw std::invalid_argument("Graph is not Eulerian (contains odd-degree node)");
+          }
+      }
+
+      // Hierholzer's Algorithm
+      std::stack<Position> stack;
+      std::vector<Edge> cycle;
+      std::map<Position, std::vector<std::pair<Position, Direction>>> tempGraph = graph; // Copy of graph for traversal
+
+      stack.push(edges[0].start);
+
+      while (!stack.empty()) {
+          Position node = stack.top();
+
+          if (!tempGraph[node].empty()) {
+              // Get the next edge and remove it
+              auto [nextNode, normal] = tempGraph[node].back();
+              tempGraph[node].pop_back();
+
+              stack.push(nextNode);
+          } else {
+              stack.pop();
+              if (!stack.empty()) {
+                  Position prevNode = stack.top();
+                  
+                  // Find the edge in the original graph to add to the cycle
+                  auto it = std::find_if(edges.begin(), edges.end(), [&](const Edge& e) {
+                      return e.start == prevNode && e.end == node;
+                  });
+
+                  if (it != edges.end()) {
+                      cycle.push_back(*it);
+                  }
+              }
+          }
+      }
+
+      return cycle;
+  }
+
+  Edges compressEdges(const Edges& edges) {
+      if (edges.empty()) return {};
+
+      Edges compressed;
+      Edge current = edges[0]; // Start with the first edge
+
+      for (size_t i = 1; i <= edges.size(); ++i) {
+          const Edge& next = edges[i % edges.size()]; // Wrap around for a closed loop
+
+          // Check if the current and next edges can be merged
+          if (current.normal == next.normal && current.end == next.start) {
+              // Extend the current edge
+              current.end = next.end;
+          } else {
+              // Push the current edge and start a new one
+              compressed.push_back(current);
+              current = next;
+          }
+      }
+      
+      return compressed;
+  }
+
   Result to_side_count(Region const& region) {
     std::cout << NL << "to_side_count id:" << region.first;
     Result result{};
@@ -375,178 +453,11 @@ namespace part2 {
       // TODO: Compress subgraph (edges) into straight edges of the region.
       //       Edges start,end,start,end,... with the same normal vector should be merged into single start,end,normal
       //       We can then just count the final region edges
-      Edges se{};
       // Put edges in order
-      std::set<Edge> visited{};
-      auto start = subgraph.front();
-      se.push_back(start);
-      visited.insert(start);
-      Edges to_visit{subgraph.begin()+1,subgraph.end()};
-      bool failed{false};
-      while (to_visit.size()>0) {
-        std::vector<Edges::iterator> iterators{};
-        auto it = to_visit.begin();
-        while ((it = std::find_if(
-          it
-          ,to_visit.end()
-          ,[&curr=se.back()](Edge const& next) {
-            return (curr.end == next.start); // next is linked after curr
-          })) != to_visit.end()) {
-          iterators.push_back(it); // Store iterator
-          ++it; // Move to the next position
-        }
-//        auto iter = std::find_if(to_visit.begin(), to_visit.end(), [&curr=se.back()](Edge const& next){
-//          return (curr.end == next.start); // next is linked after curr
-//        });
-        
-        auto iter = to_visit.end();
-        if (iterators.size()==1) iter = iterators[0];
-        else if (iterators.size()>1) {
-          // HARD FIX for my input (We need to choose the correct edge to go at the end
-          for (auto it : iterators) {
-            std::cout << NL << T << "edge option:" << *it;
-            if (it->end == Position{11,10}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{17,24}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{29,58}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{27,136}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{26,33}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{34,53}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{46,139}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{51,94}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{58,4}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{66,34}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{78,58}) {
-              iter = it;
-              break;
-            }
-            else if (it->end == Position{93,138}) {
-              iter = it;
-              break;
-            }
-            /*
-             edge option:edge{start:{row:115,col:109},end:{row:114,col:109},normal:{row:0,col:-1}}
-             edge option:edge{start:{row:115,col:109},end:{row:116,col:109},normal:{row:0,col:1}}
-             edge option:edge{start:{row:106,col:105},end:{row:105,col:105},normal:{row:0,col:-1}}
-             edge option:edge{start:{row:106,col:105},end:{row:107,col:105},normal:{row:0,col:1}}
-             */
-            else iter = it; // choose the last one
-          }
-
-        }
-        if (iter != to_visit.end()) {
-          if (iter->normal == se.back().normal) {
-            // merge *iter after se.back()
-            auto& curr = se.back();
-            curr = {curr.start,iter->end,curr.normal};
-          }
-          else {
-            se.push_back(*iter);
-          }
-          visited.insert(*iter);
-          to_visit.erase(iter); // processed
-        }
-        else {
-          
-          
-          
-          /*
-           
-           VBB
-           BNB
-           BBB
-           
-           subgraph:edges[edge{start:{row:0,col:1},end:{row:0,col:2},normal:{row:-1,col:0}}'edge{start:{row:0,col:2},end:{row:0,col:3},normal:{row:-1,col:0}}'edge{start:{row:0,col:3},end:{row:1,col:3},normal:{row:0,col:1}}'edge{start:{row:1,col:0},end:{row:1,col:1},normal:{row:-1,col:0}}'edge{start:{row:1,col:1},end:{row:0,col:1},normal:{row:0,col:-1}}'edge{start:{row:1,col:1},end:{row:2,col:1},normal:{row:0,col:1}}'edge{start:{row:1,col:2},end:{row:1,col:1},normal:{row:1,col:0}}'edge{start:{row:1,col:3},end:{row:2,col:3},normal:{row:0,col:1}}'edge{start:{row:2,col:0},end:{row:1,col:0},normal:{row:0,col:-1}}'edge{start:{row:2,col:1},end:{row:2,col:2},normal:{row:-1,col:0}}'edge{start:{row:2,col:2},end:{row:1,col:2},normal:{row:0,col:-1}}'edge{start:{row:2,col:3},end:{row:3,col:3},normal:{row:0,col:1}}'edge{start:{row:3,col:0},end:{row:2,col:0},normal:{row:0,col:-1}}'edge{start:{row:3,col:1},end:{row:3,col:0},normal:{row:1,col:0}}'edge{start:{row:3,col:2},end:{row:3,col:1},normal:{row:1,col:0}}'edge{start:{row:3,col:3},end:{row:3,col:2},normal:{row:1,col:0}}]
-           
-           UNEXPECTED: iter != to_visit.end() for se.back():edge{start:{row:1,col:1},end:{row:0,col:1},normal:{row:0,col:-1}}
-           
-           unvisited:edges[edge{start:{row:1,col:1},end:{row:2,col:1},normal:{row:0,col:1}}'edge{start:{row:1,col:2},end:{row:1,col:1},normal:{row:1,col:0}}'edge{start:{row:2,col:1},end:{row:2,col:2},normal:{row:-1,col:0}}'edge{start:{row:2,col:2},end:{row:1,col:2},normal:{row:0,col:-1}}]
-           
-           compressed:edges[edge{start:{row:0,col:1},end:{row:0,col:3},normal:{row:-1,col:0}}'edge{start:{row:0,col:3},end:{row:3,col:3},normal:{row:0,col:1}}'edge{start:{row:3,col:3},end:{row:3,col:0},normal:{row:1,col:0}}'edge{start:{row:3,col:0},end:{row:1,col:0},normal:{row:0,col:-1}}'edge{start:{row:1,col:0},end:{row:1,col:1},normal:{row:-1,col:0}}'edge{start:{row:1,col:1},end:{row:0,col:1},normal:{row:0,col:-1}}]
-           
-           The second from end: edge{start:{row:1,col:0},end:{row:1,col:1},normal:{row:-1,col:0}} (top of left 'B')
-           Should link to unvisited: edge{start:{row:1,col:1},end:{row:2,col:1},normal:{row:0,col:1}}
-           NOT the: edge{start:{row:1,col:1},end:{row:0,col:1},normal:{row:0,col:-1}}
-           */
-          /*
-           compressed:edges[edge{start:{row:0,col:9},end:{row:0,col:12},normal:{row:-1,col:0}}'edge{start:{row:0,col:12},end:{row:1,col:12},normal:{row:0,col:1}}'
-           
-           0,9 -> 0,12
-           0,12 -> 1,12
-           
-           */
-          
-          
-          /*
-           0         01       2
-           0: CCCCCCCCCBBBMMGGGGGG...
-           1: CCCCCCCCCBBBBBBGGGGG...
-           2: CCCCCCCBBBBBBBBGGGGG...
-           3: CCCCCCCCBBBBBBBGGGGG...
-           4: CCCCCCCCCBBBBBBGGGGG...
-           5: CCCCCCCCCBBBBBBBGGGG...
-           6: CCCNNNCCBBBBBBBBGEGG...
-           7: CCNNNNNBBBBBBBBBBEBS...
-           8: NNNNNNNVVVBBBBBBBBBS...
-           9: NNNNNNNVVVBBBBBBBBBS...
-           10:NNNNFNNNNBNBBBBBBBSS...
-           11:NNNNNNNNBBBBBBBBBBSS...
-           
-           x: 10,10 -> 11,10  belongs to region 'B'
-           y: 10,11 -> 10,10  belongs to region 'B'
-           z: 11,10 -> 11,11  belongs to region 'B'
-           w: 11,11 -> 10,11  belongs to region 'B'
-           
-           |
-           *<-- y --- *
-           |          ^       ...VVVBBB...
-           x-        -w       ...NNBNBB...
-           |          |       ...NBBBBB...
-           v    |     |
-           * -- z --> *
-           
-           
-           
-           */
-          std::cerr << NL << "UNEXPECTED: iter != to_visit.end() for se.back():" << se.back() << std::flush;
-          std::cout << NL << T << "unvisited:" << to_visit << std::flush;
-          failed = true;
-          break;
-        }
-      }
+      auto perimeter = findEulerianCycle(subgraph);
+      std::cout << NL << "perimeter:" << perimeter;
+      auto se = compressEdges(perimeter);
       std::cout << NL << T << "compressed:" << se << std::flush;
-      if (failed) {
-        exit(-1);
-      }
       result += se.size(); // we should have only the region sides left?
     }
     return result; // 801260 too low
@@ -600,7 +511,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {21,22,23,24,25};
-  std::vector<int> states = {20};
+  std::vector<int> states = {21};
   //  std::vector<int> states = {11,12,13,10,23,20};
   for (auto state : states) {
     switch (state) {
