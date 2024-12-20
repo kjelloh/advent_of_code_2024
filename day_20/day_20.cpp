@@ -36,13 +36,10 @@ using aoc::grid::operator<<;
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
-  auto sections = Splitter{in}.sections();
-  for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-    std::cout << NL << "---------- section " << sx << " ----------";
-    for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
+  auto lines = Splitter{in}.lines();
+  for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+    std::cout << NL << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+    result.push_back(line);
   }
   return result;
 }
@@ -120,7 +117,7 @@ namespace test {
     std::pair<Path,PositionPairs> result{};
     auto start = grid.find_all('S')[0];
     auto end = grid.find_all('E')[0];
-    std::cout << NL << start << " to " << end;
+//    std::cout << NL << start << " to " << end;
 
     Grid::Seen seen{};
     Path track{};
@@ -191,20 +188,27 @@ namespace part1 {
     if (in) {
       Integer acc{};
       auto model = parse(in);
+      bool is_example = (model.height()==15);
       std::cout << NL << model;
       auto [track,cheats] = test::to_cheats(model);
-      auto computed = aoc::grid::to_dir_traced(model, track);
-      std::cout << NL << computed;
+      if (is_example) {
+        auto computed = aoc::grid::to_dir_traced(model, track);
+        std::cout << NL << computed;
+      }
       std::map<std::size_t,PositionPairs> savings{};
       for (auto const& cheat : cheats) {
         using test::operator<<;
         auto saving = test::to_saving(track, cheat);
-        std::cout << NL << cheat << " saving:" << saving;
+//
         savings[saving].push_back(cheat);
       }
+      int gain_requirement{1};
+      if (not is_example) gain_requirement = 100;
       for (auto const& [saving,cheats] : savings) {
-        std::cout << NL << "There are " << cheats.size() << " cheats saving " << saving << " picoseconds.";
-        if (saving >= 100) acc += cheats.size();
+        if (is_example) std::cout << NL << "There are " << cheats.size() << " cheats saving " << saving << " picoseconds.";
+        if (saving >= gain_requirement) {
+          acc += cheats.size();
+        }
       }
       result = std::to_string(acc);
     }
@@ -218,7 +222,6 @@ namespace part2 {
     std::size_t result{};
     auto start = grid.find_all('S')[0];
     auto end = grid.find_all('E')[0];
-    std::cout << NL << start << " to " << end;
 
     // Create the track
     Grid::Seen seen{};
@@ -239,10 +242,11 @@ namespace part2 {
         q.push_back(cand);
       }
     }
-    std::cout << NL << "track.size():" << track.size();
     // Every position on track can cheat to another track position at a manhattan position 2..20
     std::map<std::size_t,std::size_t> counts{};
+    std::cout << NL << std::flush;
     for (int r=2;r<=20;++r) {
+      std::cout << '.' << std::flush;
       for (int i=0;i<track.size();++i) {
 //        std::cout << NL << "r:" << r << " i:" << i;
         auto from = track[i];
@@ -262,10 +266,14 @@ namespace part2 {
         }
       }
     }
-    for (auto const& [gain,count] : counts) std::cout << NL << "There are " << count << " cheats that gain that save " << gain << " picosecond";
+    if (grid.width()==15) {
+      // Example input
+      for (auto const& [gain,count] : counts) std::cout << NL << "There are " << count << " cheats that gain that save " << gain << " picosecond";
+    }
     result = std::accumulate(counts.begin(), counts.end(), std::size_t{},[](auto acc,auto const& entry){
       acc += entry.second;
       return acc;
+      
     });
     return result;
   }
@@ -296,7 +304,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {20};
+  std::vector<int> states = {11,10,21,20};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
@@ -368,8 +376,11 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:2ms answer[Part 1 Example] 44
+   duration:595ms answer[Part 1     ] 1497
+   duration:1ms answer[Part 2 Example] 285
+   duration:5373ms answer[Part 2     ] 1030809
+   
   */
   return 0;
 }
