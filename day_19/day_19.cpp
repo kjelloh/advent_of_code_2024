@@ -32,7 +32,9 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
+using Towel = aoc::raw::Line;
 using Towels = aoc::raw::Lines;
+using Design = aoc::raw::Line;
 using Designs = aoc::raw::Lines;
 
 struct Model {
@@ -54,9 +56,9 @@ Model parse(auto& in) {
   Model result{};
   auto sections = Splitter{in}.sections();
   for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-    std::cout << NL << "---------- section " << sx << " ----------";
+//    std::cout << NL << "---------- section " << sx << " ----------";
     for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+//      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
       if (sx==0) {
         for (auto const& towel : line.splits(',')) {
           result.towels.push_back(towel.trim());
@@ -68,9 +70,9 @@ Model parse(auto& in) {
       else std::cerr << NL << "DESIGN INSUFFICIENCY: Section " << sx << " not expected nor processed";
     }
   }
-  std::cout << NL << "result:";
-  std::cout << NL << T << result.towels;
-  std::cout << NL << T << result.designs;
+//  std::cout << NL << "result:";
+//  std::cout << NL << T << result.towels;
+//  std::cout << NL << T << result.designs;
   return result;
 }
 
@@ -227,10 +229,11 @@ namespace test {
   using Weight = std::string;
   // Graph with edges weighted with the towel used (consumed)
   using Adjacent = std::set<std::pair<Vertex,Weight>>;
-  using Graph = std::unordered_map<Vertex, Adjacent>;
-  Graph to_graph(const std::string& design, const std::vector<std::string>& towels,bool find_all_paths) {
-    std::cout << NL << "to_graph" << std::flush;
+  using Graph = std::unordered_map<Vertex, std::vector<std::pair<Vertex,Weight>>>;
+
+  Graph to_graph(const std::string& design, const std::vector<std::string>& towels) {
     Graph graph;
+
     struct State {
       Vertex pos;
       std::vector<std::string> path;
@@ -250,40 +253,30 @@ namespace test {
       queue.pop_front();
       seen.insert(state); // Do not revisit
       auto const& [current,path] = state;
-      if (current == design.size()) {
+      if (current == design.size()-1) {
         graph[current]; // Add the end vertex
-        if (not find_all_paths) break; // One end is enough
-        else continue; // try options still in queue
+        break; // One end is enough for now
       }
       for (const auto& towel : towels) {
-//        if (current + towel.size() > (design.size()-1)) continue; // towel don't fit (redundant?)
+        if (current + towel.size() > (design.size()-1)) continue; // towel don't fit (redundant?)
         if (design.substr(current, towel.size()) != towel) continue; // towel don't fit
-//        std::cout << NL << T << "current:" << current << " consumed:" << towel;
         Vertex next = current + static_cast<int>(towel.size());
-
-//        if (next == design.size()-1) std::cout << NL << "End candidate found";
 
         auto next_path = path;
         next_path.push_back(towel);
         State next_state{next,next_path};
         if (seen.contains(next_state)) continue; // towel-step with same path already in graph
 
-//        std::cout << NL << T << "graph.add_edge:" << current << " --> " << next << " consumed: << " << towel;
-
-        graph[current].insert({next, towel});
-        graph[next]; // Ensure orphan end is in graph
+        graph[current].push_back({next, towel});
         queue.push_front(next_state); // Explore the next position
-//        std::cout << NL << "design:" << design.size() << " next:" << next << " towel:" << towel << " new queue:" << queue.size();
       }
     }
-    std::cout << NL << "to_graph END" << std::flush;
     return graph;
   }
 
   using Path = std::vector<Vertex>;
   std::vector<Path> to_paths(const Graph& graph, Vertex start, Vertex end) {
 //    std::cout << NL << "to_paths(graph:" << graph.size() << ",..)" << std::flush;
-
     std::vector<Path> allPaths;
     std::stack<std::pair<Vertex, Path>> stack;
     std::set<Path> seen{};
@@ -323,7 +316,7 @@ namespace test {
     using test::operator<<;
     std::cout << NL << T << "expected:" << expected;
     auto design = expected.first;
-    auto graph = to_graph(design, towels,false);
+    auto graph = to_graph(design, towels);
     auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
     std::cout << NL << "paths:" << paths.size();
     if (paths.size()>0) {
@@ -369,7 +362,7 @@ namespace part1 {
       auto model = parse(in);
       for (auto const& [dx,design] : aoc::views::enumerate(model.designs)) {
         std::cout << NL << "processing design[" << dx << "]:" << design << std::flush;
-        auto graph = test::to_graph(design, model.towels,false);
+        auto graph = test::to_graph(design, model.towels);
         std::cout << NL << "design[" << dx << "]:" << std::quoted(design);
         if (graph.contains(static_cast<test::Vertex>(design.size()-1))) {
           ++acc;
@@ -381,11 +374,31 @@ namespace part1 {
       }
       result = std::to_string(acc);
     }
-    return result; // 213 too low
+    return result;
   }
 }
 
 namespace part2 {
+
+  // This is a "Word Break Problem" or "String Reconstruction from Segments"
+  // 'design' is 'the word' to assemble
+  // 'towels' are 'the snippets' from which to assemble 'the word' (design)
+  std::size_t to_combination_count(const std::string &word, const std::vector<std::string> &snippets) {
+    auto const N = word.size();
+    std::vector<std::size_t> dp(N + 1, 0);
+    dp[0] = 1; // Base case: one way to form an empty string.
+    
+    for (int pos = 1; pos <= N; ++pos) {
+      for (const std::string &snippet : snippets) {
+        auto len = snippet.size();
+        if (pos >= len && word.substr(pos - len, len) == snippet) {
+          dp[pos] += dp[pos - len]; // add history count
+        }
+      }
+    }
+    return dp[N]; // The number of ways to form the entire word.
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -394,33 +407,12 @@ namespace part2 {
       auto model = parse(in);
       for (auto const& [dx,design] : aoc::views::enumerate(model.designs)) {
         std::cout << NL << "processing design[" << dx << "]:" << design << std::flush;
-        auto graph = test::to_graph(design, model.towels,true);
-        std::cout << NL << "design[" << dx << "]:" << std::quoted(design);
-        if (graph.contains(static_cast<test::Vertex>(design.size()-1))) {
-          auto paths = test::to_paths(graph, 0,static_cast<int>(design.size()));
-          acc += paths.size();
-          std::cout  << " paths: " << paths.size() << " acc:" << acc << std::flush;
-//          for (auto const& [px,path] : aoc::views::enumerate(paths)) {
-//            using aoc::raw::operator<<;
-//            std::cout << NL << T << px << " " << path;
-//            std::cout << " <-> ";
-//            for (int i=1;i<path.size();++i) {
-//              auto v1 = path[i-1];
-//              auto v2 = path[i];
-//              auto adj = graph[v1];
-//              auto iter =  std::find_if(adj.begin(),adj.end(),[v2](auto const& entry){
-//                return entry.first == v2;
-//              });
-//              std::cout << " " << iter->second;
-//            }
-//          }
-        }
-        else {
-          std::cout  << " Impossible";
-        }
+        // This is a "Word Break Problem" or "String Reconstruction from Segments"
+        auto count = to_combination_count(design,model.towels);
+        acc += count;
+        std::cout << " -> " << count << " acc:" << acc;
       }
       result = std::to_string(acc);
-
     }
     return result;
   }
@@ -436,7 +428,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {20};
+  std::vector<int> states = {11,10,21,20};
   for (auto state : states) {
     switch (state) {
       case 111: {
@@ -486,8 +478,11 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:1ms answer[Part 1 Example] 6
+   duration:235ms answer[Part 1     ] 276
+   duration:0ms answer[Part 2 Example] 16
+   duration:483ms answer[Part 2     ] 681226908011510
+   
   */
   return 0;
 }
