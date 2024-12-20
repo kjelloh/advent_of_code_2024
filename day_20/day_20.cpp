@@ -49,6 +49,13 @@ Model parse(auto& in) {
 
 using Args = std::vector<std::string>;
 
+using aoc::grid::Position;
+using aoc::grid::Positions;
+using aoc::grid::Grid;
+using PositionPair = std::pair<Position,Position>;
+using PositionPairs = std::vector<PositionPair>;
+using aoc::grid::Path;
+
 namespace test {
 
   // Adapt to expected for day puzzle
@@ -83,13 +90,6 @@ namespace test {
     std::cout << NL << NL << "test0";
     return std::nullopt;
   }
-
-  using aoc::grid::Position;
-  using aoc::grid::Positions;
-  using aoc::grid::Grid;
-  using PositionPair = std::pair<Position,Position>;
-  using PositionPairs = std::vector<PositionPair>;
-  using aoc::grid::Path;
 
   std::size_t to_saving(Path track,PositionPair cheat) {
     std::size_t best{track.size()};
@@ -189,19 +189,98 @@ namespace part1 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
+      Integer acc{};
       auto model = parse(in);
       std::cout << NL << model;
+      auto [track,cheats] = test::to_cheats(model);
+      auto computed = aoc::grid::to_dir_traced(model, track);
+      std::cout << NL << computed;
+      std::map<std::size_t,PositionPairs> savings{};
+      for (auto const& cheat : cheats) {
+        using test::operator<<;
+        auto saving = test::to_saving(track, cheat);
+        std::cout << NL << cheat << " saving:" << saving;
+        savings[saving].push_back(cheat);
+      }
+      for (auto const& [saving,cheats] : savings) {
+        std::cout << NL << "There are " << cheats.size() << " cheats saving " << saving << " picoseconds.";
+        if (saving >= 100) acc += cheats.size();
+      }
+      result = std::to_string(acc);
     }
     return result;
   }
 }
 
 namespace part2 {
+
+  std::size_t to_large_enough_cheats(Grid const& grid,int gain_requirement) {
+    std::size_t result{};
+    auto start = grid.find_all('S')[0];
+    auto end = grid.find_all('E')[0];
+    std::cout << NL << start << " to " << end;
+
+    // Create the track
+    Grid::Seen seen{};
+    Path track{};
+    std::deque<Position> q{};
+    q.push_back(start);
+    while (not q.empty()) {
+      auto curr = q.front(); // BFS
+      q.pop_front();
+      track.push_back(curr);
+      if (curr == end) break;
+      seen.insert(curr); // no backtrack
+      for (auto const& dir : aoc::grid::ortho_directions) {
+        auto cand = curr + dir;
+        if (not grid.on_map(cand)) continue; // no outside map
+        if (grid.at(cand) == '#') continue; // no outside track
+        if (seen.contains(cand)) continue; // no back track
+        q.push_back(cand);
+      }
+    }
+    std::cout << NL << "track.size():" << track.size();
+    // Every position on track can cheat to another track position at a manhattan position 2..20
+    std::map<std::size_t,std::size_t> counts{};
+    for (int r=2;r<=20;++r) {
+      for (int i=0;i<track.size();++i) {
+//        std::cout << NL << "r:" << r << " i:" << i;
+        auto from = track[i];
+        for ( auto cheat_iter = track.begin()+i
+             ;cheat_iter != track.end()
+             ;cheat_iter = std::find_if(cheat_iter+1,track.end(),[r,&from](Position const& to){
+                return ((std::abs(to.row-from.row) + std::abs(to.col - from.col))==r);
+             })) {
+          // cheat candidate at distance r
+          auto j = std::distance(track.begin(),cheat_iter);
+          auto gain = (j - i) - r;
+//          std::cout << NL << r << " :: " << i << ":" << from << " -- " << gain << " --> " << j << ":" << *cheat_iter;
+          if (gain >= gain_requirement) {
+            counts[gain] += 1;
+//            std::cout << NL << "r:" << r << " " << i << ":" << from << " -- " << gain << " --> " << j << ":" << *cheat_iter << " count:" << count;
+          }
+        }
+      }
+    }
+    for (auto const& [gain,count] : counts) std::cout << NL << "There are " << count << " cheats that gain that save " << gain << " picosecond";
+    result = std::accumulate(counts.begin(), counts.end(), std::size_t{},[](auto acc,auto const& entry){
+      acc += entry.second;
+      return acc;
+    });
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
+      Integer acc{};
       auto model = parse(in);
+      std::cout << NL << model;
+      int gain_requirement{50};
+      if (model.height()>15) gain_requirement = 100;
+      auto count = to_large_enough_cheats(model,gain_requirement);
+      result = std::to_string(count);
     }
     return result;
   }
@@ -217,7 +296,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {101};
+  std::vector<int> states = {20};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
