@@ -30,7 +30,8 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
-using Model = aoc::raw::Lines;
+using Model = aoc::grid::Grid;
+using aoc::grid::operator<<;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -83,6 +84,55 @@ namespace test {
     return std::nullopt;
   }
 
+
+  using aoc::grid::Position;
+  using aoc::grid::Positions;
+  using aoc::grid::Grid;
+  using PositionPair = std::pair<Position,Position>;
+  using PositionPairs = std::vector<PositionPair>;
+  std::ostream& operator<<(std::ostream& os,PositionPair const& pp) {
+    std::cout << "{" << pp.first << "," << pp.second << "}";
+    return os;
+  }
+  std::ostream& operator<<(std::ostream& os,PositionPairs const& pps) {
+    for (auto const& [ix,pp] : aoc::views::enumerate(pps)) {
+      std::cout << NL << T << std::format("[{}]",ix) << pp;
+    }
+    return os;
+  }
+  PositionPairs to_cheats(Grid const& grid) {
+    PositionPairs result{};
+    auto start = grid.find_all('S')[0];
+    auto end = grid.find_all('E')[0];
+    std::cout << NL << start << " to " << end;
+
+    Grid::Seen seen{};
+    std::deque<Position> q{};
+    q.push_back(start);
+    while (not q.empty()) {
+      auto curr = q.front(); // BFS
+      q.pop_front();
+      if (curr == end) break;
+      seen.insert(curr); // no backtrack
+      for (auto const& dir : aoc::grid::ortho_directions) {
+        auto cand = curr + dir;
+        if (not grid.on_map(cand)) continue;
+        if (grid.at(cand) == '#') {
+          // Cheat?
+          auto cheat = cand + dir;
+          if (not grid.on_map(cheat)) continue;
+          if (grid.at(cheat) == '#') continue;
+          if (seen.contains(cheat)) continue; // no back track
+          result.push_back({cand,cheat});
+          continue;
+        }
+        if (seen.contains(cand)) continue;
+        q.push_back(cand);
+      }
+    }
+    return result;
+  }
+
   std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
@@ -91,6 +141,9 @@ namespace test {
       if (doc_in) {
         auto log = test::parse(doc_in);
       }
+      std::cout << NL << model;
+      std::cout << NL << to_cheats(model);
+      
     }
     return result;
   }
@@ -103,6 +156,7 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      std::cout << NL << model;
     }
     return result;
   }
@@ -129,7 +183,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11,10,211,21,20};
+  std::vector<int> states = {111};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
