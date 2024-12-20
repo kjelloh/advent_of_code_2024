@@ -21,6 +21,64 @@
 
 namespace aoc {
 
+  namespace views {
+    template <typename Iterator>
+    class enumerate_iterator {
+    public:
+        // Constructor to initialize the iterator and the index
+        enumerate_iterator(Iterator iter, typename std::iterator_traits<Iterator>::difference_type index)
+            : iter_(iter), index_(index) {}
+
+        // Dereference operator to return the index and the element
+        auto operator*() const {
+            return std::tuple(index_, *iter_);
+        }
+
+        // Prefix increment to advance the iterator
+        enumerate_iterator& operator++() {
+            ++iter_;
+            ++index_;
+            return *this;
+        }
+
+        // Comparison operator to compare iterators
+        bool operator!=(const enumerate_iterator& other) const {
+            return iter_ != other.iter_;
+        }
+
+    private:
+        Iterator iter_;  // The iterator pointing to the current element
+      typename std::iterator_traits<Iterator>::difference_type index_;   // The current index of the element
+    };
+
+    template <typename Range>
+    class enumerate_view {
+    public:
+        // Constructor to accept the range
+        enumerate_view(Range& range) : range_(range) {}
+
+        // Begin function returning an enumerate_iterator with index 0
+        auto begin() {
+            return enumerate_iterator{std::ranges::begin(range_), 0};
+        }
+
+        // End function returning an enumerate_iterator pointing to the end
+        auto end() {
+            return enumerate_iterator{std::ranges::end(range_), std::ranges::distance(range_)};
+        }
+
+    private:
+        Range& range_;  // The range we are enumerating over
+    };
+
+    // Helper function to create an enumerate view
+    template <typename Range>
+    auto enumerate(Range& range) {
+        return enumerate_view<Range>(range);
+    }
+  } // namespace views
+
+
   namespace raw {
   
     template <typename T>
@@ -35,11 +93,19 @@ namespace aoc {
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
     std::ostream& operator<<(std::ostream& os,Lines const& lines) {
-      for (auto const& line : lines) {
-        os << raw::NL << line;
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << std::quoted(line);
       }
       return os;
     }
+    std::ostream& operator<<(std::ostream& os,std::vector<int> const& ints) {
+      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
+        if (ix>0) os << ',';
+        os << n;
+      }
+      return os;
+    }
+
   }
   namespace parsing {
     class Splitter; // Forward
@@ -350,6 +416,7 @@ namespace aoc {
 
     class Grid {
     public:
+      using Seen = std::set<Position>;
       Grid& push_back(raw::Line const& row) {
         m_grid.push_back(row);
         return *this;
@@ -487,7 +554,7 @@ namespace aoc {
   
     using Path = Positions;
     // Helper Functions for Specific Use Case
-    std::vector<Position> default_neighbors(Position const& pos) {
+    std::vector<Position> to_ortho_neighbours(Position const& pos) {
         return {
             {pos.row - 1, pos.col}, // Up
             {pos.row + 1, pos.col}, // Down
@@ -496,7 +563,7 @@ namespace aoc {
         };
     }
   
-    const std::vector<Position> directions = {
+    const std::vector<Position> ortho_directions = {
         {0, 1},  // Right
         {1, 0},  // Down
         {0, -1}, // Left
@@ -504,8 +571,8 @@ namespace aoc {
     };
 
     int to_direction_index(Position const& from, Position const& to) {
-      auto it = std::find(directions.begin(), directions.end(),to-from);
-      return (it != directions.end()) ? static_cast<int>(std::distance(directions.begin(), it)) : -1;
+      auto it = std::find(ortho_directions.begin(), ortho_directions.end(),to-from);
+      return (it != ortho_directions.end()) ? static_cast<int>(std::distance(ortho_directions.begin(), it)) : -1;
     }
 
 
@@ -542,7 +609,7 @@ namespace aoc {
         visited.insert(start);
         while (not q.empty()) {
           auto curr = q.front();q.pop_front();
-          for (auto const& next : default_neighbors(curr)) {
+          for (auto const& next : to_ortho_neighbours(curr)) {
             if (not grid.on_map(next)) continue;
             if (visited.contains(next)) continue;
             if (grid.at(next) != ch) continue;
@@ -718,63 +785,6 @@ namespace aoc {
       return os;
     }
   } // namespace test
-
-  namespace views {
-    template <typename Iterator>
-    class enumerate_iterator {
-    public:
-        // Constructor to initialize the iterator and the index
-        enumerate_iterator(Iterator iter, typename std::iterator_traits<Iterator>::difference_type index)
-            : iter_(iter), index_(index) {}
-
-        // Dereference operator to return the index and the element
-        auto operator*() const {
-            return std::tuple(index_, *iter_);
-        }
-
-        // Prefix increment to advance the iterator
-        enumerate_iterator& operator++() {
-            ++iter_;
-            ++index_;
-            return *this;
-        }
-
-        // Comparison operator to compare iterators
-        bool operator!=(const enumerate_iterator& other) const {
-            return iter_ != other.iter_;
-        }
-
-    private:
-        Iterator iter_;  // The iterator pointing to the current element
-      typename std::iterator_traits<Iterator>::difference_type index_;   // The current index of the element
-    };
-
-    template <typename Range>
-    class enumerate_view {
-    public:
-        // Constructor to accept the range
-        enumerate_view(Range& range) : range_(range) {}
-
-        // Begin function returning an enumerate_iterator with index 0
-        auto begin() {
-            return enumerate_iterator{std::ranges::begin(range_), 0};
-        }
-
-        // End function returning an enumerate_iterator pointing to the end
-        auto end() {
-            return enumerate_iterator{std::ranges::end(range_), std::ranges::distance(range_)};
-        }
-
-    private:
-        Range& range_;  // The range we are enumerating over
-    };
-
-    // Helper function to create an enumerate view
-    template <typename Range>
-    auto enumerate(Range& range) {
-        return enumerate_view<Range>(range);
-    }
-  } // namespace views
 
 } // namespace aoc
 
