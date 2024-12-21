@@ -220,20 +220,9 @@ namespace test {
           ,"<v>"
         });
         
-        //press:  029A
-        //press:  <A^A^^>AvvvA
-        //        0022589963AA
-        //         0 2   9   A
-        //press:  <<vA^>>A<A>A<AA>vA^A<vAAA^>A
-        //        ^ << ^AA^^AA^^^A>>AA^vvvv^AA
-        //           <   A ^ A ^^  > A  vvv  A
-        //press:  <<vAA>A^>A<A>vAA^A<<vA^>>AvA^A<<vA^>>AAvA<A^>A<A>A<<vA>A^>AAA<A>vA^A
-        //        ^
-        //expect:  <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
-
-
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
+        // Or?
         for (LogEntry const& entry : log) {
           Robot robot0{keypad};
           Robot robot1{remote};
@@ -267,6 +256,39 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      aoc::grid::Grid keypad({
+         "789"
+        ,"456"
+        ,"123"
+        ," 0A"
+      });
+      aoc::grid::Grid remote({
+         " ^A"
+        ,"<v>"
+      });
+      test::Robot robot0{keypad};
+      test::Robot robot1{remote};
+      test::Robot robot2{remote};
+
+      Integer acc{};
+      for (auto const& code : model) {
+        auto moves0 = robot0.press({code}); // single key series to press
+        auto moves1 = robot1.press(moves0);
+        auto moves2 = robot2.press(moves1);
+        for (auto const& move : moves2) {
+          std::cout << NL << T << "press:" << T << move;
+          std::regex pattern(R"((\d+))");
+          std::smatch match;
+          if (std::regex_search(code.begin(), code.end(), match, pattern)) {
+            auto num_part = std::stoi(match[0]);
+            auto len = move.size();
+            Integer complexity = len*num_part;
+            std::cout << NL << "Answer: num_part:" << num_part << " * length:" << len << " = " << complexity;
+            acc += complexity;
+          }
+        }
+      }
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -293,7 +315,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111};
+  std::vector<int> states = {11};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
