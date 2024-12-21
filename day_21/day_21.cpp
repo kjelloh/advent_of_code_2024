@@ -35,13 +35,10 @@ using Model = aoc::raw::Lines;
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
-  auto sections = Splitter{in}.sections();
-  for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-    std::cout << NL << "---------- section " << sx << " ----------";
-    for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
+  auto lines = Splitter{in}.lines();
+  for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+    std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+    result.push_back(line);
   }
   return result;
 }
@@ -52,6 +49,8 @@ namespace test {
 
   // Adapt to expected for day puzzle
   struct LogEntry {
+    aoc::raw::Line code;
+    aoc::raw::Line expected_presses;
     bool operator==(LogEntry const& other) const {
       bool result{true};
       return result;
@@ -59,6 +58,7 @@ namespace test {
   };
 
   std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+    std::cout << entry.code << " -- ? --> " << entry.expected_presses;
     return os;
   }
 
@@ -69,17 +69,117 @@ namespace test {
     LogEntries result{};
     using namespace aoc::parsing;
     auto sections = Splitter{doc_in}.same_indent_sections();
+    int target_sx{-1};
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
       std::cout << NL << "---------- section " << sx << " ----------";
       for (auto const& [lx,line] : aoc::views::enumerate(section)) {
         std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+        if (line.str().find("here is a shortest sequence of button presses") != std::string::npos) {
+          target_sx = static_cast<int>(sx)+1;
+        }
+        if (sx == target_sx) {
+          auto const& [left,right] = line.split(':');
+          LogEntry entry{left,right.trim()};
+          result.push_back(entry);
+        }
       }
     }
     return result;
   }
 
+  using aoc::grid::Grid;
+  using aoc::grid::Position;
+  class Robot {
+  public:
+    Robot(Grid grid) : m_grid(std::move(grid)) {
+      m_current = m_grid.find_all('A')[0];
+    }
+    std::string press(std::string path) {
+      std::string result{};
+      for (char ch : path) {
+        auto end = m_grid.find_all(ch)[0];
+        auto best = find(end);
+        std::cout << NL << "best:" << best;
+        result += best;
+        result.push_back('A');
+      }
+      return result;
+    }
+  private:
+    std::string find(Position const& end) {
+      std::cout << NL << "find(" << end << ")";
+      std::string result{};
+      using CostToPos = std::pair<int,Position>;
+      using PQ = std::priority_queue<CostToPos>;
+      using CostMap = std::map<Position,int>;
+      using PrevMap = std::map<Position, Position>;
+      PQ pq{};
+      auto start = m_current;
+      pq.push({0,start});
+      CostMap cost_map{};
+      cost_map[start] = 0;
+      PrevMap prev_map{};
+      while (not pq.empty()) {
+        auto [cost,current] = pq.top();
+        pq.pop();
+        std::cout << NL << T << pq.size() << " " << current << " " << end;
+        if (current == end) {
+          this->m_current = end;
+          break;
+        }
+        using namespace aoc::grid;
+        for (auto& dp : {UP,DOWN,LEFT,RIGHT}) {
+          auto next = current + dp;
+          if (not m_grid.on_map(next)) continue;
+          if (m_grid.at(next) == ' ') continue;
+          auto new_cost = cost+1;
+          if (not cost_map.contains(next) or cost_map[next] > new_cost) {
+            cost_map[next] = new_cost;
+            pq.push({new_cost,next});
+            prev_map[next] = current;
+          }
+        }
+      }
+      // Reconstruct best path
+      auto current = end;
+      auto prev = prev_map[current];
+      std::cout << NL << T << "path:";
+      while (current != start) {
+        std::cout << NL << T << current << " <-- " << prev;
+        result.push_back(aoc::grid::to_dir_char(prev,current));
+        std::cout << " result:" << std::quoted(result);
+        current = prev;
+        prev = prev_map[current];
+      }
+      std::reverse(result.begin(), result.end());
+      return result;
+    }
+    Position m_current;
+    aoc::grid::Grid m_grid;
+  };
+
   std::optional<Result> test0(Args args) {
     std::cout << NL << NL << "test0";
+    //    For example, to make the robot type 029A on the numeric keypad, one sequence of inputs on the directional keypad you could use is:
+    //
+    //    < to move the arm from A (its initial position) to 0.
+    //    A to push the 0 button.
+    //    ^A to move the arm to the 2 button and push it.
+    //    >^^A to move the arm to the 9 button and push it.
+    //    vvvA to move the arm to the A button and push it.
+    aoc::grid::Grid keypad({
+       "789"
+      ,"456"
+      ,"123"
+      ," 0A"
+    });
+    Robot r(keypad);
+    auto moves = r.press("029A");
+    std::cout << NL << "moves:" <<  moves;
+    // moves:<A^A>^^AvvvA
+    if (moves == "<A^A>^^AvvvA") {
+      return moves + " PASSED";
+    }
     return std::nullopt;
   }
 
@@ -90,6 +190,14 @@ namespace test {
       auto model = ::parse(in);
       if (doc_in) {
         auto log = test::parse(doc_in);
+        using aoc::test::operator<<;
+        std::cout << NL << log;
+        // How do I design my solution?
+        // The log.expected_presses should be the output of
+        // the 'solver' aiminf at pressein log.code on the target keypad
+        // What must the first robot do?
+        // auto moves = robot.travel(path);
+        // E.g.
       }
     }
     return result;
@@ -129,7 +237,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11,10,211,21,20};
+  std::vector<int> states = {0};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
