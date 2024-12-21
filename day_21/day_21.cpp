@@ -119,30 +119,34 @@ namespace test {
           Direction dp{aoc::raw::sign(delta.row),aoc::raw::sign(delta.col)};
           Direction dr{dp.row,0};
           Direction dc{0,dp.col};
-          std::string steps{};
           char ch_dr = aoc::grid::to_dir_char(from, from+dr);
           char ch_dc = aoc::grid::to_dir_char(from, from+dc);
-          if (from.row==gap_pos.row) {
-            // On same row as gap, walk rows forst
-            for (int i=0;i<std::abs(delta.row);++i) steps.push_back(ch_dr);
-            for (int i=0;i<std::abs(delta.col);++i) steps.push_back(ch_dc);
+          std::string dc_steps{};
+          for (int i=0;i<std::abs(delta.col);++i) dc_steps.push_back(ch_dc);
+          std::string dr_steps{};
+          for (int i=0;i<std::abs(delta.row);++i) dr_steps.push_back(ch_dr);
+          if (from.row + dp.row == gap_pos.row) {
+            // row then column would pass gap
+            m_best[{ch1,ch2}].push_back(dc_steps+dr_steps+"A");
+          }
+          else if (from.col + dp.col == gap_pos.col) {
+              // column then row would pass gap
+            m_best[{ch1,ch2}].push_back(dr_steps+dc_steps+"A");
           }
           else {
-            // On same column as gap, walk columns first
-            for (int i=0;i<std::abs(delta.col);++i) steps.push_back(ch_dc);
-            for (int i=0;i<std::abs(delta.row);++i) steps.push_back(ch_dr);
+            // No risk passing gap
+            m_best[{ch1,ch2}].push_back(dc_steps+dr_steps+"A");
+            m_best[{ch1,ch2}].push_back(dr_steps+dc_steps+"A");
           }
-          m_best[{ch1,ch2}] = steps;
         }
       }
       
     }
-    std::string to_best(char ch1,char ch2) {
-      std::string result{"?"};
+    std::vector<std::string> to_best(char ch1,char ch2) {
       if (m_best.contains({ch1,ch2})) {
-        result = m_best[{ch1,ch2}];
+        return m_best[{ch1,ch2}];
       }
-      return result;
+      return {};
     }
     // Return a list of all the shortest pah of moves to press provided
     // sortiment of keys
@@ -150,20 +154,35 @@ namespace test {
       std::vector<std::string> result{};
       for (auto const& path : paths) {
         std::cout << NL << T << "press:" << T << path;
-        result.push_back({});
-        auto best = m_best[{'A',path[0]}];
-        result.back().append(best);
-        result.back().push_back('A');
+        // Shoot, we need something recursive!
+        
+        std::queue<std::string> q{}; // candidates
+        q.push({});
         for (int i=1;i<path.size();++i) {
-          best = m_best[{path[i-1],path[i]}];
-          result.back().append(best);
-          result.back().push_back('A');
+          auto bests = m_best[{path[i-1],path[i]}]; // step candidates
+          std::cout << NL << T << path[i-1] << " -> " << path[i] << " bests:" << bests.size();
+          // expand candidates in the queue
+          auto const N = q.size();
+          for (int j=0;j<N;++j) {
+            auto current = q.front();
+            q.pop();
+            for (auto const& best : bests) {
+              q.push(current + best); // each candidate with a different expansion
+              std::cout << NL << T << i << " current:" << current <<  " + best:" << best;
+            }
+          }
+        }
+        for (int i=0;i<q.size();++i) {
+          auto candidate = q.front();
+          q.pop();
+          result.push_back(candidate);
+          std::cout << NL << T << "candidate:" << candidate;
         }
       }
       return result;
     }
   private:
-    std::map<std::pair<char,char>,std::string> m_best{};
+    std::map<std::pair<char,char>,std::vector<std::string>> m_best{};
     aoc::grid::Grid m_grid;
   };
 
@@ -315,7 +334,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {10};
+  std::vector<int> states = {111};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
