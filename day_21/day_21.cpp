@@ -92,83 +92,78 @@ namespace test {
   class Robot {
   public:
     Robot(Grid grid) : m_grid(std::move(grid)) {
-      m_start = m_grid.find('A');
+      std::vector<std::pair<char,Position>> char2pos{};
+      for (int row=0;row<m_grid.height();++row) {
+        for (int col=0;col<m_grid.width();++col) {
+          Position pos{row,col};
+          auto ch = m_grid.at(pos);
+          if (ch!=' ') char2pos.push_back({m_grid.at(pos),pos});
+        }
+      }
+      // cache best path between all keys
+      // Assume best path is manhattan distance and at most one turn.
+      // That is, do all row steps and then all col steps
+      // Note: Choose so that ' ' is not passed!
+      auto gap_pos = m_grid.find(' ');
+      std::cout << NL << "gap_pos:" << gap_pos;
+      for (int i=0;i<char2pos.size();++i) {
+        for (int j=0;j<char2pos.size();j++) {
+          auto const& [ch1,from] = char2pos[i];
+          auto const& [ch2,to] = char2pos[j];
+          auto delta = to-from;
+          // Assume the shortest and best path for upstream robot
+          // is the shortest with the least turns?
+          // Because a turn will cause upstream robot to navigate to
+          // another key on the remote.
+          using aoc::grid::Direction;
+          Direction dp{aoc::raw::sign(delta.row),aoc::raw::sign(delta.col)};
+          Direction dr{dp.row,0};
+          Direction dc{0,dp.col};
+          std::string steps{};
+          char ch_dr = aoc::grid::to_dir_char(from, from+dr);
+          char ch_dc = aoc::grid::to_dir_char(from, from+dc);
+          if (from.row==gap_pos.row) {
+            // On same row as gap, walk rows forst
+            for (int i=0;i<std::abs(delta.row);++i) steps.push_back(ch_dr);
+            for (int i=0;i<std::abs(delta.col);++i) steps.push_back(ch_dc);
+          }
+          else {
+            // On same column as gap, walk columns first
+            for (int i=0;i<std::abs(delta.col);++i) steps.push_back(ch_dc);
+            for (int i=0;i<std::abs(delta.row);++i) steps.push_back(ch_dr);
+          }
+          m_best[{ch1,ch2}] = steps;
+        }
+      }
+      
+    }
+    std::string to_best(char ch1,char ch2) {
+      std::string result{"?"};
+      if (m_best.contains({ch1,ch2})) {
+        result = m_best[{ch1,ch2}];
+      }
+      return result;
     }
     // Return a list of all the shortest pah of moves to press provided
     // sortiment of keys
     std::vector<std::string> press(std::vector<std::string> paths) {
-      auto best = std::numeric_limits<std::size_t>::max();
-      std::map<std::size_t,std::vector<std::string>> accs{};
+      std::vector<std::string> result{};
       for (auto const& path : paths) {
-        std::string acc{};
-        m_current = m_start; // reset
-        for (char ch : path) {
-          auto end = m_grid.find(ch);
-          auto moves = find(end);
-          acc += moves;
-          acc.push_back('A'); // Call to press the key we have moved to
-        }
-        accs[acc.size()].push_back(acc);
-        best = std::min(best,acc.size());
-      }
-      if (best<std::numeric_limits<std::size_t>::max()) {
-        return accs[best];
-      }
-      return {};
-    }
-  private:
-    // find m_current -> end
-    std::string find(Position const& end) {
-      std::cout << NL << "find(" << end << ")";
-      std::string result{};
-      using CostToPos = std::pair<int,Position>;
-      using PQ = std::priority_queue<CostToPos, std::vector<CostToPos>, std::greater<CostToPos>>;
-      using CostMap = std::map<Position,int>;
-      using PrevMap = std::map<Position, Position>;
-      PQ pq{};
-      auto start = m_current;
-      pq.push({0,start});
-      CostMap cost_map{};
-      cost_map[start] = 0;
-      PrevMap prev_map{};
-      while (not pq.empty()) {
-        auto [cost,current] = pq.top();
-        pq.pop();
-        std::cout << NL << T << pq.size() << " " << current << " " << end;
-        if (current == end) {
-          this->m_current = end;
-          std::cout << NL << "best:" << cost_map[end];
-          break;
-        }
-        using namespace aoc::grid;
-        for (auto& dp : {UP,LEFT,DOWN,RIGHT}) {
-          auto next = current + dp;
-          if (not m_grid.on_map(next)) continue;
-          if (m_grid.at(next) == ' ') continue;
-          auto new_cost = cost+1;
-          if (not cost_map.contains(next) or new_cost < cost_map[next]) {
-            cost_map[next] = new_cost;
-            pq.push({new_cost,next});
-            prev_map[next] = current;
-          }
+        std::cout << NL << T << "press:" << T << path;
+        result.push_back({});
+        auto best = m_best[{'A',path[0]}];
+        result.back().append(best);
+        result.back().push_back('A');
+        for (int i=1;i<path.size();++i) {
+          best = m_best[{path[i-1],path[i]}];
+          result.back().append(best);
+          result.back().push_back('A');
         }
       }
-      // Reconstruct best path
-      auto current = end;
-      auto prev = prev_map[current];
-      std::cout << NL << T << "path:";
-      while (current != start) {
-        std::cout << NL << T << current << " <-- " << prev;
-        result.push_back(aoc::grid::to_dir_char(prev,current));
-        std::cout << " result:" << std::quoted(result);
-        current = prev;
-        prev = prev_map[current];
-      }
-      std::reverse(result.begin(), result.end());
       return result;
     }
-    Position m_start{};
-    Position m_current;
+  private:
+    std::map<std::pair<char,char>,std::string> m_best{};
     aoc::grid::Grid m_grid;
   };
 
@@ -193,6 +188,7 @@ namespace test {
     auto moves = r.press({"029A"});
     using aoc::grid::operator<<;
     std::cout << NL << "moves:" <<  moves;
+    
     if (answers.size()>0) {
       std::string acc{};
       for (auto const& answer : answers) {
@@ -223,6 +219,18 @@ namespace test {
            " ^A"
           ,"<v>"
         });
+        
+        //press:  029A
+        //press:  <A^A^^>AvvvA
+        //        0022589963AA
+        //         0 2   9   A
+        //press:  <<vA^>>A<A>A<AA>vA^A<vAAA^>A
+        //        ^ << ^AA^^AA^^^A>>AA^vvvv^AA
+        //           <   A ^ A ^^  > A  vvv  A
+        //press:  <<vAA>A^>A<A>vAA^A<<vA^>>AvA^A<<vA^>>AAvA<A^>A<A>A<<vA>A^>AAA<A>vA^A
+        //        ^
+        //expect:  <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+
 
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
@@ -230,10 +238,14 @@ namespace test {
           Robot robot0{keypad};
           Robot robot1{remote};
           Robot robot2{remote};
+          std::cout << NL << "best A --> < :" << robot2.to_best('A', '<');
           auto moves0 = robot0.press({entry.code}); // single key series to press
-          
           auto moves1 = robot1.press(moves0);
           auto moves2 = robot2.press(moves1);
+          for (auto const& move : moves2) {
+            std::cout << NL << T << "press:" << T << move;
+          }
+          std::cout << NL << T << "expect:" << T << entry.expected_presses;
         }
         if (answers.size()>0) {
           std::string acc{};
@@ -281,7 +293,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0};
+  std::vector<int> states = {111};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
