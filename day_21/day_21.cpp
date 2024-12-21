@@ -290,7 +290,7 @@ namespace part1 {
       }
       result = std::to_string(acc);
     }
-    return result;
+    return result; // 185828 too high
   }
 }
 
@@ -315,7 +315,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {11};
+  std::vector<int> states = {10};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
