@@ -479,6 +479,16 @@ namespace aoc {
         }
       }
       
+      Position find(char ch) {
+        Position result{-1,-1};
+        for (int row=0;row<height();++row) {
+          for (int col=0;col<width();++col) {
+            if (at({row,col})==ch) result = {row,col};
+          }
+        }
+        return result;
+      }
+      
       Positions find_all(char ch) const {
         Positions result{};
         auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
