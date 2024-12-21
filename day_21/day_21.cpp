@@ -95,11 +95,12 @@ namespace test {
       m_current = m_grid.find_all('A')[0];
     }
     std::string press(std::string path) {
+      std::cout << NL << "Robot::press:" << path;
       std::string result{};
       for (char ch : path) {
         auto end = m_grid.find_all(ch)[0];
         auto best = find(end);
-        std::cout << NL << "best:" << best;
+//        std::cout << NL << "best:" << best;
         result += best;
         result.push_back('A');
       }
@@ -107,10 +108,11 @@ namespace test {
     }
   private:
     std::string find(Position const& end) {
-      std::cout << NL << "find(" << end << ")";
+//      std::cout << NL << "find(" << end << ")";
       std::string result{};
       using CostToPos = std::pair<int,Position>;
-      using PQ = std::priority_queue<CostToPos>;
+//      using PQ = std::priority_queue<CostToPos>;
+      using PQ = std::priority_queue<CostToPos, std::vector<CostToPos>, std::greater<CostToPos>>;
       using CostMap = std::map<Position,int>;
       using PrevMap = std::map<Position, Position>;
       PQ pq{};
@@ -122,18 +124,19 @@ namespace test {
       while (not pq.empty()) {
         auto [cost,current] = pq.top();
         pq.pop();
-        std::cout << NL << T << pq.size() << " " << current << " " << end;
+//        std::cout << NL << T << pq.size() << " " << current << " " << end;
         if (current == end) {
           this->m_current = end;
+//          std::cout << NL << "best:" << cost_map[end];
           break;
         }
         using namespace aoc::grid;
-        for (auto& dp : {UP,DOWN,LEFT,RIGHT}) {
+        for (auto& dp : {UP,LEFT,DOWN,RIGHT}) {
           auto next = current + dp;
           if (not m_grid.on_map(next)) continue;
           if (m_grid.at(next) == ' ') continue;
           auto new_cost = cost+1;
-          if (not cost_map.contains(next) or cost_map[next] > new_cost) {
+          if (not cost_map.contains(next) or new_cost < cost_map[next]) {
             cost_map[next] = new_cost;
             pq.push({new_cost,next});
             prev_map[next] = current;
@@ -143,11 +146,11 @@ namespace test {
       // Reconstruct best path
       auto current = end;
       auto prev = prev_map[current];
-      std::cout << NL << T << "path:";
+//      std::cout << NL << T << "path:";
       while (current != start) {
-        std::cout << NL << T << current << " <-- " << prev;
+//        std::cout << NL << T << current << " <-- " << prev;
         result.push_back(aoc::grid::to_dir_char(prev,current));
-        std::cout << " result:" << std::quoted(result);
+//        std::cout << " result:" << std::quoted(result);
         current = prev;
         prev = prev_map[current];
       }
@@ -159,6 +162,8 @@ namespace test {
   };
 
   std::optional<Result> test0(Args args) {
+    
+    aoc::raw::Lines answers{};
     std::cout << NL << NL << "test0";
     //    For example, to make the robot type 029A on the numeric keypad, one sequence of inputs on the directional keypad you could use is:
     //
@@ -178,13 +183,21 @@ namespace test {
     std::cout << NL << "moves:" <<  moves;
     // moves:<A^A>^^AvvvA
     if (moves == "<A^A>^^AvvvA") {
-      return moves + " PASSED";
+      answers.push_back(moves + " PASSED");
+    }
+    if (answers.size()>0) {
+      std::string acc{};
+      for (auto const& answer : answers) {
+        acc += NL + answer;
+      }
+      return acc;
     }
     return std::nullopt;
   }
 
   std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
     std::optional<Result> result{};
+    aoc::raw::Lines answers{};
     std::cout << NL << NL << "test1";
     if (in) {
       auto model = ::parse(in);
@@ -192,12 +205,69 @@ namespace test {
         auto log = test::parse(doc_in);
         using aoc::test::operator<<;
         std::cout << NL << log;
-        // How do I design my solution?
-        // The log.expected_presses should be the output of
-        // the 'solver' aiminf at pressein log.code on the target keypad
-        // What must the first robot do?
-        // auto moves = robot.travel(path);
-        // E.g.
+        aoc::grid::Grid keypad({
+           "789"
+          ,"456"
+          ,"123"
+          ," 0A"
+        });
+        aoc::grid::Grid robot_remote({
+           " ^A"
+          ,"<v>"
+        });
+
+        
+//        Robot::press:029A
+//                           Robot::press:<A^A^^>AvvvA
+        // <A^A>^^AvvvA, <A^A^>^AvvvA, or <A^A^^>AvvvA
+//        Robot::press:<v<A>^>A<A>A<AA>vA^A<vAAA^>A
+                    // v<<A>>^A<A>AvA<^AA>A<vAAA>^A
+
+//        my press:<v<A>A<A>^>AvA^<A>vA^A<v<A>^>AvA^A<v<A>^>AAvA<A^>A<A>A<v<A>A^>AAA<A>vA^A
+          //       ^v< v <
+          //          < v <
+//        expected:<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+          //       ^v
+
+//        Robot::press:029A
+//        Robot::press:<A^A>^^AvvvA
+//        Robot::press:v<<A>>^A<A>AvA<^AA>Av<AAA>^A
+//        my press:v<A<AA>>^AvAA<^A>Av<<A>>^AvA^Av<A>^Av<<A>^A>AAvA^Av<A<A>>^AAAvA<^A>A
+          //       <vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+//        expected:<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
+
+//        Robot::press:980A
+//        Robot::press:<^<^^>>A<AvvvA>A
+        //             0214789 8
+//        Robot::press:v<<A>^Av<A>^AAv>AA^Av<<A>>^Av<AAA>^AvA^A
+//        my press:v<A<AA>>^AvA<^A>Av<A<A>>^AvA<^A>AAv<A>A^AA<A>Av<A<AA>>^AvAA<^A>Av<A<A>>^AAAvA<^A>Av<A>^A<A>A
+//        expected:<v<A>>^AAAvA^A<vA<AA>>^AvAA<^A>A<v<A>A>^AAAvA<^A>A<vA>^A<A>A
+        
+        // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
+        // that is the shortest one!
+        for (LogEntry const& entry : log) {
+          Robot robot0{keypad};
+          Robot robot1{robot_remote};
+          Robot robot2{robot_remote};
+          auto moves0 = robot0.press(entry.code);
+          auto moves1 = robot1.press(moves0);
+          auto moves2 = robot2.press(moves1);
+          std::cout << NL << "my press:" << moves2;
+          std::cout << NL << "expected:" << entry.expected_presses;
+          if (moves2 == entry.expected_presses) {
+            answers.push_back("my press:" + moves2 + " OK. PASSED");
+          }
+          else {
+            answers.push_back("my press:" + moves2 + " not expected " + entry.expected_presses + " - FAILED");
+          }
+        }
+        if (answers.size()>0) {
+          std::string acc{};
+          for (auto const& answer : answers) {
+            acc += NL + answer;
+          }
+          return acc;
+        }
       }
     }
     return result;
@@ -237,7 +307,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0};
+  std::vector<int> states = {111};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
