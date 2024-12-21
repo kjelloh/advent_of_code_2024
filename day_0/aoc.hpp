@@ -479,6 +479,16 @@ namespace aoc {
         }
       }
       
+      Position find(char ch) {
+        Position result{-1,-1};
+        for (int row=0;row<height();++row) {
+          for (int col=0;col<width();++col) {
+            if (at({row,col})==ch) result = {row,col};
+          }
+        }
+        return result;
+      }
+      
       Positions find_all(char ch) const {
         Positions result{};
         auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
@@ -574,7 +584,18 @@ namespace aoc {
       auto it = std::find(ortho_directions.begin(), ortho_directions.end(),to-from);
       return (it != ortho_directions.end()) ? static_cast<int>(std::distance(ortho_directions.begin(), it)) : -1;
     }
-
+  
+    char to_dir_char(Position const& from, Position const& to) {
+      char result{'?'};
+      switch (to_direction_index(from, to)) {
+        case 0: result = '>'; break;
+        case 1: result = 'v'; break;
+        case 2: result = '<'; break;
+        case 3: result = '^'; break;
+        case -1: break;
+      }
+      return result;
+    }
 
     Grid& to_dir_traced(Grid& grid,Path const& path) {
       for (int i=1;i<path.size()-1;++i) {
