@@ -46,7 +46,10 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
+struct Args {
+  std::map<std::string,std::string> arg{};
+  std::set<std::string> options{};
+};
 
 namespace test {
 
@@ -64,10 +67,11 @@ namespace test {
 
   using LogEntries = aoc::test::LogEntries<LogEntry>;
 
-  LogEntries parse(auto& doc_in) {
-    std::cout << NL << T << "test::parse";
+  LogEntries parse_doc() {
+    std::cout << NL << T << "parse puzzle doc text";
     LogEntries result{};
     using namespace aoc::parsing;
+    std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
     auto sections = Splitter{doc_in}.same_indent_sections();
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
       std::cout << NL << "---------- section " << sx << " ----------";
@@ -78,19 +82,11 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test0(Args args) {
-    std::cout << NL << NL << "test0";
-    return std::nullopt;
-  }
-
-  std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
-    std::cout << NL << NL << "test1";
+    std::cout << NL << NL << "test";
     if (in) {
-      auto model = ::parse(in);
-      if (doc_in) {
-        auto log = test::parse(doc_in);
-      }
+      auto model = parse(in);
     }
     return result;
   }
@@ -120,64 +116,54 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
 int main(int argc, char *argv[]) {
-  Args args{};
+  Args user_args{};
+  
+  user_args.arg["part"] = 1;
+  user_args.arg["file"] = "example.txt";
+
+  // Override by any user input
   for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
   }
+
+  
+  auto requests = to_requests(user_args);
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,111,11,10,211,21,20};
-//  std::vector<int> states = {0,111};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 211: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part=="test") {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
