@@ -124,7 +124,7 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  user_args.arg["part"] = 1;
+  user_args.arg["part"] = "1";
   user_args.arg["file"] = "example.txt";
 
   // Override by any user input
@@ -141,7 +141,6 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-
   
   auto requests = to_requests(user_args);
 
@@ -151,6 +150,7 @@ int main(int argc, char *argv[]) {
   for (auto request : requests) {
     auto part = request.arg["part"];
     auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
     std::ifstream in{file};
     if (in) {
       if (part=="1") {
