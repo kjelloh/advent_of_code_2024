@@ -400,6 +400,7 @@ namespace part2 {
         // Custom hash function for std::vector<int>
         std::vector<Key2Price> key2price_vector{};
         std::vector<std::vector<Integer>> trends{};
+        std::set<std::vector<Integer>> seen{};
         for (auto const& seed : model) {
           key2price_vector.push_back({});
           trends.push_back({});
@@ -407,39 +408,34 @@ namespace part2 {
           auto trend = test::to_steps(history);
           for (int i=0;i<trend.size()-3;++i) {
             std::vector<Integer> key{trend[i],trend[i+1],trend[i+2],trend[i+3]};
+            if (key2price_vector.back().contains(key)) continue; // only first match of interest
             key2price_vector.back()[key] = history[i+4]; // map to price (price vector one longer than steps)
+            seen.insert(key);
           }
           trends.back() = trend;
         }
         std::cout << NL << "seeds:" << model.size();
         std::cout << NL << "built key2price_vector size:" << key2price_vector.size() << std::flush;
-        std::vector<int> range{-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        // We only need to try the actual seen keys
         Integer best{0};
         std::vector<Integer> best_key{-9,-9,-9,-9};
         int loop_count{};
-        for (int i1 : range) {
-          for (int i2 : range) {
-            for (int i3 : range) {
-              for (int i4 : range) {
-                std::vector<Integer> key{i1, i2, i3, i4};
-                using aoc::raw::operator<<;
-                if (++loop_count % 5000 == 0) std::cout << NL << key;
-                Integer acc{};
-                for (int i=0;i<trends.size();++i) {
-                  auto const& trend = trends[i];
-                  auto const& key2index = key2price_vector[i];
-                  if (key2index.contains(key)) {
-                    auto const cost = key2index.at(key);
-                    acc += cost;
-                  }
-                }
-                if (acc > best) {
-                  best = acc;
-                  best_key = key;
-                  std::cout << NL << key <<  " new best:" << best;
-                }
-              }
+        for (auto const& key : seen) {
+          using aoc::raw::operator<<;
+          if (++loop_count % 5000 == 0) std::cout << NL << key;
+          Integer acc{};
+          for (int i=0;i<trends.size();++i) {
+            auto const& trend = trends[i];
+            auto const& key2index = key2price_vector[i];
+            if (key2index.contains(key)) {
+              auto const cost = key2index.at(key);
+              acc += cost;
             }
+          }
+          if (acc > best) {
+            best = acc;
+            best_key = key;
+            std::cout << NL << key <<  " new best:" << best;
           }
         }
         using aoc::raw::operator<<;
@@ -447,6 +443,7 @@ namespace part2 {
         result = std::to_string(best);
         // best:1914 for key:0,0,-1,1 too low (but index error in key match, -4 instead of -3)
         // best:1916 for key:0,0,-1,1 still too low (still to small search space?)
+        // best:1925 for key:0,0,-1,1 (fixed a bug when optimising?)
       }
             
       else {
@@ -515,8 +512,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {21};
-//  std::vector<int> states = {0,111};
+  std::vector<int> states = {11,10,21,20};
   for (auto state : states) {
     switch (state) {
       case 0: {
@@ -582,8 +578,11 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:1ms answer[Part 1 Example] 37327623
+   duration:126ms answer[Part 1     ] 16894083306
+   duration:25ms answer[Part 2 Example] 23
+   duration:32761ms answer[Part 2     ] 1925
+   
   */
   return 0;
 }
