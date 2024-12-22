@@ -98,7 +98,14 @@ namespace aoc {
       }
       return os;
     }
-    std::ostream& operator<<(std::ostream& os,std::vector<int> const& ints) {
+
+    // A concept for integral types for operator<<(std::vector<Int>) below
+    template <typename T>
+    concept Integral = std::is_integral_v<T>;
+
+    template <typename T>
+    requires Integral<T>
+    std::ostream& operator<<(std::ostream& os, const std::vector<T>& ints) {
       for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
         if (ix>0) os << ',';
         os << n;
