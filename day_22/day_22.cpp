@@ -102,7 +102,7 @@ namespace test {
 
   std::vector<Integer> to_history(Integer seed,Integer const& N) {
     std::vector<Integer> result{};
-    result.push_back(seed);
+    result.push_back(seed % 10);
     auto sn = seed;
     for (int i=0;i<N;++i) {
       sn = to_evolved(sn);
@@ -374,11 +374,137 @@ namespace part1 {
 }
 
 namespace part2 {
+  struct VectorHash {
+    template <typename T>
+    std::size_t operator () (const std::vector<T>& vec) const {
+      std::size_t hash_value = 0;
+      for (const T& element : vec) {
+        // The interwebs proposes...
+        hash_value ^= std::hash<T>()(element) + 0x9e3779b9 + (hash_value << 6) + (hash_value >> 2);
+      }
+      return hash_value;
+    }
+  };
+
+  using Key2Index = std::unordered_map<std::vector<Integer>,std::size_t,VectorHash>;
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      
+      // Pre-compute an unordered map for all four integer window over
+      // the cost vectors
+      if (true ){
+        // Custom hash function for std::vector<int>
+        std::vector<Key2Index> key2index_vector{};
+        std::vector<std::vector<Integer>> histories{};
+        std::vector<std::vector<Integer>> trends{};
+        for (auto const& seed : model) {
+          key2index_vector.push_back({});
+          histories.push_back({});
+          trends.push_back({});
+          auto history = test::to_history(seed, 2000);
+          auto trend = test::to_steps(history);
+          for (int i=0;i<trend.size()-3;++i) {
+            std::vector<Integer> key{trend[i],trend[i+1],trend[i+2],trend[i+3]};
+            key2index_vector.back()[key] = i;
+          }
+          histories.back() = history;
+          trends.back() = trend;
+        }
+        std::cout << NL << "seeds:" << model.size();
+        std::cout << NL << "built key2index_vector size:" << key2index_vector.size() << std::flush;
+        std::vector<int> range{-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        Integer best{0};
+        std::vector<Integer> best_key{-9,-9,-9,-9};
+        int loop_count{};
+        for (int i1 : range) {
+          for (int i2 : range) {
+            for (int i3 : range) {
+              for (int i4 : range) {
+                std::vector<Integer> key{i1, i2, i3, i4};
+                using aoc::raw::operator<<;
+                if (++loop_count % 5000 == 0) std::cout << NL << key;
+                Integer acc{};
+                for (int i=0;i<trends.size();++i) {
+                  auto const& history = histories[i];
+                  auto const& trend = trends[i];
+                  auto const& key2index = key2index_vector[i];
+                  if (key2index.contains(key)) {
+                    auto const index = key2index.at(key);
+                    auto cost = history[index+4]; // Note +4 (not +3) as history as trend (steps) are left shifted one step
+                    acc += cost;
+                  }
+                }
+                if (acc > best) {
+                  best = acc;
+                  best_key = key;
+                  std::cout << NL << key <<  " new best:" << best;
+                }
+              }
+            }
+          }
+        }
+        using aoc::raw::operator<<;
+        std::cout << NL << "best:" << best << " for key:" << best_key;
+        result = std::to_string(best);
+        // best:1914 for key:0,0,-1,1 too low (but index error in key match, -4 instead of -3)
+        // best:1916 for key:0,0,-1,1 still too low (still to small search space?)
+      }
+            
+      else {
+        std::vector<std::vector<Integer>> cached{};
+        std::vector<std::vector<Integer>> histories{};
+        for (auto const& seed : model) {
+          cached.push_back({});
+          histories.push_back({});
+          auto history = test::to_history(seed, 2000);
+          auto trend = test::to_steps(history);
+          cached.back() = trend;
+          histories.back() = history;
+          std::cout << NL << "trend:" << seed;
+          for (int i=0;i<9;++i) {
+            std::cout << NL << T << trend[i];
+          }
+        }
+        std::cout << NL << "cached built size:" << cached.size() << std::flush;
+        
+        // Brute force?
+        std::vector<int> range{-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        Integer best{0};
+        std::vector<int> best_key{-9,-9,-9,-9};
+        for (int i1 : range) {
+          for (int i2 : range) {
+            for (int i3 : range) {
+              for (int i4 : range) {
+                std::vector<int> key{i1, i2, i3, i4};
+                Integer acc{};
+                for (int i=0;i<cached.size();++i) {
+                  auto entry = cached[i];
+                  auto history = histories[i];
+                  auto iter = std::search(entry.begin(), entry.end(), key.begin(), key.end());
+                  if (iter != entry.end()) {
+                    auto index = std::distance(entry.begin(),iter)+4;
+                    auto price = history[index];
+                    acc += price;
+                  }
+                }
+                if (acc > best) {
+                  best = acc;
+                  best_key = key;
+                  std::cout << NL << "best:" << best;
+                }
+              }
+            }
+          }
+        }
+        using aoc::raw::operator<<;
+        std::cout << NL << "best:" << best << " for key:" << best_key;
+
+      }
+
     }
     return result;
   }
@@ -394,7 +520,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {211};
+  std::vector<int> states = {20};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
