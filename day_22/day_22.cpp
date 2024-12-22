@@ -100,6 +100,17 @@ namespace test {
     return result;
   }
 
+  std::vector<Integer> to_history(Integer seed,Integer const& N) {
+    std::vector<Integer> result{};
+    result.push_back(seed);
+    auto sn = seed;
+    for (int i=0;i<N;++i) {
+      sn = to_evolved(sn);
+      result.push_back(sn % 10); // The 'one digit'
+    }
+    return result;
+  }
+
   std::optional<Result> test0(Args args) {
     std::cout << NL << NL << "test0";
     
@@ -140,7 +151,7 @@ namespace test {
     return std::nullopt;
   }
 
-  std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
+  std::optional<Result> test111(auto& in, auto& doc_in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
     if (in) {
@@ -159,6 +170,189 @@ namespace test {
     return result;
   }
 
+  Integer to_ones_digit(Integer sn) {
+    return sn % 10;
+  }
+
+  std::vector<Integer> to_steps(std::vector<Integer> const& history) {
+    std::vector<Integer> result{history};
+    // Transform into steps
+    // Assume first in history is seed and can be safelly overwritten wih the step entry[1]-seed;
+    for (int i=0;i<result.size()-1;++i) {
+      auto step = (result[i+1]) - (result[i]);
+      result[i] = step; // replace left with step right-left
+    }
+    result.pop_back();
+    return result;
+  }
+
+  std::optional<Result> test2(Args args) {
+    std::cout << NL << NL << "test0";
+        
+    std::vector<Integer> sns{
+      123
+      ,15887950
+      ,16495136
+      ,527345
+      ,704524
+      ,1553684
+      ,12683156
+      ,11100544
+      ,12249484
+      ,7753432
+      ,5908254};
+
+    for (auto sn : sns) {
+      std::cout << NL << sn << " ones count: " << to_ones_digit(sn);
+    }
+    //For the buyer with an initial secret number of 1, changes -2,1,-1,3 first occur when the price is 7.
+    // Buyer byer_0{1}; monkey.sell_on({-2,1,-1,3}).to_buyer(buyer_0)
+    //For the buyer with initial secret 2, changes -2,1,-1,3 first occur when the price is 7.
+    //For the buyer with initial secret 3, the change sequence -2,1,-1,3 does not occur in the first 2000 changes.
+    //For the buyer starting with 2024, changes -2,1,-1,3 first occur when the price is 9.
+    
+    // So, we are looking for the 'Trend' {d1,d2,d3,d4} of price chages (price steps) so that,
+    // If we bou from a seller at the price after d4 change, we will maximice the income from all sellers.
+    // Note: It is the total income, not the price per buyer, we want to maximise.
+    
+    // 1. What are the search space of {d1,d2,d3,d4}?
+    // A: It is -9,-9,-9,-9 to 9,9,9,9 is it not?
+    
+    {
+      Model model{
+        123
+      };
+      
+      for (auto const& seed : model) {
+        auto history = to_history(seed, 2000);
+        auto trend = to_steps(history);
+        std::cout << NL << "trend:" << seed;
+        for (int i=0;i<9;++i) {
+          std::cout << NL << T << trend[i];
+        }
+      }
+    }
+    
+    {
+      Model model{
+         1
+        ,2
+        ,3
+        ,2024
+      };
+      std::vector<std::vector<Integer>> cached{};
+      std::vector<std::vector<Integer>> histories{};
+      for (auto const& seed : model) {
+        cached.push_back({});
+        histories.push_back({});
+        auto history = to_history(seed, 2000);
+        auto trend = to_steps(history);
+        cached.back() = trend;
+        histories.back() = history;
+        std::cout << NL << "trend:" << seed;
+        for (int i=0;i<9;++i) {
+          std::cout << NL << T << trend[i];
+        }
+      }
+      Integer acc{};
+      std::vector<Integer> key{-2,1,-1,3};
+      for (int i=0;i<cached.size();++i) {
+        auto entry = cached[i];
+        auto history = histories[i];
+        std::cout << NL << i << " history:" << history.size() << " entry:" << entry.size();
+        auto iter = std::search(entry.begin(), entry.end(), key.begin(), key.end());
+        if (iter != entry.end()) {
+          auto index = std::distance(entry.begin(),iter)+4;
+          std::cout << T << " first match [" << index << "]";
+          for (int j=static_cast<int>(index-4);j<=static_cast<int>(index+4);++j) {
+            if (j<history.size()) std::cout << " " << j << ":" << history[j];
+            else std::cout << j << ":-";
+          }
+          auto price = history[index];
+          std::cout << " price:" << price;
+          acc += price;
+        }
+        else {
+          std::cout << T << " void";
+        }
+      }
+      return std::to_string(acc);
+    }
+    
+    return std::nullopt;
+  }
+
+
+  std::optional<Result> test211(auto& in, auto& doc_in,Args args) {
+    std::optional<Result> result{};
+    std::cout << NL << NL << "test2";
+    if (in) {
+      auto model = ::parse(in);
+      if (doc_in) {
+        auto log = test::parse(doc_in);
+        if (log.size()>36) {
+          std::cout << NL << log[39];
+          std::cout << NL << log[40];
+        }
+        else {
+          std::cout << NL << "Doc is to short. Are you sure you have solved part 1?";
+        }
+      }
+      std::vector<std::vector<Integer>> cached{};
+      std::vector<std::vector<Integer>> histories{};
+      for (auto const& seed : model) {
+        cached.push_back({});
+        histories.push_back({});
+        auto history = to_history(seed, 2000);
+        auto trend = to_steps(history);
+        cached.back() = trend;
+        histories.back() = history;
+        std::cout << NL << "trend:" << seed;
+        for (int i=0;i<9;++i) {
+          std::cout << NL << T << trend[i];
+        }
+      }
+      
+      // Brute force?
+      std::vector<int> range{-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+      // Generate all combinations (with replacement)
+      Integer best{0};
+      std::vector<int> best_key{-9,-9,-9,-9};
+      for (int i1 : range) {
+        for (int i2 : range) {
+          for (int i3 : range) {
+            for (int i4 : range) {
+              std::vector<int> key{i1, i2, i3, i4};
+              Integer acc{};
+              for (int i=0;i<cached.size();++i) {
+                auto entry = cached[i];
+                auto history = histories[i];
+                auto iter = std::search(entry.begin(), entry.end(), key.begin(), key.end());
+                if (iter != entry.end()) {
+                  auto index = std::distance(entry.begin(),iter)+4;
+                  auto price = history[index];
+                  acc += price;
+                }
+//                else {
+//                  using aoc::raw::operator<<;
+//                  std::cout << NL << key << " void";
+//                }
+              }
+              if (acc > best) {
+                best = acc;
+                best_key = key;
+                std::cout << NL << "best:" << best;
+              }
+            }
+          }
+        }
+      }
+      using aoc::raw::operator<<;
+      std::cout << NL << "best:" << best << " for key:" << best_key;
+    }
+    return std::nullopt;
+  }
 }
 
 namespace part1 {
@@ -200,7 +394,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {10};
+  std::vector<int> states = {211};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
@@ -212,7 +406,7 @@ int main(int argc, char *argv[]) {
         std::ifstream doc_in{doc_file};
         auto file = aoc::to_working_dir_path("example.txt");
         std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
+        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test111(in,doc_in,args)});
         else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
       } break;
       case 11: {
@@ -227,16 +421,19 @@ int main(int argc, char *argv[]) {
         if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
       } break;
+      case 2: {
+        answers.push_back({"test2",test::test2(args)});
+      } break;
       case 211: {
         auto doc_file = aoc::to_working_dir_path("doc.txt");
         std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example2.txt");
         std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test1(in,doc_in,args)});
+        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test211(in,doc_in,args)});
         else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
       } break;
       case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
+        auto file = aoc::to_working_dir_path("example2.txt");
         std::ifstream in{file};
         if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
         else std::cerr << "\nSORRY, no file " << file;
