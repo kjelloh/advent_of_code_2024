@@ -386,7 +386,7 @@ namespace part2 {
     }
   };
 
-  using Key2Index = std::unordered_map<std::vector<Integer>,std::size_t,VectorHash>;
+  using Key2Price = std::unordered_map<std::vector<Integer>,std::size_t,VectorHash>;
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -398,24 +398,21 @@ namespace part2 {
       // the cost vectors
       if (true ){
         // Custom hash function for std::vector<int>
-        std::vector<Key2Index> key2index_vector{};
-        std::vector<std::vector<Integer>> histories{};
+        std::vector<Key2Price> key2price_vector{};
         std::vector<std::vector<Integer>> trends{};
         for (auto const& seed : model) {
-          key2index_vector.push_back({});
-          histories.push_back({});
+          key2price_vector.push_back({});
           trends.push_back({});
           auto history = test::to_history(seed, 2000);
           auto trend = test::to_steps(history);
           for (int i=0;i<trend.size()-3;++i) {
             std::vector<Integer> key{trend[i],trend[i+1],trend[i+2],trend[i+3]};
-            key2index_vector.back()[key] = i;
+            key2price_vector.back()[key] = history[i+4]; // map to price (price vector one longer than steps)
           }
-          histories.back() = history;
           trends.back() = trend;
         }
         std::cout << NL << "seeds:" << model.size();
-        std::cout << NL << "built key2index_vector size:" << key2index_vector.size() << std::flush;
+        std::cout << NL << "built key2price_vector size:" << key2price_vector.size() << std::flush;
         std::vector<int> range{-9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         Integer best{0};
         std::vector<Integer> best_key{-9,-9,-9,-9};
@@ -429,12 +426,10 @@ namespace part2 {
                 if (++loop_count % 5000 == 0) std::cout << NL << key;
                 Integer acc{};
                 for (int i=0;i<trends.size();++i) {
-                  auto const& history = histories[i];
                   auto const& trend = trends[i];
-                  auto const& key2index = key2index_vector[i];
+                  auto const& key2index = key2price_vector[i];
                   if (key2index.contains(key)) {
-                    auto const index = key2index.at(key);
-                    auto cost = history[index+4]; // Note +4 (not +3) as history as trend (steps) are left shifted one step
+                    auto const cost = key2index.at(key);
                     acc += cost;
                   }
                 }
@@ -520,7 +515,7 @@ int main(int argc, char *argv[]) {
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {20};
+  std::vector<int> states = {21};
 //  std::vector<int> states = {0,111};
   for (auto state : states) {
     switch (state) {
