@@ -236,12 +236,149 @@ namespace part1 {
   }
 }
 
+template <typename T>
+class GraphAdapter {
+public:
+    using Graph = aoc::graph::Graph<T>;
+    using IntGraph = aoc::graph::Graph<int>;
+  GraphAdapter(Graph const& originalGraph) : intGraph({}) {
+        convertToIntGraph(originalGraph);
+    }
+
+    // Get the graph with int vertices
+    const IntGraph& getIntGraph() const {
+        return intGraph;
+    }
+
+    // Get the mapping from int to string
+    const std::unordered_map<int, std::string>& getIntToVertexMap() const {
+        return intToVertex;
+    }
+
+    // Get the mapping from string to int
+    const std::unordered_map<std::string, int>& getVertexToIntMap() const {
+        return vertexToInt;
+    }
+
+    // Get the original vertex from an int index
+    std::string getVertexFromInt(int idx) const {
+        auto it = intToVertex.find(idx);
+        if (it != intToVertex.end()) {
+            return it->second;
+        }
+        throw std::out_of_range("Index not found in the mapping");
+    }
+
+    // Get the int index from a vertex
+    int getIntFromVertex(const std::string& vertex) const {
+        auto it = vertexToInt.find(vertex);
+        if (it != vertexToInt.end()) {
+            return it->second;
+        }
+        throw std::out_of_range("Vertex not found in the mapping");
+    }
+
+private:
+    IntGraph intGraph;
+    std::unordered_map<typename Graph::Vertex, int> vertexToInt;
+    std::unordered_map<int, typename Graph::Vertex> intToVertex;
+
+    // Helper method to perform the conversion
+    void convertToIntGraph(Graph const& originalGraph) {
+        int index = 0;
+
+        // Create mappings from string to int and int to string
+        for (const auto& [vertex, _] : originalGraph.adj()) {
+            vertexToInt[vertex] = index;
+            intToVertex[index] = vertex;
+            index++;
+        }
+
+        // Convert the adjacency list with string nodes to one with int nodes
+        for (const auto& [vertex, neighbors] : originalGraph.adj()) {
+            int u = vertexToInt[vertex];
+            for (const auto& neighbor : neighbors) {
+                int v = vertexToInt[neighbor];
+                intGraph.add_edge(u, v);
+            }
+        }
+    }
+};
+
 namespace part2 {
+
+  // Bron-Kerbosch to find the largest clique
+  void bron_kerbosch_largest(
+      std::set<int>& R,
+      std::set<int>& P,
+      std::set<int>& X,
+      const std::map<int, std::set<int>>& graph,
+      std::set<int>& largest_clique) {
+      
+      if (P.empty() && X.empty()) {
+          // Found a maximal clique; check if it's the largest so far
+          if (R.size() > largest_clique.size()) {
+              largest_clique = R; // Update largest clique
+          }
+          return;
+      }
+
+      // Iterate over vertices in P
+      std::set<int> P_copy = P; // Copy because P will be modified
+      for (int v : P_copy) {
+          // Add v to the current clique
+          R.insert(v);
+
+          // Compute P' = P ∩ neighbors(v) and X' = X ∩ neighbors(v)
+          std::set<int> P_new, X_new;
+          for (int neighbor : graph.at(v)) {
+              if (P.count(neighbor)) P_new.insert(neighbor);
+              if (X.count(neighbor)) X_new.insert(neighbor);
+          }
+
+          // Recursive call
+          bron_kerbosch_largest(R, P_new, X_new, graph, largest_clique);
+
+          // Backtrack: remove v from R, move v from P to X
+          R.erase(v);
+          P.erase(v);
+          X.insert(v);
+      }
+  }
+
+  // Wrapper function to find the largest clique
+  std::set<int> find_largest_clique(auto const& graph) {
+      std::set<int> largest_clique;
+      std::set<int> R, P, X;
+
+      // Initialize P with all vertices in the graph
+      for (const auto& [vertex, _] : graph.adj()) {
+          P.insert(vertex);
+      }
+
+      bron_kerbosch_largest(R, P, X, graph.adj(), largest_clique);
+      return largest_clique;
+  }
+
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      GraphAdapter<std::string> to_int_graph(model);
+      auto int_graph = to_int_graph.getIntGraph();
+      std::cout << NL << "int_graph" << int_graph;
+      auto largest_qlique = find_largest_clique(int_graph);
+      using aoc::raw::operator<<;
+      std::cout << NL << largest_qlique;
+      auto computers = std::accumulate(largest_qlique.begin(),largest_qlique.end(),std::string{},[&to_int_graph](auto acc,auto int_v){
+        if (acc.size()>0) acc += ",";
+        acc += to_int_graph.getVertexFromInt(int_v);
+        return acc;
+      });
+      std::cout << NL << computers;
+      
     }
     return result;
   }
