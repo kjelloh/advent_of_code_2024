@@ -106,13 +106,28 @@ namespace aoc {
     template <typename T>
     requires Integral<T>
     std::ostream& operator<<(std::ostream& os, const std::vector<T>& ints) {
+      os << "[";
       for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
         if (ix>0) os << ',';
         os << n;
       }
+      os << "]";
+      return os;
+    }
+  
+    template <typename T>
+    requires Integral<T>
+    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints) {
+      os << "{";
+      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
+        if (ix>0) os << ',';
+        os << n;
+      }
+      os << "}";
       return os;
     }
 
+  
   }
   namespace parsing {
     class Splitter; // Forward
