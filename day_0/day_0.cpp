@@ -67,14 +67,15 @@ namespace test {
 
   using LogEntries = aoc::test::LogEntries<LogEntry>;
 
-  LogEntries parse_doc() {
+  aoc::parsing::Sections parse_doc(Args const& args) {
     std::cout << NL << T << "parse puzzle doc text";
-    LogEntries result{};
+    aoc::parsing::Sections result{};
     using namespace aoc::parsing;
     std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
     auto sections = Splitter{doc_in}.same_indent_sections();
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
       std::cout << NL << "---------- section " << sx << " ----------";
+      result.push_back(section);
       for (auto const& [lx,line] : aoc::views::enumerate(section)) {
         std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
       }
@@ -82,11 +83,35 @@ namespace test {
     return result;
   }
 
+  aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
+    return {};
+  }
+
+  void create_example_file(aoc::raw::Lines const& lines) {
+    auto example_file = aoc::to_working_dir_path("example.txt");
+    std::ofstream out{example_file};
+    if (out) {
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        if (lx>0) out << NL;
+        out << line;
+      }
+      std::cout << NL << "Created " << example_file;
+    }
+    else {
+      std::cerr << NL << "Sorry, failed to create file " << example_file;
+    }
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
+      auto doc = parse_doc(args);
+      auto example = to_example(doc);
+      if (args.options.contains("-to_example")) {
+        create_example_file(example);
+      }
     }
     return result;
   }
