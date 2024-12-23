@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <set>
 #include <deque>
+#include <iterator>
 
 namespace aoc {
 
@@ -709,6 +710,17 @@ namespace aoc {
     }
 
   } // namespace grid
+
+  namespace set {
+  
+    template <typename T>
+    std::set<T> operator&(const std::set<T>& lhs, const std::set<T>& rhs) {
+      std::set<T> result;
+      std::set_intersection(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
+                            std::inserter(result, result.begin()));
+      return result;
+    }
+  }
 
   namespace dfs {
     /*
