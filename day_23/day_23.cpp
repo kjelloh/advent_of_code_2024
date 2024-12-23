@@ -82,11 +82,101 @@ namespace test {
     return result;
   }
 
+  // Helper to print tuple elements
+  template <typename Tuple, std::size_t... Is>
+  void print_tuple(std::ostream& os, Tuple const& tuple, std::index_sequence<Is...>) {
+      ((os << (Is == 0 ? "" : ", ") << std::get<Is>(tuple)), ...);
+  }
+
+  // Overload for std::tuple
+  template <typename... Args>
+  std::ostream& operator<<(std::ostream& os, std::tuple<Args...> const& tuple) {
+      os << "(";
+      print_tuple(os, tuple, std::index_sequence_for<Args...>{});
+      os << ")";
+      return os;
+  }
+
+
+  template <typename Graph>
+  auto find_triangles(Graph const& graph) {
+    using Vertex = typename Graph::Vertex;
+    using Vertices = typename Graph::Vertices;
+    using Result = std::vector<std::tuple<Vertex, Vertex, Vertex>>;
+    Result triangles;
+    auto const m_adj = graph.adj();
+    for (auto const& [u, neighbors_u] : m_adj) {
+      for (auto const& v : neighbors_u) {
+        if (u < v) { // Avoid double-counting
+          Vertices common_neighbors;
+          std::set_intersection(
+             neighbors_u.begin(), neighbors_u.end()
+            ,m_adj.at(v).begin(), m_adj.at(v).end()
+            ,std::inserter(common_neighbors, common_neighbors.begin())
+            );
+          for (auto const& w : common_neighbors) {
+            if (v < w) { // Avoid double-counting
+              triangles.emplace_back(u, v, w);
+            }
+          }
+        }
+      }
+    }
+    return triangles;
+  }
+
+  template <typename Tuple, typename Predicate>
+  bool tuple_any_of(Tuple const& tuple, Predicate pred) {
+      bool result = false;
+      std::apply([&](auto const&... elems) {
+          ((result = result || pred(elems)), ...);
+      }, tuple);
+      return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
+      auto doc_file = aoc::to_working_dir_path("doc.txt");
+      std::ifstream doc_in{doc_file};
+      if (doc_in) {
+        using namespace aoc::parsing;
+        auto sections = Splitter{doc_in}.same_indent_sections();
+        for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+          std::cout << NL << "---------- section " << sx << " ----------";
+          for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+            std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+          }
+        }
+        if (sections.size()>0) {
+          aoc::graph::Graph<std::string> graph({});
+          auto lines = sections[9];
+          for (auto const& line : lines) {
+            auto const& [left,right] = line.split('-');
+            graph.add_edge(left, right);
+            graph.add_edge(right,left);
+          }
+          auto triangles = find_triangles(graph);
+          for (auto const& triangle : triangles) {
+            std::cout << NL << triangle;
+            if (tuple_any_of(triangle, [](auto const& computer){
+              return computer.find("t") != std::string::npos;
+            })) {
+              std::cout << " keep";
+            }
+          }
+          
+        }
+        else {
+          std::cerr << "Sorry, exoected doc.txt to contain sections";
+        }
+      }
+      else {
+        std::cerr << "Sorry, expected puzzle text file " << doc_file;
+      }
+      
     }
     return result;
   }
@@ -124,8 +214,8 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  user_args.arg["part"] = 1;
-  user_args.arg["file"] = "example.txt";
+  user_args.arg["part"] = "test";
+  user_args.arg["file"] = "doc.txt";
 
   // Override by any user input
   for (int i=1;i<argc;++i) {
@@ -141,7 +231,6 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-
   
   auto requests = to_requests(user_args);
 
@@ -151,6 +240,7 @@ int main(int argc, char *argv[]) {
   for (auto request : requests) {
     auto part = request.arg["part"];
     auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
     std::ifstream in{file};
     if (in) {
       if (part=="1") {
