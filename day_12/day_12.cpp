@@ -242,7 +242,7 @@ namespace part2 {
 
 
   Edges to_all_grid_pos_edges(Region const& region) {
-    std::cout << NL << "to_all_grid_pos_edges region:" << region.first << " : " << region.second.size();
+//    std::cout << NL << "to_all_grid_pos_edges region:" << region.first << " : " << region.second.size();
     Edges result{};
     for (auto const& pos : region.second) {
       // Represent edge as if upper left corner is at plot {row,col}
@@ -266,7 +266,7 @@ namespace part2 {
 
   // Remove all 'internal edges'
   Edges to_perimeter_grid_pos_edges(Edges const& edges) {
-    std::cout << NL << "to_perimeter_grid_pos_edges(edges" << edges.size() << ")";
+//    std::cout << NL << "to_perimeter_grid_pos_edges(edges" << edges.size() << ")";
     Edges result{};
     std::set<Edge> outer_edges{};
     for (auto const& edge : edges) {
@@ -279,7 +279,7 @@ namespace part2 {
       }
     }
     result.assign(outer_edges.begin(), outer_edges.end());
-    std::cout << NL << T << " -> edges:" << result.size();
+//    std::cout << NL << T << " -> edges:" << result.size();
     return result;
   }
 
@@ -287,7 +287,7 @@ namespace part2 {
   public:
       // Constructor to process edges and find disconnected graphs
       DisconnectedGraph(Edges const& edges) {
-        std::cout << NL << "DisconnectedGraph(edges:" << edges.size() << ")";
+//        std::cout << NL << "DisconnectedGraph(edges:" << edges.size() << ")";
         findDisconnectedGraphs(edges);
       }
 
@@ -429,30 +429,30 @@ namespace part2 {
   }
 
   Result to_side_count(Region const& region) {
-    std::cout << NL << "to_side_count id:" << region.first;
+//    std::cout << NL << "to_side_count id:" << region.first;
     Result result{};
     auto all_grid_pos_edges = to_all_grid_pos_edges(region);
     auto perimeter_grid_pos_edges = to_perimeter_grid_pos_edges(all_grid_pos_edges);
     DisconnectedGraph disconnected_graph{perimeter_grid_pos_edges};
-    std::cout << NL << "disconnected_graph count:" << disconnected_graph.getSubgraphs().size() << std::flush;
+//    std::cout << NL << "disconnected_graph count:" << disconnected_graph.getSubgraphs().size() << std::flush;
     for (auto const& subgraph : disconnected_graph.getSubgraphs()) {
-      std::cout << NL << T << "subgraph:" << subgraph;
+//      std::cout << NL << T << "subgraph:" << subgraph;
       // TODO: Compress subgraph (edges) into straight edges of the region.
       //       Edges start,end,start,end,... with the same normal vector should be merged into single start,end,normal
       //       We can then just count the final region edges
       // Put edges in order
       auto perimeter = to_perimeter(subgraph);
       if (perimeter) {
-        std::cout << NL << "perimeter:" << *perimeter;
+//        std::cout << NL << "perimeter:" << *perimeter;
         auto se = compressEdges(*perimeter);
-        std::cout << NL << T << "compressed:" << se << std::flush;
+//        std::cout << NL << T << "compressed:" << se << std::flush;
         result += se.size(); // we should have only the region sides left?
       }
       else {
         std::cerr << NL << "Sorry, Failed to asemble a perimeter";
       }
     }
-    return result; // 801260 too low
+    return result;
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -476,6 +476,7 @@ namespace part2 {
         std::cout << NL << T << "Price: " << price;
         std::cout << NL << "-------------------------";
         acc += price;
+        std::cout << T << "acc:" << acc;
       }
       result = acc;
     }
@@ -503,7 +504,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {21,22,23,24,25};
-  std::vector<int> states = {20};
+  std::vector<int> states = {11,12,13,10,21,22,23,24,25,20};
   for (auto state : states) {
     switch (state) {
       case 11: {
@@ -599,13 +600,22 @@ BBB)";
   }
   std::cout << "\n";
   /*
-  For my input:
+
+   Xcode Debug -O3
+   
+   For my input:
 
    ANSWERS
-   duration:0ms answer[Part 1 Example] 140
-   duration:0ms answer[Part 1 Example 2] 772
-   duration:2ms answer[Part 1 Larger Example] 1930
-   duration:322ms answer[Part 1     ] 1352976
+   duration:0ms answer[Part 1 Example A to E] 140
+   duration:0ms answer[Part 1 Example O around X] 772
+   duration:1ms answer[Part 1 Larger Example] 1930
+   duration:46ms answer[Part 1     ] 1352976
+   duration:0ms answer[Part 2 Larger Example] 80
+   duration:0ms answer[Part 2 Example O around X] 436
+   duration:0ms answer[Part 2 Larger Example] 1206
+   duration:0ms answer[Part 2 E and X] 236
+   duration:0ms answer[Part 2 A and B example] 368
+   duration:55ms answer[Part 2     ] 808796
 
    */
   return 0;
