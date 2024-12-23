@@ -309,57 +309,56 @@ namespace part2 {
 
   // Bron-Kerbosch to find the largest clique
   void bron_kerbosch_largest(
-      std::set<int>& R,
-      std::set<int>& P,
-      std::set<int>& X,
-      const std::map<int, std::set<int>>& graph,
-      std::set<int>& largest_clique) {
+                             std::set<int>& R,
+                             std::set<int>& P,
+                             std::set<int>& X,
+                             const std::map<int, std::set<int>>& graph,
+                             std::set<int>& largest_clique) {
+    
+    if (P.empty() && X.empty()) {
+      // Found a maximal clique; check if it's the largest so far
+      if (R.size() > largest_clique.size()) {
+        // New largest clique
+        largest_clique = R;
+      }
+      return;
+    }
+    
+    // Iterate over vertices in P
+    std::set<int> P_copy = P; // Copy because P will be modified
+    for (int v : P_copy) {
+      // Add v to the current clique
+      R.insert(v);
       
-      if (P.empty() && X.empty()) {
-          // Found a maximal clique; check if it's the largest so far
-          if (R.size() > largest_clique.size()) {
-              largest_clique = R; // Update largest clique
-          }
-          return;
+      // Compute P' = P ∩ neighbors(v) and X' = X ∩ neighbors(v)
+      std::set<int> P_new, X_new;
+      for (int neighbor : graph.at(v)) {
+        if (P.count(neighbor)) P_new.insert(neighbor);
+        if (X.count(neighbor)) X_new.insert(neighbor);
       }
-
-      // Iterate over vertices in P
-      std::set<int> P_copy = P; // Copy because P will be modified
-      for (int v : P_copy) {
-          // Add v to the current clique
-          R.insert(v);
-
-          // Compute P' = P ∩ neighbors(v) and X' = X ∩ neighbors(v)
-          std::set<int> P_new, X_new;
-          for (int neighbor : graph.at(v)) {
-              if (P.count(neighbor)) P_new.insert(neighbor);
-              if (X.count(neighbor)) X_new.insert(neighbor);
-          }
-
-          // Recursive call
-          bron_kerbosch_largest(R, P_new, X_new, graph, largest_clique);
-
-          // Backtrack: remove v from R, move v from P to X
-          R.erase(v);
-          P.erase(v);
-          X.insert(v);
-      }
+      
+      // Recursive call
+      bron_kerbosch_largest(R, P_new, X_new, graph, largest_clique);
+      
+      // Backtrack: remove v from R, move v from P to X
+      R.erase(v);
+      P.erase(v);
+      X.insert(v);
+    }
   }
 
-  // Wrapper function to find the largest clique
   std::set<int> find_largest_clique(auto const& graph) {
-      std::set<int> largest_clique;
-      std::set<int> R, P, X;
-
-      // Initialize P with all vertices in the graph
-      for (const auto& [vertex, _] : graph.adj()) {
-          P.insert(vertex);
-      }
-
-      bron_kerbosch_largest(R, P, X, graph.adj(), largest_clique);
-      return largest_clique;
+    std::set<int> largest_clique;
+    std::set<int> R, P, X;
+    
+    // Initialize P with all vertices in the graph
+    for (const auto& [vertex, _] : graph.adj()) {
+      P.insert(vertex);
+    }
+    
+    bron_kerbosch_largest(R, P, X, graph.adj(), largest_clique);
+    return largest_clique;
   }
-
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -378,7 +377,7 @@ namespace part2 {
         return acc;
       });
       std::cout << NL << computers;
-      
+      result = computers;
     }
     return result;
   }
@@ -412,6 +411,21 @@ int main(int argc, char *argv[]) {
   }
   
   auto requests = to_requests(user_args);
+  
+  if (user_args.options.contains("-all")) {
+    requests.clear();
+    
+    for (int i=0;i<4;++i) {
+      Args args{};
+      std::string part{};
+      std::string file{};
+      part = (i/2==0)?"1":"2";
+      file = (i%2==0)?"example.txt":"puzzle.txt";
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
+  }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
@@ -445,11 +459,15 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   >day_22 -all
 
    ANSWERS
-   duration:84ms answer[part1 puzzle.txt] 2462
-   
-  */
+   duration:1ms answer[part1 example.txt] 7
+   duration:85ms answer[part1 puzzle.txt] 1485
+   duration:0ms answer[part2 example.txt] co,de,ka,ta
+   duration:642ms answer[part2 puzzle.txt] cc,dz,ea,hj,if,it,kf,qo,sk,ug,ut,uv,wh
+
+   */
   return 0;
 }
