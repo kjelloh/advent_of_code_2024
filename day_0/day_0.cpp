@@ -124,8 +124,8 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  user_args.arg["part"] = "1";
-  user_args.arg["file"] = "example.txt";
+  user_args.arg["part"] = "test";
+  user_args.arg["file"] = "doc.txt";
 
   // Override by any user input
   for (int i=1;i<argc;++i) {
@@ -143,6 +143,21 @@ int main(int argc, char *argv[]) {
   }
   
   auto requests = to_requests(user_args);
+  
+  if (user_args.options.contains("-all")) {
+    requests.clear();
+    
+    for (int i=0;i<4;++i) {
+      Args args{};
+      std::string part{};
+      std::string file{};
+      part = (i/2==0)?"1":"2";
+      file = (i%2==0)?"example.txt":"puzzle.txt";
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
+  }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
@@ -176,11 +191,14 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   Xcode Debug -O2
+
+   >day_22 -all
 
    ANSWERS
    ...
-      
-  */
+   
+   */
   return 0;
 }
