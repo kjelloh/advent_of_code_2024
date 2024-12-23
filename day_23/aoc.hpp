@@ -163,7 +163,10 @@ namespace aoc {
           auto line_indent_size = line.find_first_not_of(' ');
           if (line_indent_size != section_indent_size) {
             // New section
-            if (result.back().size()>0) result.push_back({}); // rdeuse previous if it is empty
+            if (result.back().size()>0 and line.size()>0) {
+              // new if current section not empty and new line is empty
+              result.push_back({});
+            }
             section_indent_size = line_indent_size;
           }
           if (line.size()>0) result.back().push_back(line);
@@ -236,9 +239,11 @@ namespace aoc {
   }
   
   namespace graph {
-    template <typename Vertex>
+  
+    template <typename T>
     class Graph {
     public:
+      using Vertex = T;
       using Vertices = std::set<Vertex>;
       using AdjList = std::map<Vertex,Vertices>;
       Graph(Vertices const& vertices) {
@@ -257,15 +262,32 @@ namespace aoc {
     };
   
     template <typename T>
-    std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
-      std::cout << "vertices:" << graph.size();
-      for (auto const& adjacency : graph.adj()) {
-        std::cout << raw::NL << raw::T << adjacency.first << " --> " << adjacency.second;
-      }
+    std::ostream& operator<<(std::ostream& os,typename Graph<T>::AdjList const& adj_list) {
       
       return os;
     }
   
+    // Helper function to print std::set
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
+        os << "{ ";
+        for (auto const& elem : s) {
+            os << elem << " ";
+        }
+        os << "}";
+        return os;
+    }
+
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
+      std::cout << "vertices:" << graph.size();
+      for (auto const& adjacency : graph.adj()) {
+        std::cout << raw::NL << raw::T << adjacency.first;
+        std::cout << " --> " << adjacency.second;
+      }
+      
+      return os;
+    }
   }
 
   namespace xy {
