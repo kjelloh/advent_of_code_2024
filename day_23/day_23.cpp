@@ -30,18 +30,18 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
-using Model = aoc::raw::Lines;
+using Computer = std::string;
+using Model = aoc::graph::Graph<Computer>;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
-  Model result{};
-  auto sections = Splitter{in}.sections();
-  for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-    std::cout << NL << "---------- section " << sx << " ----------";
-    for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-      std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
-    }
+  Model result({});
+  auto lines = Splitter{in}.lines();
+  for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+    std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+    auto const& [left,right] = line.split('-');
+    result.add_edge(left, right);
+    result.add_edge(right,left);
   }
   return result;
 }
@@ -153,6 +153,22 @@ namespace test {
         if (sections.size()>0) {
           aoc::graph::Graph<std::string> graph({});
           auto lines = sections[9];
+          {
+            // Conveniant for later
+            auto example_file = aoc::to_working_dir_path("example.txt");
+            std::ofstream out{example_file};
+            if (out) {
+              for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+                if (lx>0) out << NL;
+                out << line.str();
+              }
+              std::cout << NL << doc_file << " --> " << example_file;
+            }
+            else {
+              std::cerr << NL << "Sorry, failed to create file " << example_file;
+            }
+          }
+          
           for (auto const& line : lines) {
             auto const& [left,right] = line.split('-');
             graph.add_edge(left, right);
@@ -188,9 +204,22 @@ namespace part1 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
+      Integer acc{};
       auto model = parse(in);
+      auto triangles = test::find_triangles(model);
+      for (auto const& triangle : triangles) {
+        using test::operator<<;
+        std::cout << NL << triangle;
+        if (test::tuple_any_of(triangle, [](auto const& computer){
+          return computer.find("t") != std::string::npos;
+        })) {
+          std::cout << " keep";
+          ++acc;
+        }
+      }
+      result = std::to_string(acc);
     }
-    return result;
+    return result; // 2462 too high
   }
 }
 
@@ -269,8 +298,8 @@ int main(int argc, char *argv[]) {
    For my input:
 
    ANSWERS
-   ...
-      
+   duration:84ms answer[part1 puzzle.txt] 2462
+   
   */
   return 0;
 }
