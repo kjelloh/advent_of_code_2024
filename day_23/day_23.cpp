@@ -33,6 +33,11 @@ using Result = aoc::raw::Line;
 using Computer = std::string;
 using Model = aoc::graph::Graph<Computer>;
 
+struct Args {
+  std::map<std::string,std::string> arg{};
+  std::set<std::string> options{};
+};
+
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result({});
@@ -45,11 +50,6 @@ Model parse(auto& in) {
   }
   return result;
 }
-
-struct Args {
-  std::map<std::string,std::string> arg{};
-  std::set<std::string> options{};
-};
 
 namespace test {
 
@@ -104,18 +104,20 @@ namespace test {
     using Vertices = typename Graph::Vertices;
     using Result = std::vector<std::tuple<Vertex, Vertex, Vertex>>;
     Result triangles;
-    auto const m_adj = graph.adj();
-    for (auto const& [u, neighbors_u] : m_adj) {
+    auto const adjacent = graph.adj();
+    for (auto const& [u, neighbors_u] : adjacent) {
       for (auto const& v : neighbors_u) {
-        if (u < v) { // Avoid double-counting
+        if (u < v) {
+          // candidate for {u,v,w} where u < v (u,v edge only once)
           Vertices common_neighbors;
           std::set_intersection(
              neighbors_u.begin(), neighbors_u.end()
-            ,m_adj.at(v).begin(), m_adj.at(v).end()
+            ,adjacent.at(v).begin(), adjacent.at(v).end()
             ,std::inserter(common_neighbors, common_neighbors.begin())
             );
           for (auto const& w : common_neighbors) {
-            if (v < w) { // Avoid double-counting
+            if (v < w) {
+              // candidate for {u,v,w} where u < v < w (u -> v -> w path only once)
               triangles.emplace_back(u, v, w);
             }
           }
@@ -139,6 +141,16 @@ namespace test {
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
+      if (args.options.contains("-to_dot")) {
+        auto dot_lines = aoc::graph::to_graphviz_dot(model);
+        auto dot_file = aoc::to_working_dir_path("test.dot");
+        std::ofstream out{dot_file};
+        for (auto const& [lx,line] : aoc::views::enumerate(dot_lines)) {
+          if (lx>0) out << NL;
+          out << line;
+        }
+        std::cout << NL << "Created Graphviz DOT file " << dot_file;
+      }
       auto doc_file = aoc::to_working_dir_path("doc.txt");
       std::ifstream doc_in{doc_file};
       if (doc_in) {
@@ -206,12 +218,13 @@ namespace part1 {
     if (in) {
       Integer acc{};
       auto model = parse(in);
+      if (args.options.contains("-parse_only")) return "DONE -parse_only";
       auto triangles = test::find_triangles(model);
       for (auto const& triangle : triangles) {
         using test::operator<<;
         std::cout << NL << triangle;
         if (test::tuple_any_of(triangle, [](auto const& computer){
-          return computer.find("t") != std::string::npos;
+          return computer.front() == 't';
         })) {
           std::cout << " keep";
           ++acc;
