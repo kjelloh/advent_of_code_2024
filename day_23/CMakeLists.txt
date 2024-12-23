@@ -11,10 +11,16 @@ set(DAY_NAME "day_${DAY_NUMBER}")
 
 project(${DAY_NAME})
 set(CMAKE_CXX_STANDARD 23)
+
+# Set flags for Debug and Release builds
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto")
+set(CMAKE_CXX_FLAGS_DEBUG "-O2 -g")
+
+# Create the executable target
 add_executable(${DAY_NAME} ${DAY_NAME}.cpp aoc.hpp)
 
+# Now set the Xcode scheme property for the target
 if (CMAKE_GENERATOR STREQUAL "Xcode")
-    # Generate a scheme for the target to specify what binary to run
     set_property(TARGET ${DAY_NAME} PROPERTY XCODE_GENERATE_SCHEME TRUE)
 endif()
 
