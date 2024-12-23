@@ -109,12 +109,14 @@ namespace test {
       for (auto const& v : neighbors_u) {
         if (u < v) {
           // candidate for {u,v,w} where u < v (u,v edge only once)
-          Vertices common_neighbors;
-          std::set_intersection(
-             neighbors_u.begin(), neighbors_u.end()
-            ,adjacent.at(v).begin(), adjacent.at(v).end()
-            ,std::inserter(common_neighbors, common_neighbors.begin())
-            );
+          using aoc::set::operator&;
+          auto common_neighbors = neighbors_u & adjacent.at(v);
+//          Vertices common_neighbors;
+//          std::set_intersection(
+//             neighbors_u.begin(), neighbors_u.end()
+//            ,adjacent.at(v).begin(), adjacent.at(v).end()
+//            ,std::inserter(common_neighbors, common_neighbors.begin())
+//            );
           for (auto const& w : common_neighbors) {
             if (v < w) {
               // candidate for {u,v,w} where u < v < w (u -> v -> w path only once)
@@ -308,14 +310,16 @@ private:
 namespace part2 {
 
   // Bron-Kerbosch to find the largest clique
+  // https://en.wikipedia.org/wiki/Bron–Kerbosch_algorithm
   void bron_kerbosch_largest(
-                             std::set<int>& R,
-                             std::set<int>& P,
-                             std::set<int>& X,
-                             const std::map<int, std::set<int>>& graph,
-                             std::set<int>& largest_clique) {
+     std::set<int>& R // all (clique)
+    ,std::set<int>& P // some (clique)
+    ,std::set<int>& X // none (clique)
+    ,const std::map<int, std::set<int>>& graph
+    ,std::set<int>& largest_clique) {
     
     if (P.empty() && X.empty()) {
+      // Some and None is empty = done
       // Found a maximal clique; check if it's the largest so far
       if (R.size() > largest_clique.size()) {
         // New largest clique
@@ -324,7 +328,7 @@ namespace part2 {
       return;
     }
     
-    // Iterate over vertices in P
+    // Iterate over vertices in P (some)
     std::set<int> P_copy = P; // Copy because P will be modified
     for (int v : P_copy) {
       // Add v to the current clique
@@ -333,8 +337,8 @@ namespace part2 {
       // Compute P' = P ∩ neighbors(v) and X' = X ∩ neighbors(v)
       std::set<int> P_new, X_new;
       for (int neighbor : graph.at(v)) {
-        if (P.count(neighbor)) P_new.insert(neighbor);
-        if (X.count(neighbor)) X_new.insert(neighbor);
+        if (P.contains(neighbor)>0) P_new.insert(neighbor);
+        if (X.contains(neighbor)>0) X_new.insert(neighbor);
       }
       
       // Recursive call
@@ -460,14 +464,16 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
 
+   Xcode Debug -O2
+
    >day_22 -all
 
    ANSWERS
    duration:1ms answer[part1 example.txt] 7
-   duration:85ms answer[part1 puzzle.txt] 1485
+   duration:44ms answer[part1 puzzle.txt] 1485
    duration:0ms answer[part2 example.txt] co,de,ka,ta
-   duration:642ms answer[part2 puzzle.txt] cc,dz,ea,hj,if,it,kf,qo,sk,ug,ut,uv,wh
-
+   duration:88ms answer[part2 puzzle.txt] cc,dz,ea,hj,if,it,kf,qo,sk,ug,ut,uv,wh
+   
    */
   return 0;
 }
