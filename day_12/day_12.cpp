@@ -363,59 +363,46 @@ namespace part2 {
       }
   };
 
-  // Implementation of algorithm to find the 'cycle' (in our case the perimeter)
-  // that we expect the edges to be part of.
-  // Uses an algorithm called  Hierholzer's Algorithm
-  std::vector<Edge> findEulerianCycle(const std::vector<Edge>& edges) {
-      // Adjacency list: Position -> vector of (neighbor Position, weight Normal)
-      std::map<Position, std::vector<std::pair<Position, Direction>>> graph;
+  // Assemble edges into a perimeter graph
+  std::optional<Edges> to_perimeter(const Edges& edges) {
+    struct State {
+      Edges path_from_start;
+      State operator+(Edge const& edge) {
+        State result{path_from_start};
+        result.path_from_start.push_back(edge);
+        return result;
+      }
+    };
+    std::set<Edge> seen{};
+    std::deque<State> q{};
+    auto start = State{} + edges.front();
+    q.push_back(start);
+    while (not q.empty()) {
+//      std::cout << NL << q.size();
+      auto current = q.front();
+      q.pop_front();
+//      std::cout << NL << T << current.path_from_start;
+      auto in_current_path = [&p = current.path_from_start](Edge const& edge) {
+        auto iter = std::find(p.begin(),p.end(),edge);
+        bool result = (iter != p.end());
+//        std::cout << NL << " " << edge << " in_current_path:" << result;
+        return result;
+      };
 
-      // Build the graph (using only the provided edges as-is)
-      for (const auto& edge : edges) {
-          graph[edge.start].emplace_back(edge.end, edge.normal);
+      if (current.path_from_start.size() == edges.size()) {
+        // All edges consumed
+        return current.path_from_start;
       }
 
-      // Verify that all nodes have even degrees
-      for (const auto& [node, neighbors] : graph) {
-          if (neighbors.size() % 2 != 0) {
-              throw std::invalid_argument("Graph is not Eulerian (contains odd-degree node)");
-          }
+      for (auto const& next : edges) {
+        if (in_current_path(next)) continue; // Edge already used
+        if (current.path_from_start.back().end == next.start) {
+          // candidate to link after current
+          q.push_back(current + next);
+        }
       }
-
-      // Hierholzer's Algorithm
-      std::stack<Position> stack;
-      std::vector<Edge> cycle;
-      std::map<Position, std::vector<std::pair<Position, Direction>>> tempGraph = graph; // Copy of graph for traversal
-
-      stack.push(edges[0].start);
-
-      while (!stack.empty()) {
-          Position node = stack.top();
-
-          if (!tempGraph[node].empty()) {
-              // Get the next edge and remove it
-              auto [nextNode, normal] = tempGraph[node].back();
-              tempGraph[node].pop_back();
-
-              stack.push(nextNode);
-          } else {
-              stack.pop();
-              if (!stack.empty()) {
-                  Position prevNode = stack.top();
-                  
-                  // Find the edge in the original graph to add to the cycle
-                  auto it = std::find_if(edges.begin(), edges.end(), [&](const Edge& e) {
-                      return e.start == prevNode && e.end == node;
-                  });
-
-                  if (it != edges.end()) {
-                      cycle.push_back(*it);
-                  }
-              }
-          }
-      }
-
-      return cycle;
+    }
+    return std::nullopt;
   }
 
   Edges compressEdges(const Edges& edges) {
@@ -454,11 +441,16 @@ namespace part2 {
       //       Edges start,end,start,end,... with the same normal vector should be merged into single start,end,normal
       //       We can then just count the final region edges
       // Put edges in order
-      auto perimeter = findEulerianCycle(subgraph);
-      std::cout << NL << "perimeter:" << perimeter;
-      auto se = compressEdges(perimeter);
-      std::cout << NL << T << "compressed:" << se << std::flush;
-      result += se.size(); // we should have only the region sides left?
+      auto perimeter = to_perimeter(subgraph);
+      if (perimeter) {
+        std::cout << NL << "perimeter:" << *perimeter;
+        auto se = compressEdges(*perimeter);
+        std::cout << NL << T << "compressed:" << se << std::flush;
+        result += se.size(); // we should have only the region sides left?
+      }
+      else {
+        std::cerr << NL << "Sorry, Failed to asemble a perimeter";
+      }
     }
     return result; // 801260 too low
   }
@@ -511,8 +503,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
 //  std::vector<int> states = {21,22,23,24,25};
-  std::vector<int> states = {21};
-  //  std::vector<int> states = {11,12,13,10,23,20};
+  std::vector<int> states = {20};
   for (auto state : states) {
     switch (state) {
       case 11: {
