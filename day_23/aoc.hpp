@@ -288,6 +288,27 @@ namespace aoc {
       
       return os;
     }
+  
+    template <typename T>
+    std::vector<std::string> to_graphviz_dot(Graph<T> const& graph) {
+      std::vector<std::string> result{};
+      //digraph G {
+      result.push_back("digraph G {");
+      //    A -> B;
+      //    B -> C;
+      //    A -> C;
+      for (auto const& [v1,vertices] : graph.adj()) {
+        for (auto const& v2 : vertices) {
+          // Graph::Vertex must be streamable by an operator<<
+          std::ostringstream oss{};
+          oss << v1 << " -> " << v2;
+          result.push_back(oss.str());
+        }
+      }
+      //}
+      result.push_back("}");
+      return result;
+    }
   }
 
   namespace xy {
