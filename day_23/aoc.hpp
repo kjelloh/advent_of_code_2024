@@ -127,8 +127,17 @@ namespace aoc {
       os << "}";
       return os;
     }
-
   
+    // Helper function to print std::set
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
+        os << "{ ";
+        for (auto const& elem : s) {
+            os << elem << " ";
+        }
+        os << "}";
+        return os;
+    }
   }
   namespace parsing {
     class Splitter; // Forward
@@ -283,22 +292,12 @@ namespace aoc {
       return os;
     }
   
-    // Helper function to print std::set
-    template <typename T>
-    std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
-        os << "{ ";
-        for (auto const& elem : s) {
-            os << elem << " ";
-        }
-        os << "}";
-        return os;
-    }
-
     template <typename T>
     std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
       std::cout << "vertices:" << graph.size();
       for (auto const& adjacency : graph.adj()) {
         std::cout << raw::NL << raw::T << adjacency.first;
+        using aoc::raw::operator<<;
         std::cout << " --> " << adjacency.second;
       }
       
@@ -325,6 +324,76 @@ namespace aoc {
       result.push_back("}");
       return result;
     }
+  
+    template <typename T>
+    class GraphAdapter {
+    public:
+        using Graph = aoc::graph::Graph<T>;
+        using IntGraph = aoc::graph::Graph<int>;
+      GraphAdapter(Graph const& originalGraph) : intGraph({}) {
+            convertToIntGraph(originalGraph);
+        }
+
+        // Get the graph with int vertices
+        const IntGraph& getIntGraph() const {
+            return intGraph;
+        }
+
+        // Get the mapping from int to string
+        const std::unordered_map<int, std::string>& getIntToVertexMap() const {
+            return intToVertex;
+        }
+
+        // Get the mapping from string to int
+        const std::unordered_map<std::string, int>& getVertexToIntMap() const {
+            return vertexToInt;
+        }
+
+        // Get the original vertex from an int index
+        std::string getVertexFromInt(int idx) const {
+            auto it = intToVertex.find(idx);
+            if (it != intToVertex.end()) {
+                return it->second;
+            }
+            throw std::out_of_range("Index not found in the mapping");
+        }
+
+        // Get the int index from a vertex
+        int getIntFromVertex(const std::string& vertex) const {
+            auto it = vertexToInt.find(vertex);
+            if (it != vertexToInt.end()) {
+                return it->second;
+            }
+            throw std::out_of_range("Vertex not found in the mapping");
+        }
+
+    private:
+        IntGraph intGraph;
+        std::unordered_map<typename Graph::Vertex, int> vertexToInt;
+        std::unordered_map<int, typename Graph::Vertex> intToVertex;
+
+        // Helper method to perform the conversion
+        void convertToIntGraph(Graph const& originalGraph) {
+            int index = 0;
+
+            // Create mappings from string to int and int to string
+            for (const auto& [vertex, _] : originalGraph.adj()) {
+                vertexToInt[vertex] = index;
+                intToVertex[index] = vertex;
+                index++;
+            }
+
+            // Convert the adjacency list with string nodes to one with int nodes
+            for (const auto& [vertex, neighbors] : originalGraph.adj()) {
+                int u = vertexToInt[vertex];
+                for (const auto& neighbor : neighbors) {
+                    int v = vertexToInt[neighbor];
+                    intGraph.add_edge(u, v);
+                }
+            }
+        }
+    };
+
   }
 
   namespace xy {
