@@ -201,11 +201,178 @@ namespace part1 {
 }
 
 namespace part2 {
+
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <tuple>
+
+  using Swaps = std::vector<std::pair<int, int>>;
+
+  // Function to calculate binary addition
+  bool checkSum(const std::vector<int>& x, const std::vector<int>& y, const std::vector<int>& z) {
+    int carry = 0;
+    for (std::size_t i = 0; i < x.size(); ++i) {
+      int sum = x[i] + y[i] + carry;
+      carry = sum / 2; // Carry for the next bit
+      if ((sum % 2) != z[i]) {
+        return false; // Early exit if mismatch
+      }
+    }
+    return carry == 0; // Ensure no leftover carry
+  }
+
+  // Function to apply swaps based on pairs of indices
+  void applySwaps(std::vector<int>& z,Swaps const& swaps) {
+    for (const auto& [i, j] : swaps) {
+      std::swap(z[i], z[j]);
+    }
+  }
+
+  // Undo swaps based on pairs of indices
+  void undoSwaps(std::vector<int>& z,Swaps const& swaps) {
+    applySwaps(z, swaps); // Swapping twice undoes the swap
+  }
+
+  std::tuple<std::vector<int>,std::vector<int>,std::vector<int>> to_xyz(WireValue const& wv) {
+    return {{},{},{}};
+  }
+
+  // Main function to find swaps
+  Swaps findZSwaps(WireValue const& wire_vals) {
+
+    auto [x,y,z] = to_xyz(wire_vals);
+    auto n = z.size();
+    
+    // Generate combinations of 8 wires from z
+    std::vector<int> indices(n);
+    std::iota(indices.begin(), indices.end(), 0); // Fill indices with 0, 1, ..., n-1
+    
+    // Try all combinations of 8 wires
+    std::vector<int> selectionMask(n, 0);
+    std::fill(selectionMask.end() - 8, selectionMask.end(), 1); // Mask for choosing 8 wires
+    
+    do {
+      std::vector<int> selectedWires;
+      for (int i = 0; i < n; ++i) {
+        if (selectionMask[i] == 1) {
+          selectedWires.push_back(indices[i]);
+        }
+      }
+      
+      // Permute the selected 8 wires
+      do {
+        // Divide into four pairs of wires
+        Swaps swaps = {
+          {selectedWires[0], selectedWires[1]},
+          {selectedWires[2], selectedWires[3]},
+          {selectedWires[4], selectedWires[5]},
+          {selectedWires[6], selectedWires[7]}
+        };
+        
+        // Apply swaps
+        applySwaps(z, swaps);
+        
+        // Check if the sum constraint is satisfied
+        if (checkSum(x, y, z)) {
+          return swaps; // Return the valid swaps
+        }
+        
+        // Undo swaps
+        undoSwaps(z, swaps);
+        
+      } while (std::next_permutation(selectedWires.begin(), selectedWires.end()));
+      
+    } while (std::next_permutation(selectionMask.begin(), selectionMask.end()));
+    
+    return {}; // Return empty vector if no solution is found
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      
+      std::map<int,std::string> index2id{}; // mapping index to name
+      std::map<std::string,int> id2index{}; // mapping name to index
+      std::vector<int> ix{}; // index to x-wires in order
+      std::vector<int> iy{}; // index to y-wires in order
+      std::vector<int> iz{}; // index to z-wires in order
+
+      auto wire_vals = model.init_values;
+      for (auto const& [in1,in2,out,op] : model.ops) {
+        wire_vals[in1];
+        wire_vals[in2];
+        wire_vals[out];
+      }
+
+      for (auto const& [wire,val] : wire_vals) {
+        if (not id2index.contains(wire)) {
+          int index = static_cast<int>(id2index.size());
+          id2index[wire] = index;
+          index2id[index] = wire;
+          
+          if (wire.starts_with('x')) {
+            ix.push_back(index);
+          }
+          else if (wire.starts_with('y')) {
+            iy.push_back(index);
+          }
+          else if (wire.starts_with('z')) {
+            iz.push_back(index);
+          }
+        }
+      }
+      
+      // eval network of gates
+      auto eval_gates = [&ops = model.ops](WireValue const& wire_vals) {
+        WireValue has_val{};
+        for (auto const& [wire,val] : wire_vals) {
+          if (val) has_val[wire] = val;
+        }
+        std::deque<Operation> q{ops.begin(),ops.end()};
+        while (not q.empty()) {
+          auto [a,b,out,op] = q.front();
+          q.pop_front();
+          if (has_val[a] and has_val[b]) {
+            has_val[out] = test::applyOperation(*has_val[a], *has_val[b], op);
+          }
+          else {
+            q.push_back({a,b,out,op});
+          }
+        }
+        return has_val;
+      };
+      
+      for (const auto& [name, index] : id2index) {
+        std::cout << NL << name << " -> " << index;
+      }
+      
+      std::cout << NL << "\nX-Wires (ix): ";
+      for (int index : ix) std::cout << index << " ";
+      std::cout << "\nY-Wires (iy): ";
+      for (int index : iy) std::cout << index << " ";
+      std::cout << "\nZ-Wires (iz): ";
+      for (int index : iz) std::cout << index << " ";
+
+
+      auto ops = model.ops;
+      // find 4 pairs of z:s to swap fro x+y=z
+      while (true) {
+        break;
+      }
+      
+      Swaps swaps{};
+      if (!swaps.empty()) {
+        std::cout << "Found swaps:" << std::endl;
+        for (const auto& [i, j] : swaps) {
+          std::cout << NL << "Swap z[" << i << "] with z[" << j << "]";
+        }
+      } else {
+        std::cout << NL << "No valid swaps found!";
+      }
+
     }
     return result;
   }
