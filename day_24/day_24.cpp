@@ -173,7 +173,12 @@ namespace test {
           if (wire.starts_with('z')) z_digits.push_back(*value?'1':'0');
         }
         std::reverse(z_digits.begin(), z_digits.end());
-        std::cout << NL << "zs:" << z_digits;
+        std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
+        std::bitset<64> bits{z_digits};
+        auto z = bits.to_ulong();;
+        std::cout << " --> decimal:" << z;
+        result = std::to_string(z);
+        
         
         // zs:0011111101000
         //    0011111101000
