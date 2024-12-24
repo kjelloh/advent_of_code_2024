@@ -30,7 +30,20 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
-using Model = aoc::raw::Lines;
+
+using WireValue = std::map<std::string,bool>;
+struct Operation {
+    std::string input1;
+    std::string input2;
+    std::string output;
+    std::string op; // "AND", "OR", "XOR"
+};
+using Operations = std::vector<Operation>;
+
+struct Model {
+  WireValue init_values{};
+  Operations ops{};
+};
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -40,7 +53,20 @@ Model parse(auto& in) {
     std::cout << NL << "---------- section " << sx << " ----------";
     for (auto const& [lx,line] : aoc::views::enumerate(section)) {
       std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
+      if (sx == 0) {
+        auto const& [caption,value] = line.split(':');
+        std::cout << " --> " << to_raw(caption) << " " << to_raw(value);
+        result.init_values[caption] = (value.trim().str() == "1")?true:false;
+      }
+      else if (sx==1) {
+        auto tokens = line.splits(' ');
+        using aoc::raw::operator<<;
+        std::cout << " " << to_raw(tokens);
+        result.ops.push_back({tokens[0],tokens[2],tokens[4],tokens[1]});
+      }
+      else {
+        std::cerr << NL << "Sorry, Parse ERROR: More than two section is unexpected";
+      }
     }
   }
   return result;
@@ -52,6 +78,13 @@ struct Args {
 };
 
 namespace test {
+
+  int applyOperation(int val1, int val2, const std::string& op) {
+      if (op == "AND") return val1 & val2;
+      if (op == "OR") return val1 | val2;
+      if (op == "XOR") return val1 ^ val2;
+      throw std::invalid_argument("Unknown operation");
+  }
 
   // Adapt to expected for day puzzle
   struct LogEntry {
@@ -111,6 +144,26 @@ namespace test {
       auto example = to_example(doc);
       if (args.options.contains("-to_example")) {
         create_example_file(example);
+      }
+      else {
+        auto ops = model.ops;
+        auto wire_vals = model.init_values;
+        for (const auto& [wire1,wire2,out_wire,op] : ops) {
+            int val1 = wire_vals[wire1];
+            int val2 = wire_vals[wire2];
+            wire_vals[out_wire] = applyOperation(val1, val2, op);
+        }
+
+        std::string z_digits{};
+        for (const auto& [wire, value] : wire_vals) {
+          std::cout << NL << wire << ": " << value;
+          if (wire.starts_with('z')) z_digits.push_back(value?'1':'0');
+        }
+        std::reverse(z_digits.begin(), z_digits.end());
+        std::cout << NL << "zs:" << z_digits;
+        
+        // zs:0001011000001
+        //    0011111101000
       }
     }
     return result;
