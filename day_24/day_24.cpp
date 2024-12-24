@@ -31,17 +31,18 @@ using aoc::raw::NT;
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
 
-using WireValue = std::map<std::string,std::optional<bool>>;
+using WireValues = std::map<std::string,std::optional<bool>>;
 struct Operation {
-    std::string input1;
-    std::string input2;
-    std::string output;
-    std::string op; // "AND", "OR", "XOR"
+  std::string input1;
+  std::string input2;
+  std::string output;
+  std::string op; // "AND", "OR", "XOR"
+  auto operator<=>(const Operation&) const = default;
 };
 using Operations = std::vector<Operation>;
 
 struct Model {
-  WireValue init_values{};
+  WireValues init_values{};
   Operations ops{};
 };
 
@@ -149,7 +150,7 @@ namespace test {
         auto ops = model.ops;
         auto wire_vals = model.init_values;
         {
-          WireValue has_val{};
+          WireValues has_val{};
           for (auto const& [wire,val] : wire_vals) {
             if (val) has_val[wire] = val;
           }
@@ -202,11 +203,6 @@ namespace part1 {
 
 namespace part2 {
 
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <tuple>
-
   using Swaps = std::vector<std::pair<int, int>>;
 
   // Function to calculate binary addition
@@ -234,12 +230,12 @@ namespace part2 {
     applySwaps(z, swaps); // Swapping twice undoes the swap
   }
 
-  std::tuple<std::vector<int>,std::vector<int>,std::vector<int>> to_xyz(WireValue const& wv) {
+  std::tuple<std::vector<int>,std::vector<int>,std::vector<int>> to_xyz(WireValues const& wv) {
     return {{},{},{}};
   }
 
   // Main function to find swaps
-  Swaps findZSwaps(WireValue const& wire_vals) {
+  Swaps findZSwaps(WireValues const& wire_vals) {
 
     auto [x,y,z] = to_xyz(wire_vals);
     auto n = z.size();
@@ -294,24 +290,29 @@ namespace part2 {
     if (in) {
       auto model = parse(in);
       
-      std::map<int,std::string> index2id{}; // mapping index to name
-      std::map<std::string,int> id2index{}; // mapping name to index
+      std::vector<std::string> index2wire{}; // Mapping index to wire
+      std::map<std::string,int> wire2index{}; // mapping wire to index
       std::vector<int> ix{}; // index to x-wires in order
       std::vector<int> iy{}; // index to y-wires in order
       std::vector<int> iz{}; // index to z-wires in order
+      std::vector<int> iall{}; // index to all wires in order
+      std::vector<int> vals{}; // vals[index] = value for wire with index
 
       auto wire_vals = model.init_values;
       for (auto const& [in1,in2,out,op] : model.ops) {
+        // Ensure there is an entry in the map
+        // std::map will order them alphabetically (string key order)
         wire_vals[in1];
         wire_vals[in2];
         wire_vals[out];
       }
 
       for (auto const& [wire,val] : wire_vals) {
-        if (not id2index.contains(wire)) {
-          int index = static_cast<int>(id2index.size());
-          id2index[wire] = index;
-          index2id[index] = wire;
+        if (not wire2index.contains(wire)) {
+          int index = static_cast<int>(index2wire.size());
+          index2wire.push_back(wire);
+          wire2index[wire] = index;
+          iall.push_back(index);
           
           if (wire.starts_with('x')) {
             ix.push_back(index);
@@ -325,39 +326,103 @@ namespace part2 {
         }
       }
       
+      // Transform each op to the index world
+      struct IndexedOp {
+        int in1_ix;
+        int in2_ix;
+        int out_ix;
+        std::array<int,4> cached{}; // 00,01,10,11 to value
+        int operator()(bool in1_val,bool in2_val) {
+          return cached[2*in1_val+in2_val];
+        }
+      };
+
+      // We need to be able to evaluate op[w]({u,v})  where u,v,w are indecies
+      // We need to map each op to an index w
+      std::map<Operation,int> op2index{};
+      std::vector<Operation> index2op{};
+      std::vector<IndexedOp> iops{};
+      
+      auto to_cached = [](std::string const& op) -> std::array<int,4> {
+        if (op == "AND") {
+          //      00 01 10 11
+          return {0  ,0 ,0 ,1};
+        }
+        else if (op == "OR") {
+          //      00 01 10 11
+          return {0 ,1 ,1 ,1};
+        }
+        else if (op == "XOR") {
+          //      00 01 10 11
+          return {0 ,1 ,1 ,0};
+        }
+      };
+
+      for (auto const& op : model.ops) {
+        if (op2index.contains(op)) continue;
+        auto index = static_cast<int>(index2op.size());
+        index2op.push_back(op);
+        op2index[op] = index;
+        // Create the indexed op
+        auto const& [input1,input2,output,operation] = op;
+        auto in1 = wire2index[input1];
+        auto in2 = wire2index[input2];
+        auto out = wire2index[output];
+        auto cached = to_cached(operation);
+        IndexedOp iop{in1,in2,out,cached};
+        iops.push_back(iop);
+      }
+      
+      if (true) {
+        // Log
+        for (const auto& [name, index] : wire2index) {
+          std::cout << NL << name << " -> " << index;
+        }
+        
+        std::cout << NL << "\nX-Wires (ix): ";
+        for (int index : ix) std::cout << index << " ";
+        std::cout << "\nY-Wires (iy): ";
+        for (int index : iy) std::cout << index << " ";
+        std::cout << "\nZ-Wires (iz): ";
+        for (int index : iz) std::cout << index << " ";
+      }
+            
       // eval network of gates
-      auto eval_gates = [&ops = model.ops](WireValue const& wire_vals) {
-        WireValue has_val{};
+      std::vector<Operation> ordered_ops{};
+      {
+        auto const& ops = model.ops;
+        WireValues has_val{};
         for (auto const& [wire,val] : wire_vals) {
           if (val) has_val[wire] = val;
         }
         std::deque<Operation> q{ops.begin(),ops.end()};
         while (not q.empty()) {
-          auto [a,b,out,op] = q.front();
+          auto current = q.front();
+          auto const& [a,b,out,op] = current;
           q.pop_front();
           if (has_val[a] and has_val[b]) {
             has_val[out] = test::applyOperation(*has_val[a], *has_val[b], op);
+            ordered_ops.push_back(current);
+            auto u = wire2index[a];
+            auto v = wire2index[b];
+            auto w = wire2index[out];
+            vals[u] = *has_val[a];
+            vals[v] = *has_val[b];
+            vals[w] = *has_val[out];
+            auto op_ix = op2index[current];
+            iops[op_ix] = {u,v,w,to_cached(op)};
           }
           else {
             q.push_back({a,b,out,op});
           }
         }
-        return has_val;
-      };
-      
-      for (const auto& [name, index] : id2index) {
-        std::cout << NL << name << " -> " << index;
       }
       
-      std::cout << NL << "\nX-Wires (ix): ";
-      for (int index : ix) std::cout << index << " ";
-      std::cout << "\nY-Wires (iy): ";
-      for (int index : iy) std::cout << index << " ";
-      std::cout << "\nZ-Wires (iz): ";
-      for (int index : iz) std::cout << index << " ";
-
-
-      auto ops = model.ops;
+      // vals[wire_index] are now the wire value of wire_index = wire2index[wire]
+      // iops[op_index] are now the gate operation in the index world of op_index = op2index[operation]
+      
+      // Now I need to keep track of the index to the operations with a z output!
+                  
       // find 4 pairs of z:s to swap fro x+y=z
       while (true) {
         break;
