@@ -31,7 +31,7 @@ using aoc::raw::NT;
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
 
-using WireValue = std::map<std::string,bool>;
+using WireValue = std::map<std::string,std::optional<bool>>;
 struct Operation {
     std::string input1;
     std::string input2;
@@ -79,10 +79,10 @@ struct Args {
 
 namespace test {
 
-  int applyOperation(int val1, int val2, const std::string& op) {
-      if (op == "AND") return val1 & val2;
-      if (op == "OR") return val1 | val2;
-      if (op == "XOR") return val1 ^ val2;
+  std::optional<bool> applyOperation(int val1, int val2, const std::string& op) {
+      if (op == "AND") return val1 and val2;
+      if (op == "OR") return val1 or val2;
+      if (op == "XOR") return val1 xor val2;
       throw std::invalid_argument("Unknown operation");
   }
 
@@ -148,21 +148,34 @@ namespace test {
       else {
         auto ops = model.ops;
         auto wire_vals = model.init_values;
-        for (const auto& [wire1,wire2,out_wire,op] : ops) {
-            int val1 = wire_vals[wire1];
-            int val2 = wire_vals[wire2];
-            wire_vals[out_wire] = applyOperation(val1, val2, op);
+        {
+          WireValue has_val{};
+          for (auto const& [wire,val] : wire_vals) {
+            if (val) has_val[wire] = val;
+          }
+          std::deque<Operation> q{ops.begin(),ops.end()};
+          while (not q.empty()) {
+            auto [a,b,out,op] = q.front();
+            q.pop_front();
+            if (has_val[a] and has_val[b]) {
+              has_val[out] = applyOperation(*has_val[a], *has_val[b], op);
+            }
+            else {
+              q.push_back({a,b,out,op});
+            }
+          }
+          wire_vals = has_val;
         }
 
         std::string z_digits{};
         for (const auto& [wire, value] : wire_vals) {
-          std::cout << NL << wire << ": " << value;
-          if (wire.starts_with('z')) z_digits.push_back(value?'1':'0');
+          std::cout << NL << wire << ": " << *value;
+          if (wire.starts_with('z')) z_digits.push_back(*value?'1':'0');
         }
         std::reverse(z_digits.begin(), z_digits.end());
         std::cout << NL << "zs:" << z_digits;
         
-        // zs:0001011000001
+        // zs:0011111101000
         //    0011111101000
       }
     }
