@@ -32,18 +32,18 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = aoc::raw::Line;
 
 using WireValues = std::map<std::string,std::optional<bool>>;
-struct Operation {
+struct Gate {
   std::string input1;
   std::string input2;
   std::string output;
   std::string op; // "AND", "OR", "XOR"
-  auto operator<=>(const Operation&) const = default;
+  auto operator<=>(const Gate&) const = default;
 };
-using Operations = std::vector<Operation>;
+using Gates = std::vector<Gate>;
 
 struct Model {
   WireValues init_values{};
-  Operations ops{};
+  Gates gates{};
 };
 
 Model parse(auto& in) {
@@ -63,7 +63,10 @@ Model parse(auto& in) {
         auto tokens = line.splits(' ');
         using aoc::raw::operator<<;
         std::cout << " " << to_raw(tokens);
-        result.ops.push_back({tokens[0],tokens[2],tokens[4],tokens[1]});
+        result.gates.push_back({tokens[0],tokens[2],tokens[4],tokens[1]});
+        if (tokens[0].str().starts_with('z')) {
+          std::cout << NL << T << "GATE has z-input!"; // Never happens for my input
+        }
       }
       else {
         std::cerr << NL << "Sorry, Parse ERROR: More than two section is unexpected";
@@ -80,7 +83,7 @@ struct Args {
 
 namespace test {
 
-  std::optional<bool> applyOperation(int val1, int val2, const std::string& op) {
+  std::optional<bool> applyGate(int val1, int val2, const std::string& op) {
       if (op == "AND") return val1 and val2;
       if (op == "OR") return val1 or val2;
       if (op == "XOR") return val1 xor val2;
@@ -147,19 +150,19 @@ namespace test {
         create_example_file(example);
       }
       else {
-        auto ops = model.ops;
+        auto ops = model.gates;
         auto wire_vals = model.init_values;
         {
           WireValues has_val{};
           for (auto const& [wire,val] : wire_vals) {
             if (val) has_val[wire] = val;
           }
-          std::deque<Operation> q{ops.begin(),ops.end()};
+          std::deque<Gate> q{ops.begin(),ops.end()};
           while (not q.empty()) {
             auto [a,b,out,op] = q.front();
             q.pop_front();
             if (has_val[a] and has_val[b]) {
-              has_val[out] = applyOperation(*has_val[a], *has_val[b], op);
+              has_val[out] = applyGate(*has_val[a], *has_val[b], op);
             }
             else {
               q.push_back({a,b,out,op});
@@ -260,30 +263,117 @@ namespace part2 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
-      auto model = parse(in);
       
+      // 20241224 - Other solvers sais the structure is a ripple carry adder?
+      //            https://en.wikipedia.org/wiki/Adder_(electronics)
+      
+      // 20241224 - Viewing the graph in GraphViz I get some ideas
+      // Idea: 1. Find the x,y and z valus in the graph
+      //       2. Backtrack the z bits from high to low.
+      //       3. For addition x+y for this bit we have have some options.
+      //          carry x y z carry
+      //              0 0 0 0 0
+      //              0 0 1 1 0
+      //              0 1 0 1 0
+      //              0 1 1 1 1
+      //              1 0 0 0 1
+      //              1 0 1 0 1
+      //              1 1 0 0 1
+      //              1 1 1 1 1
+      //
+      //        4. If the adder for current bit produces the wrong z-bit, then
+      //           is 0 but should be 1
+      //
+      //          carry x y z carry
+      //              0 0 1 1 0
+      //              0 1 0 1 0
+      //              0 1 1 1 1
+      //              1 1 1 1 1
+      //
+      //           The fix is to change the x-bit, the y-bit or the carry-bit
+      //           All will flip the z-bit to be correct
+      //
+      //           In fact, this is true wether z is wrong as 0 or 1.
+      //           Question is, what swap flips x,y or carry in?
+      //                        ,and what swaps are safe (do not break ok z-bits?
+      //
+      //            According to wikipedia: For a full adder ow two bits and carry we have
+      //            z = x ^ y ^ in
+      //            out = x & y + (in & (x ^y))
+      
+      // Idea: Follow each z-bit back to root initial values and record the operations on the way back?
+      //       Well, problem is that if this is an adder the carry bit will lead all the way back to x0,y0??
+      //       But for z_n it should not be far to x_n and y_n?!
+
+      auto model = parse(in);
+      if (args.options.contains("-parse_only")) return "-parse_only";
+      if (args.options.contains("-to_dot")) {
+        std::vector<std::string> dot{};
+        dot.push_back("digraph G {");
+        for (auto const& [a,b,u,op] : model.gates) {
+          dot.push_back(std::format(R"({} -> {} [label="{}"];)",a,u,op));
+          dot.push_back(std::format(R"({} -> {} [label="{}"];)",b,u,op));
+        }
+        dot.push_back("}");
+        auto file = aoc::to_working_dir_path("graph.dot");
+        std::ofstream out{file};
+        // copy dot (std::vector<string>>) to out
+        std::copy(dot.begin(),dot.end(),std::ostream_iterator<std::string>(out,NL));
+        return std::string{"-to_dot, created dot file "} + file.string();
+      }
+      
+      std::map<Gate, int> gate2index;
+      aoc::graph::WeightedGraph<int, bool> gate_DAG{};
+      // Build DAG with Vertices being gates mapped to int index
+      {
+        for (const auto& gate : model.gates) {
+          if (not gate2index.contains(gate)) {
+            auto index = static_cast<int>(gate2index.size());;
+            gate2index[gate] = index;
+            gate_DAG.add_vertex(index);
+          }
+          
+          auto const& [input1,input2,output,operation] = gate;
+
+          // connect gates
+          for (const auto& [other_gate, index] : gate2index) {
+            if (other_gate.output == input1 || other_gate.output == input2) {
+              gate_DAG.add_edge(index, gate2index[gate], false);
+            }
+          }
+        }
+      }
+      
+      for (auto const& adjacent : gate_DAG.adj()) {
+        if (adjacent.second.size()>1) {
+          std::cout << NL << T << adjacent.first;
+          using aoc::raw::operator<<;
+          std::cout << " is connected to " << adjacent.second;
+        }
+      }
+                        
       auto wire_vals = model.init_values;
-      for (auto const& [a,b,o,type] : model.ops) {
+      for (auto const& [a,b,o,type] : model.gates) {
         wire_vals[a];
         wire_vals[b];
         wire_vals[o];
       }
             
       // eval network of gates
-      std::vector<Operation> ordered_ops{};
+      std::vector<Gate> ordered_ops{};
       {
-        auto const& ops = model.ops;
+        auto const& ops = model.gates;
         WireValues has_val{};
         for (auto const& [wire,val] : wire_vals) {
           if (val) has_val[wire] = val;
         }
-        std::deque<Operation> q{ops.begin(),ops.end()};
+        std::deque<Gate> q{ops.begin(),ops.end()};
         while (not q.empty()) {
           auto current = q.front();
           auto const& [a,b,out,op] = current;
           q.pop_front();
           if (has_val[a] and has_val[b]) {
-            has_val[out] = test::applyOperation(*has_val[a], *has_val[b], op);
+            has_val[out] = test::applyGate(*has_val[a], *has_val[b], op);
             ordered_ops.push_back(current);
           }
           else {
