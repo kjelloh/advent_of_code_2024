@@ -259,6 +259,53 @@ namespace part2 {
     return {}; // Return empty vector if no solution is found
   }
 
+  // sum,carry
+  std::pair<std::string, std::string> to_bitwise_added(const std::string& x, const std::string& y) {
+      // Ensure x and y are of the same length by padding with leading zeros
+      auto len = std::max(x.size(), y.size());
+      std::string x_padded = std::string(len - x.size(), '0') + x;
+      std::string y_padded = std::string(len - y.size(), '0') + y;
+      
+      std::string sum(len, '0');      // Resulting sum
+      std::string carry(len + 1, '?'); // Carry bits, both 0 at [len] and carry out at [0]
+      
+      char carry_in = '0'; // Initial carry is zero
+      
+      // Traverse from LSB to MSB
+      for (int i = static_cast<int>(len-1); i >= 0; --i) {
+          // Perform bitwise addition for the current bit
+          int bit_x = x_padded[i] - '0';
+          int bit_y = y_padded[i] - '0';
+          int bit_carry_in = carry_in - '0';
+          
+          int bit_sum = bit_x ^ bit_y ^ bit_carry_in; // XOR for sum
+          int bit_carry_out = (bit_x & bit_y) | (bit_x & bit_carry_in) | (bit_y & bit_carry_in); // OR for carry
+          
+          sum[i] = bit_sum + '0';   // Convert back to char
+          carry[i] = bit_carry_out + '0'; // Store carry at i+1 to handle MSB carry-out
+          
+          carry_in = carry[i]; // Update carry for the next iteration
+      }
+      
+      return {sum, carry};
+  }
+
+  struct BitSumResult {
+    char sum;
+    char carry_out;
+  };
+
+  BitSumResult to_added(char x_digit, char y_digit, char c_in_digit) {
+    bool x = x_digit == '1';
+    bool y = y_digit == '1';
+    bool c_in = c_in_digit == '1';
+    // Compute the sum and carry-out
+    bool sum = x ^ y ^ c_in; // XOR for sum
+    bool carry_out = (x & y) | (y & c_in) | (c_in & x); // Carry-out logic
+        
+    return {sum, carry_out};
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
     std::cout << NL << NL << "part2";
@@ -330,10 +377,70 @@ namespace part2 {
       auto x_digits = test::to_bin_digit_string('x',vals);
       auto y_digits = test::to_bin_digit_string('y',vals);
       auto z_digits = test::to_bin_digit_string('z',vals);
-      std::cout << NL << "x:" << x_digits;
-      std::cout << NL << "y:" << y_digits;
-      std::cout << NL << "z:" << z_digits;
+      
+      auto const N = static_cast<int>(z_digits.size()); // N z digits
+      
+      auto const& [s_digits,carry_digits] = to_bitwise_added(x_digits, y_digits);
+      
+      std::cout << NL << "carry:" << carry_digits;
+      std::cout << NL << "   x:  " << x_digits;
+      std::cout << NL << "+  y:  " << y_digits;
+      std::cout << NL << "-------" << std::string(N-1,'-');
+      std::cout << NL << "=  s:  " << s_digits;
+      std::cout << NL << "   z: " << z_digits;
 
+      // Find all digit suming that goes wrong
+      // digit[N-1] is the rightmost lowest bit
+      std::string diff_string(N-1,' ');
+      for (int i=N-2;i>=0;--i) {
+        auto c_digit = carry_digits[i+1];
+        auto x_digit = x_digits[i];
+        auto y_digit = y_digits[i];
+        auto s_digit = s_digits[i];
+        auto z_digit = z_digits[i+1];
+        if (z_digit != s_digit) diff_string[i] = '?';
+      }
+      std::cout << NL << "diff:  " << diff_string;
+      auto diff_count = std::count(diff_string.begin(), diff_string.end(), '?');
+      std::cout << NL << "diff count:" << diff_count;
+      
+      //           4         3         2         1         0
+      //carry:100111111110111111111100001111110000000111001?
+      //   x:  100010011110101101010110001010110100000011001
+      //+  y:  110111100110010010111101100101110001000111001
+      //----------------------------------------------------
+      //=  s:  011010000101000000010011110000100101001010010
+      //   z: 1011010000100111111110011101100101001001010010
+      //diff:             ????????      ???    ??
+      //diff count:13
+
+      // Now given addition is done low significant to high significant with carry
+      // It seems the first error is at bit 11?
+      // A carry plus one x-bit should add to 1 but z is 0.
+      // So - the carry bit is lost (wired somewhere else)?
+
+      // Find missmatch and try to figure out
+      // if it is x,y or carry_in that is in fault?
+      for (int i=N-2;i>=0;--i) {
+        auto c_in_digit = carry_digits[i+1];
+        auto x_digit = x_digits[i];
+        auto y_digit = y_digits[i];
+        auto s_digit = s_digits[i];
+        auto z_digit = z_digits[i+1];
+        if (z_digit != s_digit) {
+          auto expected = to_added(x_digit,y_digit, c_in_digit);
+          std::cout << NL << "error at bit:" << N-i-2; // 0 = N-(N-2)-2
+          if (expected.carry_out=='0' and z_digit == '0') {
+            if ((x_digit=='1') xor (y_digit=='1')) std::cout << " Swap to make carry_in == 1";
+            else std::cout << " swap to make carry_in == 0";
+          }
+          else if (z_digit == '0' and expected.carry_out=='0') {
+
+          }
+        }
+      }
+
+      
     }
     if (response.str().size()>0) return response.str();
     else return std::nullopt;
