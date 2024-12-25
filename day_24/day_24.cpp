@@ -422,31 +422,133 @@ namespace part2 {
       // Find missmatch and try to figure out
       // if it is x,y or carry_in that is in fault?
       for (int i=N-2;i>=0;--i) {
+        int bit_number = (N-2)-i;
         auto s_digit = s_digits[i];
         auto z_digit = z_digits[i+1];
         
         if (z_digit != s_digit) {
+          
           auto c_in_digit = carry_digits[i+1];
           auto x_digit = x_digits[i];
           auto y_digit = y_digits[i];
           auto c_out_digit = carry_digits[i];
-
-          std::string z_name = std::format("z{:02}",(N-2)-i); // z00 is i = (N-2)
-          if (wire_vals[z_name]) {
-            std::cout << NL << z_name <<  " is " << *wire_vals[z_name];
+          
+          auto to_wire_name = [](char prefix,int bit_number) -> std::string {
+            return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
+          };
+          
+          std::set<std::string> x_and_y_names{};
+          for (int i=0;i<x_digits.size();++i) {
+            x_and_y_names.insert(to_wire_name('x', i));
+            x_and_y_names.insert(to_wire_name('y', i));
           }
 
-          if (z_digit=='0') {
-            // must be even numbers of 1 in c_in,x,y,c_out
-            // c_in + x + y = c_out,z
-            //  0     0   0 = 0,0
-            //  0     0   1 = 0,1
-            //  0     1   0 = 0,1
-            //  0     1   1 = 1,0
-            //  1     0   0 = 0,1
-            //  1     0   1 = 1,0
-            //  1     1   0 = 1,0
-            //  1     1   1 = 1,1
+          auto wire_name = to_wire_name('z', bit_number);
+          if (wire_vals[wire_name]) {
+            auto iter = std::find_if(model.gates.begin(), model.gates.end(), [&wire_name](Gate const& gate){
+              return gate.output == wire_name;
+            });
+            int backtrack_level{1};
+            if (iter != model.gates.end()) {
+              std::cout << NL << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
+              
+              //According to wikipedia: For a full adder ow two bits and carry we have
+              // to implement z = c_in + x + y
+              //           z = x ^ y ^ carry_in
+              //   carry_out = x & y + (carry_in & (x ^ y))
+
+              // Two cases:
+              // 1) z is an XOR of its inputs
+              // 2) z is NOT an XOR of its inputs
+              if (iter->op == "XOR") {
+                // track case: z = x ^ y ^ carry_in
+                
+                // From logging we see all XOR for is z done in this way
+                // with x,y done by XOR gate one level 'back'
+                //
+                //    x11        y11    carry_in
+                //     |          |         |
+                //      ----XOR---          |
+                //           |              |
+                //           |              |
+                //           ?? -- XOR --- ??
+                //                   |
+                //                  z11
+                
+                ++backtrack_level;
+                bool swap_candidate_found{false};
+                // Recurse one level lhs1
+                {
+                  auto wire_name = iter->input1;
+                  auto iter = std::find_if(model.gates.begin(), model.gates.end(), [&wire_name](Gate const& gate){
+                    return gate.output == wire_name;
+                  });
+                  if (iter != model.gates.end()) {
+                    std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
+                  }
+                  if ((x_and_y_names.contains(iter->input1) and x_and_y_names.contains(iter->input2))) {
+                    if (iter->op == "XOR") {
+                      std::cout << " OK ";
+                    }
+                    else {
+                      std::cout << " --> Swap with the XOR variant with same inputs";
+                      swap_candidate_found = true;
+                    }
+                  }
+                  else {
+                    if (iter->op == "OR") {
+                      std::cout << " --> Back track carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
+                      swap_candidate_found = true;
+                    }
+                    else if (iter->op == "XOR") {
+                      std::cout << " --> Swap for OR to get carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
+                    }
+                    else {
+                      std::cout << " --> ?? ";
+                    }
+                  }
+                }
+                // Recurse one level lhs2
+                {
+                  auto wire_name = iter->input2;
+                  auto iter = std::find_if(model.gates.begin(), model.gates.end(), [&wire_name](Gate const& gate){
+                    return gate.output == wire_name;
+                  });
+                  if (iter != model.gates.end()) {
+                    std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
+                  }
+                  
+                  if (swap_candidate_found) continue;
+                  
+                  if ((x_and_y_names.contains(iter->input1) and x_and_y_names.contains(iter->input2))) {
+                    if (iter->op == "XOR") {
+                      std::cout << " OK ";
+                    }
+                    else {
+                      std::cout << " --> Swap with the XOR variant with same inputs";
+                    }
+                  }
+                  else {
+                    if (iter->op == "OR") {
+                      std::cout << " --> Back track carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
+                    }
+                    else if (iter->op == "XOR") {
+                      std::cout << " --> Swap for OR to get carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
+                    }
+                    else {
+                      std::cout << " --> ?? ";
+                    }
+                  }
+                }
+              }
+              else {
+                std::cout << " --> SWAP this gate with gate that IS an XOR for x ^ y ^ carry_in";
+              }
+                            
+            }
+            else {
+              std::cout << " ??";
+            }
           }
         }
       }
