@@ -304,6 +304,11 @@ namespace part2 {
       // Idea: Follow each z-bit back to root initial values and record the operations on the way back?
       //       Well, problem is that if this is an adder the carry bit will lead all the way back to x0,y0??
       //       But for z_n it should not be far to x_n and y_n?!
+      
+      // 241225 Reduce the serach space
+      //        1. Only swap to NOT change the wire values we allready have checked as ok
+      //        2. Perhaps we can even swap only wires that affect the output of only the z-bit we are checking (none of the others)
+      //        3. swp only so that current wrong z-bit flips (no need to swap with no effect)
 
       auto model = parse(in);
       if (args.options.contains("-parse_only")) return "-parse_only";
