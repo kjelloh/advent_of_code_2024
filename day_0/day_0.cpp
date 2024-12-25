@@ -32,6 +32,13 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = aoc::raw::Line;
 using Model = aoc::raw::Lines;
 
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  os << NL << "Model:";
+  using aoc::raw::operator<<;
+  os << NL << model;
+  return os;
+}
+
 Model parse(auto& in) {
   using namespace aoc::parsing;
   Model result{};
@@ -49,6 +56,9 @@ Model parse(auto& in) {
 struct Args {
   std::map<std::string,std::string> arg{};
   std::set<std::string> options{};
+  operator bool() const {
+    return (arg.size()>0) or (options.size()>0);
+  }
 };
 
 namespace test {
@@ -87,56 +97,59 @@ namespace test {
     return {};
   }
 
-  void create_example_file(aoc::raw::Lines const& lines) {
-    auto example_file = aoc::to_working_dir_path("example.txt");
-    std::ofstream out{example_file};
-    if (out) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        if (lx>0) out << NL;
-        out << line;
-      }
-      std::cout << NL << "Created " << example_file;
-    }
-    else {
-      std::cerr << NL << "Sorry, failed to create file " << example_file;
-    }
-  }
-
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
       auto doc = parse_doc(args);
-      auto example = to_example(doc);
+      auto example_lines = to_example(doc);
       if (args.options.contains("-to_example")) {
-        create_example_file(example);
+        auto example_file = aoc::to_working_dir_path("example.txt");
+        if (aoc::raw::write_to_file(example_file, example_lines)) {
+          response << "Created " << example_file;
+        }
+        else {
+          response << "Sorry, failed to create file " << example_file;
+        }
+        return response.str();
+      }
+      else {
+        std::ostringstream oss{};
+        aoc::raw::write_to(oss, example_lines);
+        std::istringstream example_in{oss.str()};
+        auto example_model = ::parse(example_in);
+        using ::operator<<;
+        std::cout << NL << "example_model:" << example_model;
       }
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 
-}
+} // namespace test
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 }
 
 namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 }
 
@@ -149,11 +162,9 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  user_args.arg["part"] = "test";
-  user_args.arg["file"] = "doc.txt";
-
   // Override by any user input
   for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
     std::string token{argv[i]};
     if (token.starts_with("-")) user_args.options.insert(token);
     else {
@@ -169,15 +180,14 @@ int main(int argc, char *argv[]) {
   
   auto requests = to_requests(user_args);
   
-  if (user_args.options.contains("-all")) {
+  if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
-    for (int i=0;i<4;++i) {
-      Args args{};
-      std::string part{};
-      std::string file{};
-      part = (i/2==0)?"1":"2";
-      file = (i%2==0)?"example.txt":"puzzle.txt";
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
       requests.push_back(args);
