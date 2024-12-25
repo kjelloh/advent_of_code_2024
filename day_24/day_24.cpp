@@ -192,8 +192,8 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      auto vals = test::to_evaluated(model);
-      auto z_digits = test::to_bin_digit_string('z',vals);
+      auto wire_vals = test::to_evaluated(model);
+      auto z_digits = test::to_bin_digit_string('z',wire_vals);
       std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
       auto z = test::to_int(z_digits);
       std::cout << " --> decimal:" << z;
@@ -373,10 +373,10 @@ namespace part2 {
         std::copy(dot.begin(),dot.end(),std::ostream_iterator<std::string>(out,NL));
         return std::string{"-to_dot, created dot file "} + file.string();
       }
-      auto vals = test::to_evaluated(model);
-      auto x_digits = test::to_bin_digit_string('x',vals);
-      auto y_digits = test::to_bin_digit_string('y',vals);
-      auto z_digits = test::to_bin_digit_string('z',vals);
+      auto wire_vals = test::to_evaluated(model);
+      auto x_digits = test::to_bin_digit_string('x',wire_vals);
+      auto y_digits = test::to_bin_digit_string('y',wire_vals);
+      auto z_digits = test::to_bin_digit_string('z',wire_vals);
       
       auto const N = static_cast<int>(z_digits.size()); // N z digits
       
@@ -422,20 +422,31 @@ namespace part2 {
       // Find missmatch and try to figure out
       // if it is x,y or carry_in that is in fault?
       for (int i=N-2;i>=0;--i) {
-        auto c_in_digit = carry_digits[i+1];
-        auto x_digit = x_digits[i];
-        auto y_digit = y_digits[i];
         auto s_digit = s_digits[i];
         auto z_digit = z_digits[i+1];
+        
         if (z_digit != s_digit) {
-          auto expected = to_added(x_digit,y_digit, c_in_digit);
-          std::cout << NL << "error at bit:" << N-i-2; // 0 = N-(N-2)-2
-          if (expected.carry_out=='0' and z_digit == '0') {
-            if ((x_digit=='1') xor (y_digit=='1')) std::cout << " Swap to make carry_in == 1";
-            else std::cout << " swap to make carry_in == 0";
-          }
-          else if (z_digit == '0' and expected.carry_out=='0') {
+          auto c_in_digit = carry_digits[i+1];
+          auto x_digit = x_digits[i];
+          auto y_digit = y_digits[i];
+          auto c_out_digit = carry_digits[i];
 
+          std::string z_name = std::format("z{:02}",(N-2)-i); // z00 is i = (N-2)
+          if (wire_vals[z_name]) {
+            std::cout << NL << z_name <<  " is " << *wire_vals[z_name];
+          }
+
+          if (z_digit=='0') {
+            // must be even numbers of 1 in c_in,x,y,c_out
+            // c_in + x + y = c_out,z
+            //  0     0   0 = 0,0
+            //  0     0   1 = 0,1
+            //  0     1   0 = 0,1
+            //  0     1   1 = 1,0
+            //  1     0   0 = 0,1
+            //  1     0   1 = 1,0
+            //  1     1   0 = 1,0
+            //  1     1   1 = 1,1
           }
         }
       }
