@@ -326,7 +326,13 @@ namespace part2 {
         std::copy(dot.begin(),dot.end(),std::ostream_iterator<std::string>(out,NL));
         return std::string{"-to_dot, created dot file "} + file.string();
       }
-      
+      auto vals = test::to_evaluated(model);
+      auto x_digits = test::to_bin_digit_string('x',vals);
+      auto y_digits = test::to_bin_digit_string('y',vals);
+      auto z_digits = test::to_bin_digit_string('z',vals);
+      std::cout << NL << "x:" << x_digits;
+      std::cout << NL << "y:" << y_digits;
+      std::cout << NL << "z:" << z_digits;
 
     }
     if (response.str().size()>0) return response.str();
