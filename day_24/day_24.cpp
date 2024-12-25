@@ -373,6 +373,40 @@ namespace part2 {
         std::copy(dot.begin(),dot.end(),std::ostream_iterator<std::string>(out,NL));
         return std::string{"-to_dot, created dot file "} + file.string();
       }
+
+      //According to wikipedia: For a full adder ow two bits and carry we have
+      // to implement z = c_in + x + y
+      //           z = x ^ y ^ carry_in
+      //   carry_out = x & y + (carry_in & (x ^ y))
+      // IDEA: Break down these expressions into two-input gates and name them.
+      //       xnn ^ ynn                : xy_xor_nn
+      //       xy_xor_nn ^ cin_nn       : znn
+      //       xnn & ynn                : xy_and_nn
+      //       cin_nn & xy_xor_nn       : cin_and_nn
+      //       xy_and_nn or cin_and_nn  : cout_nn -> cin_pp (pp = nn+1)
+      
+      // What if we rename wires as we identify them and see what that gets us?
+      for (auto& gate : model.gates) {
+        // abc = xnn ^ ynn : abc -> xy_xor_nn
+        if (    (gate.input1.starts_with('x') and gate.input2.starts_with('y'))
+                 or (gate.input1.starts_with('y') and gate.input2.starts_with('x'))) {
+          auto bit_no = gate.input1.substr(1);
+          std::string new_name = std::format("xy_xor_{}",bit_no);
+          if (gate.op == "AND") {
+            new_name = std::format("xy_and_{}",bit_no);
+          }
+          auto old_name = gate.output;
+          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+            if (target.input1 == old_name) target.input1 = new_name;
+            if (target.input2 == old_name) target.input2 = new_name;
+          });
+          gate.output = new_name;
+        }
+        // znn = xy_xor_nn ^ abc : abc -> cin_nn
+        
+      }
+
+      
       auto wire_vals = test::to_evaluated(model);
       auto x_digits = test::to_bin_digit_string('x',wire_vals);
       auto y_digits = test::to_bin_digit_string('y',wire_vals);
@@ -404,6 +438,16 @@ namespace part2 {
       auto diff_count = std::count(diff_string.begin(), diff_string.end(), '?');
       std::cout << NL << "diff count:" << diff_count;
       
+      auto to_wire_name = [](std::string const& prefix,int bit_number) -> std::string {
+        return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
+      };
+      
+      std::set<std::string> x_and_y_names{};
+      for (int i=0;i<x_digits.size();++i) {
+        x_and_y_names.insert(to_wire_name("x", i));
+        x_and_y_names.insert(to_wire_name("y", i));
+      }
+      
       //           4         3         2         1         0
       //carry:100111111110111111111100001111110000000111001?
       //   x:  100010011110101101010110001010110100000011001
@@ -418,7 +462,7 @@ namespace part2 {
       // It seems the first error is at bit 11?
       // A carry plus one x-bit should add to 1 but z is 0.
       // So - the carry bit is lost (wired somewhere else)?
-
+      
       // Find missmatch and try to figure out
       // if it is x,y or carry_in that is in fault?
       for (int i=N-2;i>=0;--i) {
@@ -427,30 +471,41 @@ namespace part2 {
         auto z_digit = z_digits[i+1];
         
         if (z_digit != s_digit) {
+          int backtrack_level{1};
+
+          std::cout << NL << NL; // new z-bit
+
+          // For a full bit adder we expect to find gates that takes x and why for current bit number
+          if (true) {
+            auto iter = model.gates.begin();
+            auto x_wire_name = to_wire_name("x", bit_number);
+            auto y_wire_name = to_wire_name("y", bit_number);
+
+            while (iter != model.gates.end()) {
+              iter = std::find_if(iter, model.gates.end(), [&x_wire_name,&y_wire_name](Gate const& gate) {
+                return     (gate.input1==x_wire_name and gate.input2==y_wire_name)
+                        or (gate.input1==y_wire_name and gate.input2==x_wire_name);
+              });
+              if (iter != model.gates.end()) {
+                std::cout << NL << std::string(2*backtrack_level,' ') << "candidate:" << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2;
+                ++iter;
+              }
+            }
+          }
+
           
           auto c_in_digit = carry_digits[i+1];
           auto x_digit = x_digits[i];
           auto y_digit = y_digits[i];
           auto c_out_digit = carry_digits[i];
           
-          auto to_wire_name = [](char prefix,int bit_number) -> std::string {
-            return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
-          };
-          
-          std::set<std::string> x_and_y_names{};
-          for (int i=0;i<x_digits.size();++i) {
-            x_and_y_names.insert(to_wire_name('x', i));
-            x_and_y_names.insert(to_wire_name('y', i));
-          }
-
-          auto wire_name = to_wire_name('z', bit_number);
+          auto wire_name = to_wire_name("z", bit_number);
           if (wire_vals[wire_name]) {
             auto iter = std::find_if(model.gates.begin(), model.gates.end(), [&wire_name](Gate const& gate){
               return gate.output == wire_name;
             });
-            int backtrack_level{1};
             if (iter != model.gates.end()) {
-              std::cout << NL << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
+              std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
               
               //According to wikipedia: For a full adder ow two bits and carry we have
               // to implement z = c_in + x + y
@@ -474,7 +529,24 @@ namespace part2 {
                 //           ?? -- XOR --- ??
                 //                   |
                 //                  z11
-                
+
+                // to implement z = c_in + x + y
+                //           z = x ^ y ^ carry_in
+                //   carry_out = x & y + (carry_in & (x ^ y))
+
+                //    x11        y11    carry_in 11 -      x10       y10         x10        y10
+                //     |          |         |        |      |          |          |          |             carry_in 10
+                //      ->--XOR--<-         v        ^       -- AND ---           ---- XOR ---                |
+                //           |              |        |           |                      |                     |
+                //           v              |        |           |                      |                     |
+                //           ?? -- XOR --- ??        |           |                       ---------- AND -------
+                //                   |               |           |                                   |
+                //                  z11              ??          --------------- OR ------------------
+                //                                   |                            |
+                //                                   |                           carry_out 10
+                //                                   |                                |
+                //                                   ------------------------------<--
+                                
                 ++backtrack_level;
                 bool swap_candidate_found{false};
                 // Recurse one level lhs1
