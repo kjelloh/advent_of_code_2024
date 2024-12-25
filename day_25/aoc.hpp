@@ -188,7 +188,21 @@ namespace aoc {
       return os;
     }
   
-  }
+    bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
+      if (out) {
+        for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+          if (lx>0) out << NL;
+          out << line;
+        }
+        return true;
+      }
+      return false;
+    }
+    bool write_to_file(std::filesystem::path file,aoc::raw::Lines const& lines) {
+      std::ofstream out{file};
+      return write_to(out, lines);
+    }
+  } // namespace raw
   namespace parsing {
     class Splitter; // Forward
     using Line = Splitter;

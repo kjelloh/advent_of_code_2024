@@ -30,7 +30,18 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
-using Model = aoc::raw::Lines;
+using ColumnCount = std::vector<int>;
+using OptionalColumnCount = std::optional<ColumnCount>;
+using LockOrKey = std::pair<OptionalColumnCount,OptionalColumnCount>;
+using Model = std::vector<LockOrKey>;
+
+std::ostream& operator<<(std::ostream& os,LockOrKey const& lock_or_key) {
+  using aoc::raw::operator<<;
+  if (lock_or_key.first) std::cout << "lock:" << *lock_or_key.first;
+  else if (lock_or_key.second) std::cout << "key:" << *lock_or_key.second;
+  else os << "?";
+  return os;
+}
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -38,9 +49,26 @@ Model parse(auto& in) {
   auto sections = Splitter{in}.sections();
   for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
     std::cout << NL << "---------- section " << sx << " ----------";
+    result.push_back({});
+    ColumnCount col_count(section[0].size(),-1); // reduced for solid count '###..."
     for (auto const& [lx,line] : aoc::views::enumerate(section)) {
       std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
+      auto entry = line.str();
+      for (int i=0;i<entry.size();++i) {
+        if (entry[i]=='#') ++col_count[i];
+      }
+      if (lx==0) {
+        if (std::all_of(entry.begin(), entry.end(),[](char ch){return ch == '.';})) {
+          result.back().second = col_count; // mark key
+          std::cout << NL << "Parsing key";
+        }
+        else {
+          result.back().first = col_count; // lock
+          std::cout << NL << "Parsing Lock";
+        }
+      }
+      if (result.back().first) result.back().first = col_count;
+      else result.back().second = col_count;
     }
   }
   return result;
@@ -84,22 +112,54 @@ namespace test {
   }
 
   aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
-    return {};
+    std::cout << NL << "To example";
+    aoc::raw::Lines result;
+    for (int i=15;i<=19;++i) {
+      std::cout << NL << i;
+      if (i>15) result.push_back({});
+      for (auto const& line : sections[i]) {
+        result.push_back(line);
+        std::cout << NL << T << line.str();
+      }
+    }
+    return result;
   }
 
-  void create_example_file(aoc::raw::Lines const& lines) {
-    auto example_file = aoc::to_working_dir_path("example.txt");
-    std::ofstream out{example_file};
-    if (out) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        if (lx>0) out << NL;
-        out << line;
+  Integer to_fits_count(Model const& model) {
+    Integer result{};
+    for (int i=0;i<model.size();++i) {
+      for (int j=i+1;j<model.size();++j) {
+        auto const& lhs = model[i];
+        auto const& rhs = model[j];
+        ColumnCount result_counts{};
+        ColumnCount lhs_counts{};
+        ColumnCount rhs_counts{};
+        if (lhs.first and rhs.second) {
+          lhs_counts = *lhs.first;
+          rhs_counts = *rhs.second;
+        }
+        else if (lhs.second and rhs.first) {
+          lhs_counts = *lhs.second;
+          rhs_counts = *rhs.first;
+        }
+        else {
+          // skip
+          continue;
+        }
+        std::transform(lhs_counts.begin(), lhs_counts.end(), rhs_counts.begin(), std::back_insert_iterator(result_counts), [](int c1,int c2){
+          return c2+c1;
+        });
+        using aoc::raw::operator<<;
+        std::cout << NL << "result_counts:" << result_counts;
+        if (std::all_of(result_counts.begin(), result_counts.end(), [](int c){
+          return c <= 5;
+        })) {
+          ++result;
+          std::cout << NL << result;
+        }
       }
-      std::cout << NL << "Created " << example_file;
     }
-    else {
-      std::cerr << NL << "Sorry, failed to create file " << example_file;
-    }
+    return result;
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -108,10 +168,28 @@ namespace test {
     if (in) {
       auto model = parse(in);
       auto doc = parse_doc(args);
-      auto example = to_example(doc);
+      auto example_lines = to_example(doc);
       if (args.options.contains("-to_example")) {
-        create_example_file(example);
+        std::ostringstream oss{};
+        auto example_file = aoc::to_working_dir_path("example.txt");
+        if (aoc::raw::write_to_file(example_file, example_lines)) {
+          oss << "Created " << example_file;
+        }
+        else {
+          oss << "Sorry, failed to create file " << example_file;
+        }
+        return oss.str();
       }
+      std::ostringstream oss{};
+      aoc::raw::write_to(oss, example_lines);
+      std::istringstream example_in{oss.str()};
+      auto example_model = ::parse(example_in);
+      for (auto const& entry : example_model) {
+        using ::operator<<;
+        std::cout << NL << entry;
+      }
+      
+      auto acc = to_fits_count(example_model);
     }
     return result;
   }
@@ -124,6 +202,9 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
+      auto acc = test::to_fits_count(model);
+      std::cout << NL << "acc:" << acc;
+      result = std::to_string(acc);
     }
     return result;
   }
