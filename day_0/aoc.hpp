@@ -99,11 +99,17 @@ namespace aoc {
       }
       return os;
     }
+  
+    template <typename T>
+    concept Streamable = requires(std::ostream& os, T const& t) {
+        { os << t } -> std::same_as<std::ostream&>;
+    };
 
     // A concept for integral types for operator<<(std::vector<Int>) below
     template <typename T>
     concept Integral = std::is_integral_v<T>;
 
+    // << std::vector<Integral>
     template <typename T>
     requires Integral<T>
     std::ostream& operator<<(std::ostream& os, const std::vector<T>& ints) {
@@ -116,6 +122,24 @@ namespace aoc {
       return os;
     }
   
+    template <typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
+
+
+    // << std::vector
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
+      os << "[";
+      for (auto const& [ix,e] : aoc::views::enumerate(v)) {
+        if (ix>0) os << ',';
+        os << e;
+      }
+      os << "]";
+      return os;
+    }
+
+    // << std::set<Integral>
     template <typename T>
     requires Integral<T>
     std::ostream& operator<<(std::ostream& os, const std::set<T>& ints) {
@@ -128,8 +152,9 @@ namespace aoc {
       return os;
     }
   
-    // Helper function to print std::set
+    // << std::set
     template <typename T>
+    requires Streamable<T>
     std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
         os << "{ ";
         for (auto const& elem : s) {
@@ -138,6 +163,31 @@ namespace aoc {
         os << "}";
         return os;
     }
+  
+    // std:.pair
+    template <typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp) {
+      os << "{ " << pp.first << "," << pp.second << "}";
+      return os;
+    }
+  
+    // Base case: printing an empty tuple
+    std::ostream& operator<<(std::ostream& os, const std::tuple<>&) {
+      return os;
+    }
+    
+    // Recursive case: printing the first element, then recursing on the rest
+    template <typename T, typename... Types>
+    std::ostream& operator<<(std::ostream& os, const std::tuple<T, Types...>& t) {
+      os << std::get<0>(t);  // Print the first element
+      if constexpr (sizeof...(Types) > 0) {  // If there are more elements
+        os << ", ";  // Print a comma and a space
+        operator<<(os, std::tuple<Types...>(std::get<Types>(t)...)); // Recurse on the rest of the tuple
+      }
+      return os;
+    }
+  
   }
   namespace parsing {
     class Splitter; // Forward
@@ -393,6 +443,46 @@ namespace aoc {
             }
         }
     };
+  
+    template <typename T, typename W>
+    class WeightedGraph {
+    public:
+        using Vertex = T;
+        using Weight = W;
+        using AdjList = std::map<Vertex, std::vector<std::pair<Vertex, Weight>>>;
+
+        void add_vertex(Vertex const& v) {
+            m_adj[v]; // Ensures the vertex exists in the adjacency list
+        }
+
+        void add_edge(Vertex const& v1, Vertex const& v2, Weight const& weight) {
+            m_adj[v1].emplace_back(v2, weight);
+        }
+
+        auto get_neighbors(Vertex const& v) const {
+            auto it = m_adj.find(v);
+            if (it != m_adj.end()) return it->second;
+            throw std::runtime_error("Vertex not found");
+        }
+
+        W get_weight(Vertex const& v1, Vertex const& v2) const {
+            auto it = m_adj.find(v1);
+            if (it != m_adj.end()) {
+                for (const auto& [neighbor, weight] : it->second) {
+                    if (neighbor == v2) return weight;
+                }
+            }
+            throw std::runtime_error("Edge not found");
+        }
+
+        AdjList const& adj() const { return m_adj; }
+
+        auto size() const { return m_adj.size(); }
+
+    private:
+        AdjList m_adj;
+    };
+
 
   }
 
