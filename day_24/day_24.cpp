@@ -79,6 +79,32 @@ Model parse(auto& in) {
 
 namespace test {
 
+  std::optional<bool> applyGate(int val1, int val2, const std::string& op) {
+      if (op == "AND") return val1 and val2;
+      if (op == "OR") return val1 or val2;
+      if (op == "XOR") return val1 xor val2;
+      throw std::invalid_argument("Unknown operation");
+  }
+
+  WireValues to_evaluated(Model model) {
+    WireValues result{};
+    auto const& [wire_vals,ops] = model;
+    WireValues has_val{model.init_values};
+    std::deque<Gate> q{ops.begin(),ops.end()};
+    while (not q.empty()) {
+      auto [a,b,out,op] = q.front();
+      q.pop_front();
+      if (has_val[a] and has_val[b]) {
+        has_val[out] = applyGate(*has_val[a], *has_val[b], op);
+      }
+      else {
+        q.push_back({a,b,out,op}); // retry later
+      }
+    }
+    result = has_val;
+    return result;
+  }
+
   std::string to_bin_digit_string(char id,WireValues const& wire_vals) {
     std::string result{};
     for (const auto& [wire, value] : wire_vals) {
@@ -92,13 +118,6 @@ namespace test {
   auto to_int(std::string bin_digits) {
     std::bitset<64> bits{bin_digits};
     return bits.to_ulong();;
-  }
-
-  std::optional<bool> applyGate(int val1, int val2, const std::string& op) {
-      if (op == "AND") return val1 and val2;
-      if (op == "OR") return val1 or val2;
-      if (op == "XOR") return val1 xor val2;
-      throw std::invalid_argument("Unknown operation");
   }
 
   // Adapt to expected for day puzzle
@@ -153,27 +172,8 @@ namespace test {
         return response.str();
       }
       else {
-        auto ops = model.gates;
-        auto wire_vals = model.init_values;
-        {
-          WireValues has_val{};
-          for (auto const& [wire,val] : wire_vals) {
-            if (val) has_val[wire] = val;
-          }
-          std::deque<Gate> q{ops.begin(),ops.end()};
-          while (not q.empty()) {
-            auto [a,b,out,op] = q.front();
-            q.pop_front();
-            if (has_val[a] and has_val[b]) {
-              has_val[out] = applyGate(*has_val[a], *has_val[b], op);
-            }
-            else {
-              q.push_back({a,b,out,op});
-            }
-          }
-          wire_vals = has_val;
-        }
-        auto z_digits = to_bin_digit_string('z',wire_vals);
+        auto vals = to_evaluated(model);
+        auto z_digits = to_bin_digit_string('z',vals);
         std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
         auto z = to_int(z_digits);
         std::cout << " --> decimal:" << z;
@@ -190,7 +190,17 @@ namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
     std::cout << NL << NL << "part1";
-    return test::solve_for(in, args);
+    if (in) {
+      auto model = parse(in);
+      auto vals = test::to_evaluated(model);
+      auto z_digits = test::to_bin_digit_string('z',vals);
+      std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
+      auto z = test::to_int(z_digits);
+      std::cout << " --> decimal:" << z;
+      response << z;
+    }
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 }
 
