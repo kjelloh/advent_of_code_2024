@@ -27,6 +27,7 @@
 using aoc::raw::NL;
 using aoc::raw::T;
 using aoc::raw::NT;
+using aoc::Args;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
@@ -76,12 +77,22 @@ Model parse(auto& in) {
   return result;
 }
 
-struct Args {
-  std::map<std::string,std::string> arg{};
-  std::set<std::string> options{};
-};
-
 namespace test {
+
+  std::string to_bin_digit_string(char id,WireValues const& wire_vals) {
+    std::string result{};
+    for (const auto& [wire, value] : wire_vals) {
+      std::cout << NL << wire << ": " << *value;
+      if (wire.starts_with(id)) result.push_back(*value?'1':'0');
+    }
+    std::reverse(result.begin(), result.end()); // requires wire_vals alphabetically sorted
+    return result;
+  }
+
+  auto to_int(std::string bin_digits) {
+    std::bitset<64> bits{bin_digits};
+    return bits.to_ulong();;
+  }
 
   std::optional<bool> applyGate(int val1, int val2, const std::string& op) {
       if (op == "AND") return val1 and val2;
@@ -124,30 +135,22 @@ namespace test {
     return {};
   }
 
-  void create_example_file(aoc::raw::Lines const& lines) {
-    auto example_file = aoc::to_working_dir_path("example.txt");
-    std::ofstream out{example_file};
-    if (out) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        if (lx>0) out << NL;
-        out << line;
-      }
-      std::cout << NL << "Created " << example_file;
-    }
-    else {
-      std::cerr << NL << "Sorry, failed to create file " << example_file;
-    }
-  }
-
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
       auto doc = parse_doc(args);
-      auto example = to_example(doc);
+      auto example_lines = to_example(doc);
       if (args.options.contains("-to_example")) {
-        create_example_file(example);
+        auto example_file = aoc::to_working_dir_path("example.txt");
+        if (aoc::raw::write_to_file(example_file, example_lines)) {
+          response << "Created " << example_file;
+        }
+        else {
+          response << "Sorry, failed to create file " << example_file;
+        }
+        return response.str();
       }
       else {
         auto ops = model.gates;
@@ -170,37 +173,24 @@ namespace test {
           }
           wire_vals = has_val;
         }
-
-        std::string z_digits{};
-        for (const auto& [wire, value] : wire_vals) {
-          std::cout << NL << wire << ": " << *value;
-          if (wire.starts_with('z')) z_digits.push_back(*value?'1':'0');
-        }
-        std::reverse(z_digits.begin(), z_digits.end());
+        auto z_digits = to_bin_digit_string('z',wire_vals);
         std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
-        std::bitset<64> bits{z_digits};
-        auto z = bits.to_ulong();;
+        auto z = to_int(z_digits);
         std::cout << " --> decimal:" << z;
-        result = std::to_string(z);
-        
-        
-        // zs:0011111101000
-        //    0011111101000
+        response << z;
       }
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 
 }
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "part1";
-    if (in) {
-      auto model = parse(in);
-    }
-    return result;
+    return test::solve_for(in, args);
   }
 }
 
@@ -260,7 +250,7 @@ namespace part2 {
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "part2";
     if (in) {
       
@@ -327,81 +317,10 @@ namespace part2 {
         return std::string{"-to_dot, created dot file "} + file.string();
       }
       
-      std::map<Gate, int> gate2index;
-      aoc::graph::WeightedGraph<int, bool> gate_DAG{};
-      // Build DAG with Vertices being gates mapped to int index
-      {
-        for (const auto& gate : model.gates) {
-          if (not gate2index.contains(gate)) {
-            auto index = static_cast<int>(gate2index.size());;
-            gate2index[gate] = index;
-            gate_DAG.add_vertex(index);
-          }
-          
-          auto const& [input1,input2,output,operation] = gate;
-
-          // connect gates
-          for (const auto& [other_gate, index] : gate2index) {
-            if (other_gate.output == input1 || other_gate.output == input2) {
-              gate_DAG.add_edge(index, gate2index[gate], false);
-            }
-          }
-        }
-      }
-      
-      for (auto const& adjacent : gate_DAG.adj()) {
-        if (adjacent.second.size()>1) {
-          std::cout << NL << T << adjacent.first;
-          using aoc::raw::operator<<;
-          std::cout << " is connected to " << adjacent.second;
-        }
-      }
-                        
-      auto wire_vals = model.init_values;
-      for (auto const& [a,b,o,type] : model.gates) {
-        wire_vals[a];
-        wire_vals[b];
-        wire_vals[o];
-      }
-            
-      // eval network of gates
-      std::vector<Gate> ordered_ops{};
-      {
-        auto const& ops = model.gates;
-        WireValues has_val{};
-        for (auto const& [wire,val] : wire_vals) {
-          if (val) has_val[wire] = val;
-        }
-        std::deque<Gate> q{ops.begin(),ops.end()};
-        while (not q.empty()) {
-          auto current = q.front();
-          auto const& [a,b,out,op] = current;
-          q.pop_front();
-          if (has_val[a] and has_val[b]) {
-            has_val[out] = test::applyGate(*has_val[a], *has_val[b], op);
-            ordered_ops.push_back(current);
-          }
-          else {
-            q.push_back({a,b,out,op});
-          }
-        }
-      }
-            
-      Swaps swaps{};
-      
-      // find swaps
-      
-      if (!swaps.empty()) {
-        std::cout << "Found swaps:" << std::endl;
-        for (const auto& [i, j] : swaps) {
-          std::cout << NL << "Swap z[" << i << "] with z[" << j << "]";
-        }
-      } else {
-        std::cout << NL << "No valid swaps found!";
-      }
 
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 }
 
@@ -414,11 +333,9 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  user_args.arg["part"] = "test";
-  user_args.arg["file"] = "doc.txt";
-
   // Override by any user input
   for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
     std::string token{argv[i]};
     if (token.starts_with("-")) user_args.options.insert(token);
     else {
@@ -434,15 +351,14 @@ int main(int argc, char *argv[]) {
   
   auto requests = to_requests(user_args);
   
-  if (user_args.options.contains("-all")) {
+  if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
-    for (int i=0;i<4;++i) {
-      Args args{};
-      std::string part{};
-      std::string file{};
-      part = (i/2==0)?"1":"2";
-      file = (i%2==0)?"example.txt":"puzzle.txt";
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
       requests.push_back(args);

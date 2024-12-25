@@ -22,6 +22,14 @@
 
 namespace aoc {
 
+  struct Args {
+    std::map<std::string,std::string> arg{};
+    std::set<std::string> options{};
+    operator bool() const {
+      return (arg.size()>0) or (options.size()>0);
+    }
+  };
+
   namespace views {
     template <typename Iterator>
     class enumerate_iterator {
@@ -81,7 +89,7 @@ namespace aoc {
 
 
   namespace raw {
-  
+
     template <typename T>
     int sign(T value) {
         return (value > T(0)) - (value < T(0));
@@ -93,6 +101,7 @@ namespace aoc {
     using Line = std::string;
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
+  
     std::ostream& operator<<(std::ostream& os,Lines const& lines) {
       for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
         os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << std::quoted(line);
@@ -188,7 +197,23 @@ namespace aoc {
       return os;
     }
   
-  }
+    bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
+      if (out) {
+        for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+          if (lx>0) out << NL;
+          out << line;
+        }
+        return true;
+      }
+      return false;
+    }
+  
+    bool write_to_file(std::filesystem::path file,aoc::raw::Lines const& lines) {
+      std::ofstream out{file};
+      return write_to(out, lines);
+    }
+  
+  } // namespace raw
   namespace parsing {
     class Splitter; // Forward
     using Line = Splitter;
@@ -1042,6 +1067,19 @@ namespace aoc {
       return os;
     }
   } // namespace test
+
+  namespace algo {
+    template <typename T1, typename T2>
+    std::vector<std::pair<T1, T2>> cartesian_product(const std::vector<T1>& vec1, const std::vector<T2>& vec2) {
+        std::vector<std::pair<T1, T2>> result;
+        for (const auto& a : vec1) {
+            for (const auto& b : vec2) {
+                result.emplace_back(a, b);
+            }
+        }
+        return result;
+    }
+  }
 
 } // namespace aoc
 
