@@ -386,14 +386,18 @@ namespace part2 {
       //       xy_and_nn or cin_and_nn  : cout_nn -> cin_pp (pp = nn+1)
       
       // What if we rename wires as we identify them and see what that gets us?
+
       for (auto& gate : model.gates) {
-        // abc = xnn ^ ynn : abc -> xy_xor_nn
-        if (    (gate.input1.starts_with('x') and gate.input2.starts_with('y'))
-                 or (gate.input1.starts_with('y') and gate.input2.starts_with('x'))) {
+        // not_z = xnn ^ ynn : not_z -> xy_xor_nn
+        // any = xnn & ynn : any -> xy_and_nn
+        if (    (     (gate.input1.starts_with('x') and gate.input2.starts_with('y'))
+                   or (gate.input1.starts_with('y') and gate.input2.starts_with('x'))
+                )
+            and ( not (gate.output.starts_with('z')))) {
           auto bit_no = gate.input1.substr(1);
-          std::string new_name = std::format("xy_xor_{}",bit_no);
+          std::string new_name = std::format("_xy_xor_{}",bit_no);
           if (gate.op == "AND") {
-            new_name = std::format("xy_and_{}",bit_no);
+            new_name = std::format("_xy_and_{}",bit_no);
           }
           auto old_name = gate.output;
           std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
@@ -402,7 +406,78 @@ namespace part2 {
           });
           gate.output = new_name;
         }
-        // znn = xy_xor_nn ^ abc : abc -> cin_nn
+        // jdm := bng OR _xy_and_10  : jdm -> cin_nn
+        if (gate.op == "OR" and gate.input2.starts_with("_xy_and")) {
+          auto old_name = gate.output;
+          auto bit_no = gate.input2.substr(gate.input2.size()-2);
+          std::string new_name = std::format("_cin_{}",bit_no);
+          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+            if (target.input1 == old_name) target.input1 = new_name;
+            if (target.input2 == old_name) target.input2 = new_name;
+            if (target.output == old_name) target.output = new_name;
+          });
+        }
+        // _cin_10 := bng OR _xy_and_10 : bng -> cin_and_10
+        if (gate.output.starts_with("_cin_") and gate.input2.starts_with("_xy_and_")) {
+          auto old_name = gate.input1;
+          auto bit_no = gate.input2.substr(gate.input2.size()-2);
+          std::string new_name = std::format("_cin_and_{}",bit_no);
+          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+            if (target.input1 == old_name) target.input1 = new_name;
+            if (target.input2 == old_name) target.input2 = new_name;
+            if (target.output == old_name) target.output = new_name;
+          });
+        }
+        // z17 := _xy_and_17 OR ffg : ffg -> cin_and_nn
+        if (gate.op == "OR" and gate.input1.starts_with("_xy_and_")) {
+          auto old_name = gate.input2;
+          auto bit_no = gate.input1.substr(gate.input1.size()-2);
+          std::string new_name = std::format("_cin_and_{}",bit_no);
+          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+            if (target.input1 == old_name) target.input1 = new_name;
+            if (target.input2 == old_name) target.input2 = new_name
+              ;
+            if (target.output == old_name) target.output = new_name;
+          });
+        }
+        // z12 := _xy_xor_12 XOR sfm  : sfm -> _cin_12
+        if (gate.output.starts_with('z') and gate.input1.starts_with("_xy_xor")) {
+          auto old_name = gate.input2;
+          auto bit_no = gate.input1.substr(gate.input1.size()-2);
+          std::string new_name = std::format("_cin_{}",bit_no);
+          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+            if (target.input1 == old_name) target.input1 = new_name;
+            if (target.input2 == old_name) target.input2 = new_name;
+            if (target.output == old_name) target.output = new_name;
+          });
+        }
+        // _cin_12 := ckv OR _xy_xor_11 : ckv -> cin_and_12
+        
+
+
+//        // znn = xy_xor_nn ^ abc : abc -> cin_nn
+//        else if (gate.input1.starts_with("_xy_xor_")) {
+//          auto old_name = gate.input2;
+//          auto bit_no = gate.input1.substr(gate.input1.size()-2);
+//          std::string new_name = std::format("_cin_{}",bit_no);
+//          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+//            if (target.input1 == old_name) target.input1 = new_name;
+//            if (target.input2 == old_name) target.input2 = new_name;
+//            if (target.output == old_name) target.output = new_name;
+//          });
+//        }
+//        else if (gate.input2.starts_with("_xy_xor_")) {
+//          auto old_name = gate.input1;
+//          auto bit_no = gate.input2.substr(gate.input2.size()-2);
+//          std::string new_name = std::format("_cin_{}",bit_no);
+//          std::for_each(model.gates.begin(), model.gates.end(), [&new_name,&old_name](Gate& target){
+//            if (target.input1 == old_name) target.input1 = new_name;
+//            if (target.input2 == old_name) target.input2 = new_name;
+//            if (target.output == old_name) target.output = new_name;
+//          });
+//        }
+        
+        //  z11 := _xy_and_11 XOR jdm
         
       }
 
