@@ -278,62 +278,6 @@ namespace part2 {
     }
   }
 
-  Model to_renamed_gates(Model const& model) {
-    Model result{model};
-    auto& [wire_vals,gates] = result;
-    // What if we rename wires as we identify them and see what that gets us?
-    for (auto const& gate : model.gates) {
-      // not_z = xnn ^ ynn : not_z -> xy_xor_nn
-      // any = xnn & ynn : any -> xy_and_nn
-      if (    (     (gate.input1.starts_with('x') and gate.input2.starts_with('y'))
-                 or (gate.input1.starts_with('y') and gate.input2.starts_with('x'))
-              )
-          and ( not (gate.output.starts_with('z')))) {
-
-        auto bit_no = gate.input1.substr(1);
-        std::string new_name = std::format("_xy_xor_{}",bit_no);
-        if (gate.op == "AND") {
-          new_name = std::format("_xy_and_{}",bit_no);
-        }
-        auto old_name = gate.output;
-        rename_wire(old_name, new_name, result);
-      }
-
-      
-//      // jdm := bng OR _xy_and_10  : jdm -> cin_nn
-//      if (gate.op == "OR" and gate.input2.starts_with("_xy_and")) {
-//        auto old_name = gate.output;
-//        auto bit_no = gate.input2.substr(gate.input2.size()-2);
-//        std::string new_name = std::format("_cin_{}",bit_no);
-//        rename_wire(old_name, new_name, model);
-//      }
-//            
-//      // _cin_10 := bng OR _xy_and_10 : bng -> cin_and_10
-//      if (gate.output.starts_with("_cin_") and gate.input2.starts_with("_xy_and_")) {
-//        auto old_name = gate.input1;
-//        auto bit_no = gate.input2.substr(gate.input2.size()-2);
-//        std::string new_name = std::format("_cin_and_{}",bit_no);
-//        rename_wire(old_name, new_name, model);
-//      }
-//            
-//      // z17 := _xy_and_17 OR ffg : ffg -> cin_and_nn
-//      if (gate.op == "OR" and gate.input1.starts_with("_xy_and_")) {
-//        auto old_name = gate.input2;
-//        auto bit_no = gate.input1.substr(gate.input1.size()-2);
-//        std::string new_name = std::format("_cin_and_{}",bit_no);
-//        rename_wire(old_name, new_name, model);
-//      }
-//      // z12 := _xy_xor_12 XOR sfm  : sfm -> _cin_12
-//      if (gate.output.starts_with('z') and gate.input1.starts_with("_xy_xor")) {
-//        auto old_name = gate.input2;
-//        auto bit_no = gate.input1.substr(gate.input1.size()-2);
-//        std::string new_name = std::format("_cin_{}",bit_no);
-//        rename_wire(old_name, new_name, model);
-//      }
-    }
-    return result;
-  }
-
   //           z = x ^ y ^ carry_in
   //   carry_out = x & y + (carry_in & (x ^ y))
   //           dc = x & y   direct carry
@@ -446,6 +390,7 @@ namespace part2 {
         } break;
         default: break;
       }
+      if (result != eGate_Undefined) break;
     }
     return result;
   }
@@ -589,7 +534,7 @@ namespace part2 {
       
       using Swap = std::pair<std::string,std::string>;
       using Swaps = std::vector<Swap>;
-      Swaps found_swaps{};
+      Swaps applied_swaps{};
 
       struct State {
         Swaps swaps; // applied swaps so far
@@ -609,9 +554,7 @@ namespace part2 {
                   
         auto& [applied_swaps,model,last_bit_no] = current;
         auto& [wire_vals,gates] = model;
-        
-        model = to_renamed_gates(model);
-        
+                
         auto x_digits = test::to_bin_digit_string('x',wire_vals);
         auto y_digits = test::to_bin_digit_string('y',wire_vals);
         auto z_digits = test::to_bin_digit_string('z',wire_vals);
@@ -642,12 +585,12 @@ namespace part2 {
         std::cout << NL << "diff count:" << diff_count;
         
         if (diff_count==0) {
-          found_swaps = current.swaps;
+          applied_swaps = current.swaps;
           break;
         }
         if (diff_count<best) {
           best = diff_count;
-          found_swaps=current.swaps;
+          applied_swaps=current.swaps;
           using aoc::raw::operator<<;
           std::cout << NL << "new best:" << best << " for swaps:" << current.swaps;
         }
@@ -687,7 +630,7 @@ namespace part2 {
         }
         else {
           int backtrack_level{1};
-
+          
           std::cout << NL << NL; // new z-bit
 
           // For a full bit adder we expect to find gates that takes x and why for current bit number
@@ -721,7 +664,12 @@ namespace part2 {
             });
             if (iter != gates.end()) {
               std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
-              
+          
+              pritty_print(wire_name, 0, gates);
+              std::cout << NL << "Please enter two wires to swap:";
+              std::string input{};
+              std::getline(std::cin, input);
+
               //z11 := _xy_and_11 XOR jdm val:0
               //    _xy_and_11 := y11 AND x11 val:0 --> Swap with the XOR variant with same inputs
               //    jdm := bng OR _xy_and_10 val:0
@@ -874,11 +822,11 @@ namespace part2 {
         }
       }
       using aoc::raw::operator<<;
-      std::cout << NL << "FOUND swaps:" << found_swaps;
-      if (found_swaps.size()==4) {
+      std::cout << NL << "applied swaps:" << applied_swaps;
+      if (applied_swaps.size()==4) {
         std::cout << NL << "FOUND 4 pairs to swap OK!";
         std::vector<std::string> swap_names{};
-        for (auto const& [left,right]: found_swaps) {
+        for (auto const& [left,right]: applied_swaps) {
           swap_names.push_back(left);
           swap_names.push_back(right);
         }
