@@ -471,7 +471,7 @@ namespace part2 {
   // Recursive Pritty Print
   void pritty_print(std::string const& out_wire_name,int level,Gates const& gates) {
     auto gate = to_gate(out_wire_name, gates);
-    std::cout << NL << aoc::raw::Indent(2*level) << gate;
+    std::cout << NL << aoc::raw::Indent(2*level) << gate << " " << to_gate_id(gate, gates);
     if (level > 2) return;
     if (not is_xy_wire(gate.input1)) pritty_print(gate.input1, level+1, gates);
     if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates);
