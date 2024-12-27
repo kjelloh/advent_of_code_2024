@@ -91,6 +91,27 @@ namespace aoc {
   namespace raw {
 
     template <typename T>
+    constexpr T advance(T value, int steps = 1) {
+      if constexpr (std::is_enum_v<T>) {
+        using underlying = std::underlying_type_t<T>;
+        return static_cast<T>(static_cast<underlying>(value) + steps);
+      } else if constexpr (std::is_integral_v<T>) {
+        return value + steps;
+      } else if constexpr (std::is_base_of_v<std::input_iterator_tag,
+                           typename std::iterator_traits<T>::iterator_category>) {
+        return std::next(value, steps);
+      } else {
+        static_assert(false, "Unsupported type for advance");
+      }
+    }
+
+    template <typename T>
+    constexpr T operator++(T& value) {
+      value = aoc::raw::advance(value,1);
+      return value;
+    }
+  
+    template <typename T>
     int sign(T value) {
         return (value > T(0)) - (value < T(0));
     }

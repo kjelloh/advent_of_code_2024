@@ -40,6 +40,12 @@ struct Gate {
   std::string op; // "AND", "OR", "XOR"
   auto operator<=>(const Gate&) const = default;
 };
+std::ostream& operator<<(std::ostream& os,Gate const& gate) {
+  os << '(' << "setq " << gate.output <<  " (
+  
+  " << gate.op << " " << gate.input1 << " " << gate.input2 << "))"; // lisp :)
+  return os;
+}
 using Gates = std::vector<Gate>;
 
 struct Model {
@@ -330,6 +336,136 @@ namespace part2 {
     return result;
   }
 
+  //           z = x ^ y ^ carry_in
+  //   carry_out = x & y + (carry_in & (x ^ y))
+  //           dc = x & y   direct carry
+  //           rc = cin & either_xy  re-carry
+  //            c = dc + rc
+  enum eGate  {
+    eGate_Undefined
+    ,eGate_either_xy // xnn XOR ynn
+    ,eGate_direct_carry // xnn AND ynn
+    ,eGate_re_carry // cin & either_xy
+    ,egate_carry // eGate_direct_carry OR eGate_re_carry
+    ,egate_s // eGate_either_xy XOR egate_carry
+    ,eGate_Unknown
+  };
+
+  std::string to_string(eGate id) {
+      switch (id) {
+          case eGate_Undefined:   return "eGate_Undefined";
+          case eGate_either_xy:   return "eGate_either_xy";
+          case eGate_direct_carry: return "eGate_direct_carry";
+          case eGate_re_carry:    return "eGate_re_carry";
+          case egate_carry:       return "egate_carry";
+          case egate_s:           return "egate_s";
+          case eGate_Unknown:     return "eGate_Unknown";
+          default:                return "Unknown eGate";
+      }
+  }
+
+  std::ostream& operator<<(std::ostream& os,eGate id) {
+    os << to_string(id);
+    return os;
+  }
+
+  std::pair<std::string,std::string> to_prefix_and_bit(std::string const& wire_name) {
+    std::pair<std::string,std::string> result{wire_name,""};
+    std::regex pattern(R"((\S+?)(\d*)$)");
+    std::smatch match;
+    if (std::regex_match(wire_name.begin(), wire_name.end(), match, pattern)) {
+      result.first = match[1];
+      result.second = match[2];
+    }
+    return result;
+  }
+
+  bool has_prefixed_in_wire(std::string const& prefix,Gate const& gate) {
+    return (gate.input1.starts_with(prefix) or gate.input2.starts_with(prefix));
+  }
+
+  std::string to_prefix(std::string const& wire_name) {
+    return to_prefix_and_bit(wire_name).first;
+  }
+
+  std::string to_bit(std::string const& wire_name) {
+    return to_prefix_and_bit(wire_name).second;
+  }
+
+  bool is_gate(std::string const& op,std::string const& in_a,std::string const& in_b,Gate const& gate) {
+    bool is_op = gate.op == op;
+    bool has_also_in_a = is_op & has_prefixed_in_wire(to_prefix(in_a),gate);
+    bool has_also_in_b = has_also_in_a & has_prefixed_in_wire(to_prefix(in_b),gate);
+    return has_also_in_b;
+  }
+
+  Gate const& to_gate(std::string const& output_name,Gates const& gates) {
+    auto iter = std::find_if(gates.begin(), gates.end(), [&output_name](Gate const& gate){
+      return (gate.output == output_name);
+    });
+    if (iter != gates.end()) return *iter;
+    else throw std::runtime_error(std::format("Sorry, to_gate() failed for output_name {}",output_name));
+  }
+
+  bool is_xy_wire(std::string const& wire_name) {
+    auto [prefix,bit] = to_prefix_and_bit(wire_name);
+    return (prefix == "x" or prefix == "y");
+  }
+
+  bool has_xy_input(Gate const& gate) {
+    return is_xy_wire(gate.input1) and is_xy_wire(gate.input2);
+  }
+
+  eGate to_gate_id(Gate const& gate,Gates const gates) {
+//    std::cout << NL << NL << "to_gate_id:" << gate;
+    
+    eGate result{eGate_Undefined};
+    using aoc::raw::operator++;
+
+    for (auto id=aoc::raw::advance(eGate_Undefined,1);id<eGate_Unknown;++id) {
+//      std::cout << NL << "id:" << id << gate;
+      
+      switch (id) {
+        case eGate_either_xy: {
+          if (is_gate("XOR","x","y",gate)) result = id;
+        } break;
+        case eGate_direct_carry: {
+          if (is_gate("AND","x","y",gate)) result = id;
+        } break;
+        case eGate_re_carry: {
+          // cin & either_xy  re-carry
+          if (not has_xy_input(gate) and to_gate_id(to_gate(gate.input2,gates),gates) == eGate_either_xy) result = id;
+        } break;
+        case egate_carry: {
+          //,egate_carry // eGate_direct_carry OR eGate_re_carry
+          // NOTE: Don't check input1 as this will result in infinite recursion back through bits
+          if (not has_xy_input(gate) and (to_gate_id(to_gate(gate.input1,gates),gates) == eGate_direct_carry)) result = id;
+        } break;
+        case egate_s: {
+          //,egate_s // eGate_either_xy XOR egate_carry
+          // None of the above
+          if (not has_xy_input(gate) and gate.op == "XOR" and to_gate_id(to_gate(gate.input1,gates), gates) == eGate_either_xy) result = id;
+        } break;
+        default: break;
+      }
+    }
+    return result;
+  }
+
+  int to_identified_gates(Gates const& gates) {
+    int result{};
+    for (auto const& gate : gates) {
+      auto gate_id = to_gate_id(gate, gates);
+      auto const& [prefix,bit] = to_prefix_and_bit(gate.output);
+      std::cout << NL << T << "bit:" << bit << " " << gate_id << ":" << gate;
+      if (gate_id != eGate_Undefined or gate_id != eGate_Undefined) {
+        ++result;
+        std::cout << " " << result;
+      }
+    }
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
     std::cout << NL << NL << "part2";
@@ -399,6 +535,11 @@ namespace part2 {
         return std::string{"-to_dot, created dot file "} + file.string();
       }
       
+      if (args.options.contains("-to_ids")) {
+        auto ids = to_identified_gates(init_model.gates);
+        return std::format("-to_ids: {} out of {}",ids,init_model.gates.size());
+      }
+      
       std::set<std::string> x_and_y_names{};
       std::for_each(init_model.gates.begin(), init_model.gates.end(), [&x_and_y_names](Gate const& gate){
         if (gate.input1.starts_with('x') or gate.input1.starts_with('y')) x_and_y_names.insert(gate.input1);
@@ -416,6 +557,8 @@ namespace part2 {
       //       xnn & ynn                : xy_and_nn
       //       cin_nn & xy_xor_nn       : cin_and_nn
       //       xy_and_nn or cin_and_nn  : cout_nn -> cin_pp (pp = nn+1)
+
+      
       using Swap = std::pair<std::string,std::string>;
       using Swaps = std::vector<Swap>;
       Swaps found_swaps{};
