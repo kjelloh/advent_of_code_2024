@@ -41,9 +41,7 @@ struct Gate {
   auto operator<=>(const Gate&) const = default;
 };
 std::ostream& operator<<(std::ostream& os,Gate const& gate) {
-  os << '(' << "setq " << gate.output <<  " (
-  
-  " << gate.op << " " << gate.input1 << " " << gate.input2 << "))"; // lisp :)
+  os << '(' << "setq " << gate.output <<  " (" << gate.op << " " << gate.input1 << " " << gate.input2 << "))"; // lisp :)
   return os;
 }
 using Gates = std::vector<Gate>;
@@ -452,6 +450,10 @@ namespace part2 {
     return result;
   }
 
+  bool is_xy_gate(Gate const& gate) {
+    return (is_xy_wire(gate.input1) and is_xy_wire(gate.input2));
+  }
+
   int to_identified_gates(Gates const& gates) {
     int result{};
     for (auto const& gate : gates) {
@@ -465,6 +467,16 @@ namespace part2 {
     }
     return result;
   }
+
+  // Recursive Pritty Print
+  void pritty_print(std::string const& out_wire_name,int level,Gates const& gates) {
+    auto gate = to_gate(out_wire_name, gates);
+    std::cout << NL << aoc::raw::Indent(2*level) << gate;
+    if (level > 2) return;
+    if (not is_xy_wire(gate.input1)) pritty_print(gate.input1, level+1, gates);
+    if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates);
+  }
+
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
@@ -534,12 +546,28 @@ namespace part2 {
         std::copy(dot.begin(),dot.end(),std::ostream_iterator<std::string>(out,NL));
         return std::string{"-to_dot, created dot file "} + file.string();
       }
-      
-      if (args.options.contains("-to_ids")) {
+
+      // Identify gates
+      if (args.options.contains("-to_ids"))
+      {
         auto ids = to_identified_gates(init_model.gates);
         return std::format("-to_ids: {} out of {}",ids,init_model.gates.size());
       }
       
+      // Pritty Print
+      if (args.options.contains("-pp")) {
+        if (args.arg.contains("3")) {
+          auto bit = args.arg.at("3");
+          std::cout << NL << "Pritty Print for z " << bit;
+          auto z_gate = to_gate(std::format("z{}",bit), init_model.gates);
+          pritty_print(z_gate.output,0,init_model.gates);
+        }
+        else {
+          response << "Sorry, Please provide bit number as 4:th argument";
+        }
+        return "-pp";
+      }
+
       std::set<std::string> x_and_y_names{};
       std::for_each(init_model.gates.begin(), init_model.gates.end(), [&x_and_y_names](Gate const& gate){
         if (gate.input1.starts_with('x') or gate.input1.starts_with('y')) x_and_y_names.insert(gate.input1);
@@ -875,9 +903,8 @@ std::vector<Args> to_requests(Args const& args) {
 int main(int argc, char *argv[]) {
   Args user_args{};
   
-  // Override by any user input
+  user_args.arg["file"] = "example.txt";
   for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
     std::string token{argv[i]};
     if (token.starts_with("-")) user_args.options.insert(token);
     else {
@@ -886,7 +913,7 @@ int main(int argc, char *argv[]) {
       switch (non_option_index) {
         case 1: user_args.arg["part"] = token; break;
         case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+        default: user_args.arg[std::to_string(non_option_index)] = token;
       }
     }
   }
@@ -905,6 +932,14 @@ int main(int argc, char *argv[]) {
       args.arg["file"] = file;
       requests.push_back(args);
     }
+  }
+  
+  std::cout << NL << "Arguments:";
+  for (auto const& request : requests) {
+    auto const& [arg,options] = request;
+    using aoc::raw::operator<<;
+    std::cout << NL << "  {key,value} : " << arg;
+    std::cout << NL << "  options     : " << options;
   }
 
   Answers answers{};
