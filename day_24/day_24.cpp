@@ -632,35 +632,49 @@ namespace part2 {
         std::pair<AdderResult,AdderResult> odd_even_result{};
         
         {
+          std::string x_digits = std::string(y_digits.size(),'0');
           auto const& [s_digits,carry_digits] = to_bitwise_added(x_digits, y_digits);
+          auto z_digits = test::adder_eval(x_digits, y_digits, model.gates);
           
-          std::cout << NL << "carry:" << carry_digits;
+          std::cout << NL << " cin: " << carry_digits;
           std::cout << NL << "   x:  " << x_digits;
           std::cout << NL << "+  y:  " << y_digits;
           std::cout << NL << "-------" << std::string(N-1,'-');
           std::cout << NL << "=  s:  " << s_digits;
           std::cout << NL << "   z: " << z_digits;
-          
+
           odd_even_result.first.z_digits = z_digits;
           odd_even_result.first.s_digits = s_digits;
           odd_even_result.first.carry_digits = carry_digits;
         }
         
+        // Find all digit summing that goes wrong
+        // digit[N-1] is the rightmost lowest bit
+        std::string first_diff_string(N-1,' ');
+        for (int i=N-2;i>=0;--i) {
+          auto first_s_digit = odd_even_result.first.s_digits[i];
+          auto first_z_digit = odd_even_result.first.z_digits[i+1];
+          if (first_z_digit != first_s_digit) first_diff_string[i] = '?';
+        }
+        std::cout << NL << "   d:  " << first_diff_string;
+        auto first_diff_count = std::count(first_diff_string.begin(), first_diff_string.end(), '?');
+        std::cout << NL << " d count:" << first_diff_count;
+        
         {
           auto i = (N-2) - current_z_bit;
 
-          std::string mod_x_digits = x_digits;
-          mod_x_digits[i] = (mod_x_digits[i]=='1')?'0':'1';
-          
+          std::string mod_x_digits = std::string(x_digits.size(),'1');
+                              
           auto const& [mod_s_digits,mod_carry_digits] = to_bitwise_added(mod_x_digits, y_digits);
           auto mod_z_digits = test::adder_eval(mod_x_digits, y_digits, model.gates);
           
-          std::cout << NL << "carry:" << mod_carry_digits;
+          std::cout << NL << " cin: " << mod_carry_digits;
           std::cout << NL << "  x':  " << mod_x_digits;
           std::cout << NL << "+  y:  " << y_digits;
           std::cout << NL << "-------" << std::string(N-1,'-');
-          std::cout << NL << "=  s:  " << mod_s_digits;
-          std::cout << NL << "   z: " << mod_z_digits;
+          std::cout << NL << "= s':  " << mod_s_digits;
+          std::cout << NL << "  z': " << mod_z_digits;
+
           
           odd_even_result.second.z_digits = mod_z_digits;
           odd_even_result.second.s_digits = mod_s_digits;
@@ -670,32 +684,22 @@ namespace part2 {
         
         // Find all digit summing that goes wrong
         // digit[N-1] is the rightmost lowest bit
-        std::string first_diff_string(N-1,' ');
         std::string second_diff_string(N-1,' ');
         for (int i=N-2;i>=0;--i) {
-          auto first_s_digit = odd_even_result.first.s_digits[i];
-          auto first_z_digit = odd_even_result.first.z_digits[i+1];
-          if (first_z_digit != first_s_digit) first_diff_string[i] = '?';
           auto second_s_digit = odd_even_result.second.s_digits[i];
           auto second_z_digit = odd_even_result.second.z_digits[i+1];
           if (second_z_digit != second_s_digit) second_diff_string[i] = '?';
         }
-        std::cout << NL << "first_diff:  " << first_diff_string;
-        auto first_diff_count = std::count(first_diff_string.begin(), first_diff_string.end(), '?');
-        std::cout << NL << "first diff count:" << first_diff_count;
-
-        std::cout << NL << "second_diff:  " << second_diff_string;
+        std::cout << NL << "  d':  " << second_diff_string;
         auto second_diff_count = std::count(second_diff_string.begin(), second_diff_string.end(), '?');
-        std::cout << NL << "second diff count:" << second_diff_count;
-
-        auto diff_count = second_diff_count-first_diff_count;
+        std::cout << NL << "d' count:" << second_diff_count;
         
         if (first_diff_count==0 and second_diff_count==0) {
           found_swaps = current.swaps;
           break;
         }
         if (first_diff_count==second_diff_count and first_diff_count<best) {
-          best = diff_count;
+          best = first_diff_count;
           applied_swaps=current.swaps;
           using aoc::raw::operator<<;
           std::cout << NL << "new best:" << best << " for swaps:" << current.swaps;
