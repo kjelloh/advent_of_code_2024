@@ -83,7 +83,7 @@ Model parse(auto& in) {
 
 namespace test {
 
-  std::optional<bool> applyGate(int val1, int val2, const std::string& op) {
+  std::optional<bool> applyGate(bool val1, bool val2, const std::string& op) {
       if (op == "AND") return val1 and val2;
       if (op == "OR") return val1 or val2;
       if (op == "XOR") return val1 xor val2;
@@ -107,11 +107,20 @@ namespace test {
     return result;
   }
 
+  auto to_wire_name(std::string const& prefix,int bit_number) {
+    return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
+  };
+
   std::string to_bin_digit_string(char id,WireValues const& wire_vals) {
     std::string result{};
-    for (const auto& [wire, value] : wire_vals) {
-//
-      if (wire.starts_with(id)) result.push_back(*value?'1':'0');
+    int i=0;
+    while (true) {
+      std::string prefix = std::string(1,id);
+      auto wire_name = to_wire_name(prefix, i);
+      std::cout << NL << wire_name;
+      if (not wire_vals.contains(wire_name) or not wire_vals.at(wire_name)) break;
+      result.push_back(*wire_vals.at(wire_name)?'1':'0');
+      ++i;
     }
     std::reverse(result.begin(), result.end()); // requires wire_vals alphabetically sorted
     return result;
@@ -239,6 +248,9 @@ namespace part2 {
       }
       
       return {sum, carry};
+    // Web: 01011010000101000000010011110000100101001010010
+    // sum:   011010000101000000010011110000100101001010010
+    //   z:  1011010000100111111110011101100101001001010010
   }
 
   struct BitSumResult {
@@ -422,19 +434,10 @@ namespace part2 {
     if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates,depth-1);
   }
 
-  auto to_wire_name(std::string const& prefix,int bit_number) {
-    return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
-  };
-
-
-  void print_higher(int bit,Model const& model) {
-    auto z_wire = to_wire_name("z", bit);
-    try {
-      if (bit < 46) print_higher(bit+1, model);
-    }
-    catch (...) {
-      std::cout << NL << "BREAK on " << z_wire;
-    }
+  void print_higher(int bit,Model const& model,int depth = 2) {
+    auto z_wire = test::to_wire_name("z", bit);
+    if (bit > 45 or depth <= 0) return;
+    print_higher(bit+1, model,depth-1);
     // unwind
     pritty_print(z_wire, bit, model.gates);
   }
@@ -606,7 +609,7 @@ namespace part2 {
         std::cout << NL << "   x:  " << x_digits;
         std::cout << NL << "+  y:  " << y_digits;
         std::cout << NL << "-------" << std::string(N-1,'-');
-        std::cout << NL << "=  s: " << s_digits;
+        std::cout << NL << "=  s:  " << s_digits;
         std::cout << NL << "   z: " << z_digits;
 
         // Find all digit suming that goes wrong
@@ -673,8 +676,8 @@ namespace part2 {
           // For a full bit adder we expect to find gates that takes x and why for current bit number
           if (true) {
             auto iter = gates.begin();
-            auto x_wire_name = to_wire_name("x", bit_number);
-            auto y_wire_name = to_wire_name("y", bit_number);
+            auto x_wire_name = test::to_wire_name("x", bit_number);
+            auto y_wire_name = test::to_wire_name("y", bit_number);
 
             while (iter != gates.end()) {
               iter = std::find_if(iter, gates.end(), [&x_wire_name,&y_wire_name](Gate const& gate) {
@@ -694,7 +697,7 @@ namespace part2 {
           auto y_digit = y_digits[i];
           auto c_out_digit = carry_digits[i];
           
-          auto wire_name = to_wire_name("z", bit_number);
+          auto wire_name = test::to_wire_name("z", bit_number);
           if (wire_vals[wire_name]) {
             auto iter = std::find_if(gates.begin(), gates.end(), [&wire_name](Gate const& gate){
               return gate.output == wire_name;
