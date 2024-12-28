@@ -47,7 +47,7 @@ std::ostream& operator<<(std::ostream& os,Gate const& gate) {
 using Gates = std::vector<Gate>;
 
 struct Model {
-  WireValues init_values{};
+  WireValues wire_values{};
   Gates gates{};
 };
 
@@ -62,7 +62,7 @@ Model parse(auto& in) {
       if (sx == 0) {
         auto const& [caption,value] = line.split(':');
         std::cout << " --> " << to_raw(caption) << " " << to_raw(value);
-        result.init_values[caption] = (value.trim().str() == "1")?true:false;
+        result.wire_values[caption] = (value.trim().str() == "1")?true:false;
       }
       else if (sx==1) {
         auto tokens = line.splits(' ');
@@ -83,15 +83,15 @@ Model parse(auto& in) {
 
 namespace test {
 
-  std::optional<bool> applyGate(bool val1, bool val2, const std::string& op) {
+  bool applyGate(bool val1, bool val2, const std::string& op) {
       if (op == "AND") return val1 and val2;
       if (op == "OR") return val1 or val2;
       if (op == "XOR") return val1 xor val2;
       throw std::invalid_argument("Unknown operation");
   }
 
-  Model to_evaluated(WireValues init_values, Model const& model) {
-    Model result{init_values,model.gates};
+  Model to_evaluated(WireValues const& INIT_VALUES, Model const& model) {
+    Model result{INIT_VALUES,model.gates};
     auto& [wire_vals,ops] = result;
     std::deque<Gate> q{ops.begin(),ops.end()};
     while (not q.empty()) {
@@ -122,7 +122,7 @@ namespace test {
       result.push_back(*wire_vals.at(wire_name)?'1':'0');
       ++i;
     }
-    std::reverse(result.begin(), result.end()); // requires wire_vals alphabetically sorted
+    std::reverse(result.begin(), result.end()); // least significant at end
     return result;
   }
 
@@ -170,7 +170,7 @@ namespace test {
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
-      auto init_values = model.init_values;
+      auto const INIT_VALUES = model.wire_values;
       auto doc = parse_doc(args);
       auto example_lines = to_example(doc);
       if (args.options.contains("-to_example")) {
@@ -184,7 +184,7 @@ namespace test {
         return response.str();
       }
       else {
-        auto const& [vals,gates] = to_evaluated(init_values,model);
+        auto const& [vals,gates] = to_evaluated(INIT_VALUES,model);
         auto z_digits = to_bin_digit_string('z',vals);
         std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
         auto z = to_int(z_digits);
@@ -204,8 +204,8 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      auto init_values = model.init_values;
-      auto [wire_vals,gates] = test::to_evaluated(init_values,model);
+      auto INIT_VALUES = model.wire_values;
+      auto [wire_vals,gates] = test::to_evaluated(INIT_VALUES,model);
       auto z_digits = test::to_bin_digit_string('z',wire_vals);
       std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
       auto z = test::to_int(z_digits);
@@ -282,11 +282,11 @@ namespace part2 {
     });
     // A bit cumbersome to rename a key in an std::map
     // Also costly - so lets see if we can do this without getting too long solve time?
-    auto iter = model.init_values.find(old_name);
-    if (iter != model.init_values.end()) {
+    auto iter = model.wire_values.find(old_name);
+    if (iter != model.wire_values.end()) {
       auto value = iter->second;
-      model.init_values.erase(iter);
-      model.init_values[new_name] = value;
+      model.wire_values.erase(iter);
+      model.wire_values[new_name] = value;
     }
   }
 
@@ -445,7 +445,7 @@ namespace part2 {
   using Swap = std::pair<std::string,std::string>;
   using Swaps = std::vector<Swap>;
 
-  Model to_swapped(WireValues const& init_values, Model const& model,Swap const& swap) {
+  Model to_swapped(WireValues const& INIT_VALUES, Model const& model,Swap const& swap) {
     Model result{model};
     auto [lhs,rhs] = swap;
     auto lhs_iter = std::find_if(result.gates.begin(), result.gates.end(), [&lhs](Gate const& gate){
@@ -462,7 +462,7 @@ namespace part2 {
     else {
       throw std::runtime_error(std::format(R"(Sorry, failed to swap {} {}. failed to find both in gates)",lhs,rhs));
     }
-    result = test::to_evaluated(init_values,result);
+    result = test::to_evaluated(INIT_VALUES,result);
     return result;
   }
 
@@ -519,8 +519,8 @@ namespace part2 {
       //        3. swp only so that current wrong z-bit flips (no need to swap with no effect)
 
       auto const _in_model = parse(in);
-      auto init_values = _in_model.init_values;
-      auto const init_model = test::to_evaluated(init_values,_in_model);
+      auto const INIT_VALUES = _in_model.wire_values;
+      auto const init_model = test::to_evaluated(INIT_VALUES,_in_model);
       if (args.options.contains("-parse_only")) return "-parse_only";
       if (args.options.contains("-to_dot")) {
         std::vector<std::string> dot{};
@@ -847,7 +847,7 @@ namespace part2 {
             std::getline(std::cin, input);
             auto [lhs,rhs] = aoc::parsing::Splitter(input).split(' ');
             Swap swap{lhs,rhs};
-            auto modified_model = to_swapped(init_values,model,swap);
+            auto modified_model = to_swapped(INIT_VALUES,model,swap);
             auto modified_swaps = current.swaps;
             modified_swaps.push_back(swap);
             State next{modified_swaps,modified_model,last_bit_no+1};
