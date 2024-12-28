@@ -926,7 +926,7 @@ namespace part2 {
         }
       } // while q
       using aoc::raw::operator<<;
-      std::cout << NL << "Found swaps:" << found_swaps; // { "qjj","gjc"},{ "z17","wmp"},{ "z26","gvm"}
+      std::cout << NL << "Found swaps:" << found_swaps; // Found swaps:[{ "qjj","gjc"},{ "z17","wmp"},{ "z26","gvm"},{ "z39","qsb"}]
       std::vector<std::string> swap_names{};
       for (auto const& [left,right]: found_swaps) {
         swap_names.push_back(left);
@@ -972,10 +972,11 @@ int main(int argc, char *argv[]) {
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
 
-    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> parts = {"1", "2"};
     std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part=="2" and file=="example.txt") continue;
       Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
@@ -1028,9 +1029,15 @@ int main(int argc, char *argv[]) {
 
    >day_22 -all
 
-   ANSWERS
-   ...
+   NOTE: User must inspect and enter swaps to fix each faulty z-bit found by program
+   NOTE: My Manual input swaps [{ "qjj","gjc"},{ "z17","wmp"},{ "z26","gvm"},{ "z39","qsb"}]
+   NOTE: Execution time includes user interaction.
    
+   ANSWERS
+   duration:0ms answer[part1 example.txt] 4
+   duration:24ms answer[part1 puzzle.txt] 49520947122770
+   duration:52854ms answer[part2 puzzle.txt] gjc,gvm,qjj,qsb,wmp,z17,z26,z39
+
    */
   return 0;
 }
