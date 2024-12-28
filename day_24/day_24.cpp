@@ -146,40 +146,6 @@ namespace test {
     return to_bin_digit_string('z', evaluated_model.wire_values);
   }
 
-//to_evaluated()
-//  x:100110000001011010100011010101101011110010001
-//  y:100111000100011101001101111010010011001111011
-//
-
-//Process bit:0 swaps:[]
-//carry:100110000000011000001111110000000011111110011?
-//   x:  100110000001011010100011010101101011110010001
-//+  y:  100111000100011101001101111010010011001111011
-//----------------------------------------------------
-//=  s:  001101000101110111110001001111111111000001100
-//   z: 0100101001001010011011100111111110010000101101
-
-//adder_eval
-//  100110000001011010100011010101101011110010001
-//  100111000100011101001101111010010011001111011
-//to_evaluated()
-//  x:100010011110101101010110001010110100000011001
-//  y:110111100110010010111101100101110001000111001
-//carry:100110000000011000001111110000000011111110011?
-//  x':  100110000001011010100011010101101011110010001
-//+  y:  100111000100011101001101111010010011001111011
-//----------------------------------------------------
-//=  s:  001101000101110111110001001111111111000001100
-//   z: 0011000001111111100101000100001111010000111001
-
-//first_diff:  ? ?     ??  ?  ?  ? ?? ???      ?? ?   ?    ?
-//first diff count:17
-//second_diff:   ? ? ?  ? ?   ? ?? ??  ?? ???    ? ?   ?? ? ?
-//second diff count:21
-//new best:4 for swaps:[]
-
-
-
   auto to_int(std::string bin_digits) {
     std::bitset<64> bits{bin_digits};
     return bits.to_ulong();;
@@ -755,11 +721,11 @@ namespace part2 {
 
         auto diff_count = second_diff_count-first_diff_count;
         
-        if (diff_count==0) {
+        if (first_diff_count==0 and second_diff_count==0) {
           found_swaps = current.swaps;
           break;
         }
-        if (diff_count<best) {
+        if (first_diff_count==second_diff_count and first_diff_count<best) {
           best = diff_count;
           applied_swaps=current.swaps;
           using aoc::raw::operator<<;
