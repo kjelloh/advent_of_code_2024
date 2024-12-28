@@ -90,8 +90,8 @@ namespace test {
       throw std::invalid_argument("Unknown operation");
   }
 
-  Model to_evaluated(WireValues const& init_values,Gates const& gates) {
-    Model result{init_values,gates};
+  Model to_evaluated(WireValues init_values, Model const& model) {
+    Model result{init_values,model.gates};
     auto& [wire_vals,ops] = result;
     std::deque<Gate> q{ops.begin(),ops.end()};
     while (not q.empty()) {
@@ -161,6 +161,7 @@ namespace test {
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
+      auto init_values = model.init_values;
       auto doc = parse_doc(args);
       auto example_lines = to_example(doc);
       if (args.options.contains("-to_example")) {
@@ -174,7 +175,7 @@ namespace test {
         return response.str();
       }
       else {
-        auto const& [vals,gates] = to_evaluated(model.init_values,model.gates);
+        auto const& [vals,gates] = to_evaluated(init_values,model);
         auto z_digits = to_bin_digit_string('z',vals);
         std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
         auto z = to_int(z_digits);
@@ -194,7 +195,8 @@ namespace part1 {
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      auto [wire_vals,gates] = test::to_evaluated(model.init_values,model.gates);
+      auto init_values = model.init_values;
+      auto [wire_vals,gates] = test::to_evaluated(init_values,model);
       auto z_digits = test::to_bin_digit_string('z',wire_vals);
       std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
       auto z = test::to_int(z_digits);
@@ -207,8 +209,6 @@ namespace part1 {
 }
 
 namespace part2 {
-
-  using Swaps = std::vector<std::pair<int, int>>;
 
   // sum,carry
   std::pair<std::string, std::string> to_bitwise_added(const std::string& x, const std::string& y) {
@@ -417,9 +417,33 @@ namespace part2 {
   void pritty_print(std::string const& out_wire_name,int level,Gates const& gates) {
     auto gate = to_gate(out_wire_name, gates);
     std::cout << NL << aoc::raw::Indent(2*level) << gate << " " << to_gate_id(gate, gates);
-    if (level > 2) return;
+    if (level > 4) return;
     if (not is_xy_wire(gate.input1)) pritty_print(gate.input1, level+1, gates);
     if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates);
+  }
+
+  using Swap = std::pair<std::string,std::string>;
+  using Swaps = std::vector<Swap>;
+
+  Model to_swapped(WireValues const& init_values, Model const& model,Swap const& swap) {
+    Model result{model};
+    auto [lhs,rhs] = swap;
+    auto lhs_iter = std::find_if(result.gates.begin(), result.gates.end(), [&lhs](Gate const& gate){
+      return (gate.output == lhs);
+    });
+    auto rhs_iter = std::find_if(result.gates.begin(), result.gates.end(), [&rhs](Gate const& gate){
+      return (gate.output == rhs);
+    });
+    if (lhs_iter != result.gates.end() and rhs_iter != result.gates.end()) {
+      std::cout << NL << "swap " << *lhs_iter << " <--> " << *rhs_iter;
+      std::swap(rhs_iter->output,lhs_iter->output);
+      std::cout << NL << "swapped " << *lhs_iter << "  " << *rhs_iter;
+    }
+    else {
+      throw std::runtime_error(std::format(R"(Sorry, failed to swap {} {}. failed to find both in gates)",lhs,rhs));
+    }
+    result = test::to_evaluated(init_values,result);
+    return result;
   }
 
 
@@ -475,7 +499,8 @@ namespace part2 {
       //        3. swp only so that current wrong z-bit flips (no need to swap with no effect)
 
       auto const _in_model = parse(in);
-      auto const init_model = test::to_evaluated(_in_model.init_values,_in_model.gates);
+      auto init_values = _in_model.init_values;
+      auto const init_model = test::to_evaluated(init_values,_in_model);
       if (args.options.contains("-parse_only")) return "-parse_only";
       if (args.options.contains("-to_dot")) {
         std::vector<std::string> dot{};
@@ -532,9 +557,7 @@ namespace part2 {
       //       xy_and_nn or cin_and_nn  : cout_nn -> cin_pp (pp = nn+1)
 
       
-      using Swap = std::pair<std::string,std::string>;
-      using Swaps = std::vector<Swap>;
-      Swaps applied_swaps{};
+      Swaps found_swaps{};
 
       struct State {
         Swaps swaps; // applied swaps so far
@@ -627,6 +650,7 @@ namespace part2 {
         if (z_digit == s_digit) {
           // try next z-bit
           q.push_front(State{current.swaps,current.model,bit_number+1});
+          found_swaps = current.swaps;
         }
         else {
           int backtrack_level{1};
@@ -665,11 +689,6 @@ namespace part2 {
             if (iter != gates.end()) {
               std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
           
-              pritty_print(wire_name, 0, gates);
-              std::cout << NL << "Please enter two wires to swap:";
-              std::string input{};
-              std::getline(std::cin, input);
-
               //z11 := _xy_and_11 XOR jdm val:0
               //    _xy_and_11 := y11 AND x11 val:0 --> Swap with the XOR variant with same inputs
               //    jdm := bng OR _xy_and_10 val:0
@@ -691,8 +710,7 @@ namespace part2 {
                   }
                 }
               }
-
-              
+                            
               //According to wikipedia: For a full adder ow two bits and carry we have
               // to implement z = c_in + x + y
               //           z = x ^ y ^ carry_in
@@ -736,7 +754,6 @@ namespace part2 {
                 //                                   ------------------------------<--
                                 
                 ++backtrack_level;
-                bool swap_candidate_found{false};
                 // Recurse one level lhs1
                 {
                   auto wire_name = iter->input1;
@@ -752,13 +769,11 @@ namespace part2 {
                     }
                     else {
                       std::cout << " --> Swap with the XOR variant with same inputs";
-                      swap_candidate_found = true;
                     }
                   }
                   else {
                     if (iter->op == "OR") {
                       std::cout << " --> Back track carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
-                      swap_candidate_found = true;
                     }
                     else if (iter->op == "XOR") {
                       std::cout << " --> Swap for OR to get carry in = previous carry_out = x & y + (carry_in & (x ^ y))";
@@ -777,9 +792,7 @@ namespace part2 {
                   if (iter != gates.end()) {
                     std::cout << NL << std::string(2*backtrack_level,' ') << iter->output << " := " << iter->input1 << " " << iter->op << " " << iter->input2 << " val:" << *wire_vals[wire_name];
                   }
-                  
-                  if (swap_candidate_found) continue;
-                  
+                                    
                   if ((x_and_y_names.contains(iter->input1) and x_and_y_names.contains(iter->input2))) {
                     if (iter->op == "XOR") {
                       std::cout << " OK ";
@@ -800,33 +813,43 @@ namespace part2 {
                     }
                   }
                 }
-              }
+
+              } // if z is "XOR"
               else {
                 std::cout << " --> SWAP this gate with gate that IS an XOR for x ^ y ^ carry_in";
               }
-            }
+                            
+            } // if iter -> z-wire
             else {
               std::cout << " ??";
             }
+         
+            pritty_print(wire_name, 0, gates);
+            std::cout << NL << "Please enter two wires to swap:";
+            std::string input{};
+            std::getline(std::cin, input);
+            auto [lhs,rhs] = aoc::parsing::Splitter(input).split(' ');
+            Swap swap{lhs,rhs};
+            auto modified_model = to_swapped(init_values,model,swap);
+            auto modified_swaps = current.swaps;
+            modified_swaps.push_back(swap);
+            State next{modified_swaps,modified_model,last_bit_no+1};
+            q.push_front(next);
 
-
-            
           } // if z wire
-          
-          
           std::cout << NL << "q:" << q.size();
-          if (true) {
+          if (false) {
             std::cout << NL << "BREAK after first faulty bit - for test" << std::flush;
             break;
           }
         }
-      }
+      } // while q
       using aoc::raw::operator<<;
-      std::cout << NL << "applied swaps:" << applied_swaps;
-      if (applied_swaps.size()==4) {
+      std::cout << NL << "Found swaps:" << found_swaps;
+      if (found_swaps.size()==4) {
         std::cout << NL << "FOUND 4 pairs to swap OK!";
         std::vector<std::string> swap_names{};
-        for (auto const& [left,right]: applied_swaps) {
+        for (auto const& [left,right]: found_swaps) {
           swap_names.push_back(left);
           swap_names.push_back(right);
         }
