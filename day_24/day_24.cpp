@@ -117,7 +117,6 @@ namespace test {
     while (true) {
       std::string prefix = std::string(1,id);
       auto wire_name = to_wire_name(prefix, i);
-      std::cout << NL << wire_name;
       if (not wire_vals.contains(wire_name) or not wire_vals.at(wire_name)) break;
       result.push_back(*wire_vals.at(wire_name)?'1':'0');
       ++i;
@@ -595,7 +594,7 @@ namespace part2 {
         using aoc::raw::operator<<;
         std::cout << NL << NL << "Process bit:" << current.bit_no << " swaps:" << current.swaps;
                   
-        auto& [applied_swaps,model,last_bit_no] = current;
+        auto& [applied_swaps,model,current_z_bit] = current;
         auto& [wire_vals,gates] = model;
                 
         auto x_digits = test::to_bin_digit_string('x',wire_vals);
@@ -840,7 +839,7 @@ namespace part2 {
               std::cout << " ??";
             }
          
-            print_higher(last_bit_no+1, model);
+            print_higher(current_z_bit+1, model);
             pritty_print(wire_name, 0, gates);
             std::cout << NL << "Please enter two wires to swap:";
             std::string input{};
@@ -850,7 +849,7 @@ namespace part2 {
             auto modified_model = to_swapped(INIT_VALUES,model,swap);
             auto modified_swaps = current.swaps;
             modified_swaps.push_back(swap);
-            State next{modified_swaps,modified_model,last_bit_no+1};
+            State next{modified_swaps,modified_model,current_z_bit+1};
             q.push_front(next);
 
           } // if z wire
@@ -862,7 +861,7 @@ namespace part2 {
         }
       } // while q
       using aoc::raw::operator<<;
-      std::cout << NL << "Found swaps:" << found_swaps;
+      std::cout << NL << "Found swaps:" << found_swaps; // { "qjj","gjc"},{ "z17","wmp"},{ "z26","gvm"}
       std::vector<std::string> swap_names{};
       for (auto const& [left,right]: found_swaps) {
         swap_names.push_back(left);
