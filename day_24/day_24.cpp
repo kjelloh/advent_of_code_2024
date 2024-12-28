@@ -414,12 +414,29 @@ namespace part2 {
   }
 
   // Recursive Pritty Print
-  void pritty_print(std::string const& out_wire_name,int level,Gates const& gates) {
+  void pritty_print(std::string const& out_wire_name,int level,Gates const& gates,int depth = 4) {
     auto gate = to_gate(out_wire_name, gates);
     std::cout << NL << aoc::raw::Indent(2*level) << gate << " " << to_gate_id(gate, gates);
-    if (level > 4) return;
-    if (not is_xy_wire(gate.input1)) pritty_print(gate.input1, level+1, gates);
-    if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates);
+    if (depth == 0) return;
+    if (not is_xy_wire(gate.input1)) pritty_print(gate.input1, level+1, gates,depth-1);
+    if (not is_xy_wire(gate.input2)) pritty_print(gate.input2, level+1, gates,depth-1);
+  }
+
+  auto to_wire_name(std::string const& prefix,int bit_number) {
+    return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
+  };
+
+
+  void print_higher(int bit,Model const& model) {
+    auto z_wire = to_wire_name("z", bit);
+    try {
+      if (bit < 46) print_higher(bit+1, model);
+    }
+    catch (...) {
+      std::cout << NL << "BREAK on " << z_wire;
+    }
+    // unwind
+    pritty_print(z_wire, bit, model.gates);
   }
 
   using Swap = std::pair<std::string,std::string>;
@@ -589,7 +606,7 @@ namespace part2 {
         std::cout << NL << "   x:  " << x_digits;
         std::cout << NL << "+  y:  " << y_digits;
         std::cout << NL << "-------" << std::string(N-1,'-');
-        std::cout << NL << "=  s:  " << s_digits;
+        std::cout << NL << "=  s: " << s_digits;
         std::cout << NL << "   z: " << z_digits;
 
         // Find all digit suming that goes wrong
@@ -608,7 +625,7 @@ namespace part2 {
         std::cout << NL << "diff count:" << diff_count;
         
         if (diff_count==0) {
-          applied_swaps = current.swaps;
+          found_swaps = current.swaps;
           break;
         }
         if (diff_count<best) {
@@ -617,11 +634,7 @@ namespace part2 {
           using aoc::raw::operator<<;
           std::cout << NL << "new best:" << best << " for swaps:" << current.swaps;
         }
-                            
-        auto to_wire_name = [](std::string const& prefix,int bit_number) -> std::string {
-          return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
-        };
-                  
+                                              
         //           4         3         2         1         0
         //carry:100111111110111111111100001111110000000111001?
         //   x:  100010011110101101010110001010110100000011001
@@ -824,6 +837,7 @@ namespace part2 {
               std::cout << " ??";
             }
          
+            print_higher(last_bit_no+1, model);
             pritty_print(wire_name, 0, gates);
             std::cout << NL << "Please enter two wires to swap:";
             std::string input{};
@@ -846,18 +860,15 @@ namespace part2 {
       } // while q
       using aoc::raw::operator<<;
       std::cout << NL << "Found swaps:" << found_swaps;
-      if (found_swaps.size()==4) {
-        std::cout << NL << "FOUND 4 pairs to swap OK!";
-        std::vector<std::string> swap_names{};
-        for (auto const& [left,right]: found_swaps) {
-          swap_names.push_back(left);
-          swap_names.push_back(right);
-        }
-        std::ranges::sort(swap_names);
-        for (auto const& [ix,name] : aoc::views::enumerate(swap_names)) {
-          if (ix>0) response << ',';
-          response << name;
-        }
+      std::vector<std::string> swap_names{};
+      for (auto const& [left,right]: found_swaps) {
+        swap_names.push_back(left);
+        swap_names.push_back(right);
+      }
+      std::ranges::sort(swap_names);
+      for (auto const& [ix,name] : aoc::views::enumerate(swap_names)) {
+        if (ix>0) response << ',';
+        response << name;
       }
     }
     if (response.str().size()>0) return response.str();
