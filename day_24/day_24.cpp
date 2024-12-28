@@ -83,6 +83,24 @@ Model parse(auto& in) {
 
 namespace test {
 
+  auto to_wire_name(std::string const& prefix,int bit_number) {
+    return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
+  };
+
+  std::string to_bin_digit_string(char id,WireValues const& wire_vals) {
+    std::string result{};
+    int i=0;
+    while (true) {
+      std::string prefix = std::string(1,id);
+      auto wire_name = to_wire_name(prefix, i);
+      if (not wire_vals.contains(wire_name) or not wire_vals.at(wire_name)) break;
+      result.push_back(*wire_vals.at(wire_name)?'1':'0');
+      ++i;
+    }
+    std::reverse(result.begin(), result.end()); // MSB at index 0
+    return result;
+  }
+
   bool applyGate(bool val1, bool val2, const std::string& op) {
       if (op == "AND") return val1 and val2;
       if (op == "OR") return val1 or val2;
@@ -91,6 +109,10 @@ namespace test {
   }
 
   Model to_evaluated(WireValues const& INIT_VALUES, Model const& model) {
+    std::cout << NL << "to_evaluated()";
+    std::cout << NL << T << "x:" << to_bin_digit_string('x', model.wire_values) << std::flush;
+    std::cout << NL << T << "y:" << to_bin_digit_string('y', model.wire_values) << std::flush;
+
     Model result{INIT_VALUES,model.gates};
     auto& [wire_vals,ops] = result;
     std::deque<Gate> q{ops.begin(),ops.end()};
@@ -107,23 +129,56 @@ namespace test {
     return result;
   }
 
-  auto to_wire_name(std::string const& prefix,int bit_number) {
-    return std::format("{}{:02}",prefix,bit_number); // z00 is i = (N-2)
-  };
-
-  std::string to_bin_digit_string(char id,WireValues const& wire_vals) {
-    std::string result{};
-    int i=0;
-    while (true) {
-      std::string prefix = std::string(1,id);
-      auto wire_name = to_wire_name(prefix, i);
-      if (not wire_vals.contains(wire_name) or not wire_vals.at(wire_name)) break;
-      result.push_back(*wire_vals.at(wire_name)?'1':'0');
-      ++i;
+  std::string adder_eval(std::string const& x,std::string const& y,Gates const& gates) {
+    std::cout << NL << "adder_eval";
+    std::cout << NL << T << x;
+    std::cout << NL << T << y;
+    auto const N = x.size();
+    WireValues wire_vals{};
+    for (int bit = 0;bit<x.size();++bit) {
+      auto x_wire_name = to_wire_name("x", bit);
+      wire_vals[x_wire_name] = x[N-1-bit]=='1'?true:false; // x[size-1] = bit 0
+      auto y_wire_name = to_wire_name("y", bit);
+      wire_vals[y_wire_name] = y[N-1-bit]=='1'?true:false;
     }
-    std::reverse(result.begin(), result.end()); // least significant at end
-    return result;
+    Model model{wire_vals,gates};
+    auto evaluated_model = to_evaluated(wire_vals, model);
+    return to_bin_digit_string('z', evaluated_model.wire_values);
   }
+
+//to_evaluated()
+//  x:100110000001011010100011010101101011110010001
+//  y:100111000100011101001101111010010011001111011
+//
+
+//Process bit:0 swaps:[]
+//carry:100110000000011000001111110000000011111110011?
+//   x:  100110000001011010100011010101101011110010001
+//+  y:  100111000100011101001101111010010011001111011
+//----------------------------------------------------
+//=  s:  001101000101110111110001001111111111000001100
+//   z: 0100101001001010011011100111111110010000101101
+
+//adder_eval
+//  100110000001011010100011010101101011110010001
+//  100111000100011101001101111010010011001111011
+//to_evaluated()
+//  x:100010011110101101010110001010110100000011001
+//  y:110111100110010010111101100101110001000111001
+//carry:100110000000011000001111110000000011111110011?
+//  x':  100110000001011010100011010101101011110010001
+//+  y:  100111000100011101001101111010010011001111011
+//----------------------------------------------------
+//=  s:  001101000101110111110001001111111111000001100
+//   z: 0011000001111111100101000100001111010000111001
+
+//first_diff:  ? ?     ??  ?  ?  ? ?? ???      ?? ?   ?    ?
+//first diff count:17
+//second_diff:   ? ? ?  ? ?   ? ?? ??  ?? ???    ? ?   ?? ? ?
+//second diff count:21
+//new best:4 for swaps:[]
+
+
 
   auto to_int(std::string bin_digits) {
     std::bitset<64> bits{bin_digits};
@@ -596,35 +651,109 @@ namespace part2 {
                   
         auto& [applied_swaps,model,current_z_bit] = current;
         auto& [wire_vals,gates] = model;
-                
+
         auto x_digits = test::to_bin_digit_string('x',wire_vals);
         auto y_digits = test::to_bin_digit_string('y',wire_vals);
         auto z_digits = test::to_bin_digit_string('z',wire_vals);
         auto const N = static_cast<int>(z_digits.size()); // N z digits
-        
-        auto const& [s_digits,carry_digits] = to_bitwise_added(x_digits, y_digits);
-        
-        std::cout << NL << "carry:" << carry_digits;
-        std::cout << NL << "   x:  " << x_digits;
-        std::cout << NL << "+  y:  " << y_digits;
-        std::cout << NL << "-------" << std::string(N-1,'-');
-        std::cout << NL << "=  s:  " << s_digits;
-        std::cout << NL << "   z: " << z_digits;
 
-        // Find all digit suming that goes wrong
-        // digit[N-1] is the rightmost lowest bit
-        std::string diff_string(N-1,' ');
-        for (int i=N-2;i>=0;--i) {
-          auto c_digit = carry_digits[i+1];
-          auto x_digit = x_digits[i];
-          auto y_digit = y_digits[i];
-          auto s_digit = s_digits[i];
-          auto z_digit = z_digits[i+1];
-          if (z_digit != s_digit) diff_string[i] = '?';
+        struct AdderResult {
+          std::string z_digits{};
+          std::string s_digits{};
+          std::string carry_digits{};
+        };
+        
+        std::pair<AdderResult,AdderResult> odd_even_result{};
+        
+        {
+          auto const& [s_digits,carry_digits] = to_bitwise_added(x_digits, y_digits);
+          
+          std::cout << NL << "carry:" << carry_digits;
+          std::cout << NL << "   x:  " << x_digits;
+          std::cout << NL << "+  y:  " << y_digits;
+          std::cout << NL << "-------" << std::string(N-1,'-');
+          std::cout << NL << "=  s:  " << s_digits;
+          std::cout << NL << "   z: " << z_digits;
+          
+          odd_even_result.first.z_digits = z_digits;
+          odd_even_result.first.s_digits = s_digits;
+          odd_even_result.first.carry_digits = carry_digits;
         }
-        std::cout << NL << "diff:  " << diff_string;
-        auto diff_count = std::count(diff_string.begin(), diff_string.end(), '?');
-        std::cout << NL << "diff count:" << diff_count;
+        
+        {
+          auto i = (N-2) - current_z_bit;
+
+          std::string mod_x_digits = x_digits;
+//          mod_x_digits[i] = (mod_x_digits[i]=='1')?'0':'1';
+          
+          auto const& [mod_s_digits,mod_carry_digits] = to_bitwise_added(mod_x_digits, y_digits);
+          auto mod_z_digits = test::adder_eval(mod_x_digits, y_digits, model.gates);
+          
+          std::cout << NL << "carry:" << mod_carry_digits;
+          std::cout << NL << "  x':  " << mod_x_digits;
+          std::cout << NL << "+  y:  " << y_digits;
+          std::cout << NL << "-------" << std::string(N-1,'-');
+          std::cout << NL << "=  s:  " << mod_s_digits;
+          std::cout << NL << "   z: " << mod_z_digits;
+          
+          odd_even_result.second.z_digits = mod_z_digits;
+          odd_even_result.second.s_digits = mod_s_digits;
+          odd_even_result.second.carry_digits = mod_carry_digits;
+          
+          //to_evaluated()
+          //  x:100010011110101101010110001010110100000011001
+          //  y:110111100110010010111101100101110001000111001
+          //
+          //Process bit:0 swaps:[]
+          //carry:100111111110111111111100001111110000000111001?
+          //   x:  100010011110101101010110001010110100000011001
+          //+  y:  110111100110010010111101100101110001000111001
+          //----------------------------------------------------
+          //=  s:  011010000101000000010011110000100101001010010
+          //   z: 1011010000100111111110011101100101001001010010
+          //adder_eval
+          //  100010011110101101010110001010110100000011001
+          //  110111100110010010111101100101110001000111001
+          //to_evaluated()
+          //  x:100110000001011010100011010101101011110010001
+          //  y:100111000100011101001101111010010011001111011
+          //carry:100111111110111111111100001111110000000111001?
+          //  x':  100010011110101101010110001010110100000011001
+          //+  y:  110111100110010010111101100101110001000111001
+          //----------------------------------------------------
+          //=  s:  011010000101000000010011110000100101001010010
+          //   z: 1011010000100111111110011101100101001001010010
+          //   z: 1001110000101111000010001010011111111000001100
+          //first_diff:             ????????      ???    ??
+          //first diff count:13
+          //second_diff:   ? ?        ???       ? ?   ?? ?? ?   ? ????
+          //second diff count:17
+          //new best:4 for swaps:[]
+
+          
+        }
+        
+        // Find all digit summing that goes wrong
+        // digit[N-1] is the rightmost lowest bit
+        std::string first_diff_string(N-1,' ');
+        std::string second_diff_string(N-1,' ');
+        for (int i=N-2;i>=0;--i) {
+          auto first_s_digit = odd_even_result.first.s_digits[i];
+          auto first_z_digit = odd_even_result.first.z_digits[i+1];
+          if (first_z_digit != first_s_digit) first_diff_string[i] = '?';
+          auto second_s_digit = odd_even_result.second.s_digits[i];
+          auto second_z_digit = odd_even_result.second.z_digits[i+1];
+          if (second_z_digit != second_s_digit) second_diff_string[i] = '?';
+        }
+        std::cout << NL << "first_diff:  " << first_diff_string;
+        auto first_diff_count = std::count(first_diff_string.begin(), first_diff_string.end(), '?');
+        std::cout << NL << "first diff count:" << first_diff_count;
+
+        std::cout << NL << "second_diff:  " << second_diff_string;
+        auto second_diff_count = std::count(second_diff_string.begin(), second_diff_string.end(), '?');
+        std::cout << NL << "second diff count:" << second_diff_count;
+
+        auto diff_count = second_diff_count-first_diff_count;
         
         if (diff_count==0) {
           found_swaps = current.swaps;
@@ -659,11 +788,14 @@ namespace part2 {
         // bit_number               0 ... N-2
         int bit_number = current.bit_no;
         auto i = (N-2) - bit_number;
-        auto s_digit = s_digits[i];
-        auto z_digit = z_digits[i+1];
+        auto first_s_digit = odd_even_result.first.s_digits[i];
+        auto first_z_digit = odd_even_result.first.z_digits[i+1];
+        auto second_s_digit = odd_even_result.second.s_digits[i];
+        auto second_z_digit = odd_even_result.second.z_digits[i+1];
+
         
-        if (z_digit == s_digit) {
-          // try next z-bit
+        if (first_z_digit == first_s_digit and second_z_digit == second_s_digit) {
+          // OK. try next z-bit
           q.push_front(State{current.swaps,current.model,bit_number+1});
           found_swaps = current.swaps;
         }
@@ -690,12 +822,6 @@ namespace part2 {
             }
           }
 
-          
-          auto c_in_digit = carry_digits[i+1];
-          auto x_digit = x_digits[i];
-          auto y_digit = y_digits[i];
-          auto c_out_digit = carry_digits[i];
-          
           auto wire_name = test::to_wire_name("z", bit_number);
           if (wire_vals[wire_name]) {
             auto iter = std::find_if(gates.begin(), gates.end(), [&wire_name](Gate const& gate){
