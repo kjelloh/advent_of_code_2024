@@ -146,6 +146,7 @@ struct CPU {
   Registers m_reg{};
   Memory m_mem{};
   Integer ip() {return m_reg['I'];}
+  bool m_pritty_print{false};
   CPU(Registers reg,int ip,Memory const& mem) : m_reg{reg},m_mem{mem} {
     m_reg['I'] = ip;
   }
@@ -155,7 +156,7 @@ struct CPU {
     ++m_reg['I'];
     return m_mem[ip];
   }
-  Integer eval(int combo) {
+  Integer combo(int literal) {
     Integer result{};
 //    std::cout << " eval(" << combo << ")";
     //    Combo operands 0 through 3 represent literal values 0 through 3.
@@ -163,26 +164,30 @@ struct CPU {
     //    Combo operand 5 represents the value of register B.
     //    Combo operand 6 represents the value of register C.
     //    Combo operand 7 is reserved and will not appear in valid programs.
-    switch (combo) {
+    switch (literal) {
       case 0:
       case 1:
       case 2:
       case 3:
-        result = combo;
+        result = literal;
 //        std::cout << " literal ";
+        if (m_pritty_print) std::cout << " " << result;
         break;
 
       case 4:
         result = m_reg['A'];
 //        std::cout << " 'A' ";
+        if (m_pritty_print) std::cout << " A:" << result;
         break;
       case 5:
         result = m_reg['B'];
 //        std::cout << " 'B' ";
+        if (m_pritty_print) std::cout << " B:" << result;
         break;
       case 6:
         result = m_reg['C'];
 //        std::cout << " 'C' ";
+        if (m_pritty_print) std::cout << " C:" << result;
         break;
 
       case 7:
@@ -191,22 +196,29 @@ struct CPU {
 //    std::cout << " --> " << result;
     return result;
   }
+  void pritty_print(bool flag) {m_pritty_print=flag;}
   std::string operator++() {
     std::string result{};
     if (ip() >= m_mem.size()) return "";
+    if (m_pritty_print) std::cout << NL << NL << T << "A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
     auto op = to_op(next());
     auto literal = next();
 //    std::cout << NL << "execute:" << op << " " << literal;
-    auto combo = eval(literal);
+    if (m_pritty_print) std::cout << NL << std::format("[{}]: ",m_reg['I']-2);
+    if (m_pritty_print) std::cout << T << to_op_name(op);
+
     switch (op) {
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo;
+        auto denominator = 1 << combo(literal);
         auto y = numerator / denominator;
         m_reg['A'] = y;
 //        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
+        if (m_pritty_print) std::cout << " A / " << denominator << " --> A:" << y;
+
+
       } break;
         
         //
@@ -214,24 +226,30 @@ struct CPU {
       case bxl: {
 //        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor literal;
+        if (m_pritty_print) std::cout << " B xor " << literal;
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+        if (m_pritty_print) std::cout << " --> B:" << y;
       } break;
         //
         //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
       case bst: {
 //        std::cout << NL << to_op_description(op);
-        auto y = combo % 8;
+        auto y = combo(literal) % 8;
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+        if (m_pritty_print) std::cout << " --> B:" << y;
+
       } break;
         //
         //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
       case jnz: {
 //        std::cout << NL << to_op_description(op);
+        if (m_pritty_print) std::cout << " A:" <<  m_reg['A'];
         if (m_reg['A'] > 0) {
           m_reg['I'] = literal;
 //          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
+          if (m_pritty_print) std::cout << " --> " << literal;
         }
         else {
 //          std::cout << NL << T << " NOP";
@@ -242,35 +260,40 @@ struct CPU {
       case bxc: {
 //        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor m_reg['C'];
+        if (m_pritty_print) std::cout << " B xor C";
         m_reg['B'] = y;
 //        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
+        if (m_pritty_print) std::cout << " --> B:" << y;
       } break;
         //
         //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
       case out: {
 //        std::cout << NL << to_op_description(op);
-        auto y = combo % 8;
+        auto y = combo(literal) % 8;
         result.push_back('0'+y);
+        if (m_pritty_print) std::cout << " % 8 " << T << T << " ==> " << result.back();
       } break;
         //
         //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
       case bdv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo;
+        auto denominator = 1 << combo(literal);
         auto y = numerator / denominator;
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
+        if (m_pritty_print) std::cout << " A /  " << denominator << " --> B:" << y;
       } break;
         //
         //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
       case cdv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo;
+        auto denominator = 1 << combo(literal);
         auto y = numerator / denominator;
         m_reg['C'] = y;
 //        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
+        if (m_pritty_print) std::cout << " A /  " << denominator << " --> C:" << y;
       } break;
         
       default: {
@@ -300,9 +323,12 @@ struct Computer {
   Memory m_mem;
   CPU m_cpu;
   Computer(Registers reg,Memory const& memory) : m_mem{memory},m_cpu{reg,0,m_mem} {}
-  Result run() {
+  Result run(std::string const& arg={}) {
     Result result{};
+    bool pritty_print = arg == "pp";
     std::cout << NL << "run:" << m_cpu << " on " << m_mem;
+    if (pritty_print) std::cout << " 'pritty print'";
+    m_cpu.pritty_print(pritty_print);
     while (m_cpu.ip()<m_mem.size()) {
       if (auto output = ++m_cpu;output.size()>0) {
         if (result.size()>0) result.push_back(',');
@@ -369,7 +395,13 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
+struct Args {
+  std::map<std::string,std::string> arg{};
+  std::set<std::string> options{};
+  operator bool() const {
+    return (arg.size()>0) or (options.size()>0);
+  }
+};
 
 namespace test {
 
@@ -540,73 +572,13 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test1(auto& in, auto& log_in,Args args) {
-    std::optional<Result> result{};
-    std::cout << NL << NL << "test1";
-    if (in and log_in) {
-      bool failed{};
-      auto log = parse1(in,log_in);
-      auto pc = log.before;
-      auto output = pc.run();
-      std::cout << NL << "logged.output:" << std::quoted(*log.output);
-      std::cout << NL << "computed.output:" << std::quoted(output);
-      if (output != log.output) {
-        failed = true;
-      }
-      if (failed) result = "FAILED";
-      else result = "passed";
-    }
+  std::optional<Result> solve_for(auto& in,Args args) {
+    std::optional<Result> result;
+    auto part = args.arg["part"];
+    if (part == "test0") return test0(args);
     return result;
   }
 
-  std::optional<Result> test2(auto& in,Integer adjusted_A,Args args) {
-    std::optional<Result> result{};
-    std::cout << NL << NL << "test1";
-    if (in) {
-      bool found{false};
-      auto model = ::parse(in);
-      {
-        Computer pc{model.registers,model.memory};
-        pc.m_cpu.m_reg['A'] = adjusted_A;
-        auto output = pc.run();
-        using ::operator<<;
-        std::cout << NL << "memory:" << model.memory;
-        std::cout << NL << "output:" << output;
-        // OK
-      }
-      
-//      auto guess{adjusted_A};
-      auto guess{0};
-      while (true) {
-        CPU adjusted_cpu{model.registers,0,model.memory};
-        adjusted_cpu.m_reg['A'] = guess;
-        int ix{0};
-        int count{0};
-        while (true) {
-          if (++count % 1000 == 0) std::cout << NL << count << " " << guess << " " << ix;
-          if (ix >= model.memory.size()) {
-            found = true;
-            break;
-          }
-          auto output = ++adjusted_cpu;
-          if (output.size()==0) continue;
-          if (output.back()-'0' == (model.memory[ix])) {
-            ++ix;
-            continue;
-          }
-          else {
-//            std::cout << NL << T << "output.back():" << output.back() << "  != model.memory[ix]:" << model.memory[ix];
-          }
-          break;
-        }
-        ++guess;
-        if (guess > adjusted_A) break; // give up
-      }
-      if (not found) result = "FAILED";
-      else result = "passed";
-    }
-    return result;
-  }
 
 }
 
@@ -630,67 +602,75 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      Computer pc{model.registers,model.memory};
+      auto output = pc.run("pp"); // Pritty Print
+      result = output;
     }
     return result;
   }
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
+  Args user_args{};
+  
+  // Override by any user input
+  for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test0", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      Args args;
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {2};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto log_file = aoc::to_working_dir_path("example.log");
-        std::ifstream log_in{log_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 2: {
-        auto file = aoc::to_working_dir_path("example2.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Test Example vs Adjusted A",test::test2(in,117440,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -703,15 +683,18 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
 
+   Xcode Debug -O2
+   
    ANSWERS
-   duration:8ms answer[test0] passed
-   duration:0ms answer[Part 1 Test Example vs Log] passed
-   duration:0ms answer[Part 1 Example] 4,6,3,5,6,3,5,2,1,0
-   duration:0ms answer[Part 1     ] 2,1,3,0,5,2,3,7,1
-   
-   
-  */
+   duration:5ms answer[test0 example.txt] passed
+   duration:4ms answer[test0 puzzle.txt] passed
+   duration:0ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
+   duration:0ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
+   duration:0ms answer[part2 example.txt] NO OPERATION
+   duration:0ms answer[part2 puzzle.txt] NO OPERATION
+
+
+   */
   return 0;
 }
