@@ -147,6 +147,7 @@ struct CPU {
   Memory m_mem{};
   Integer ip() {return m_reg['I'];}
   bool m_pritty_print{false};
+  int m_loop_index{0};
   CPU(Registers reg,int ip,Memory const& mem) : m_reg{reg},m_mem{mem} {
     m_reg['I'] = ip;
   }
@@ -200,7 +201,7 @@ struct CPU {
   std::string operator++() {
     std::string result{};
     if (ip() >= m_mem.size()) return "";
-    if (m_pritty_print) std::cout << NL << NL << T << "A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
+    if (m_pritty_print) std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
     auto op = to_op(next());
     auto literal = next();
 //    std::cout << NL << "execute:" << op << " " << literal;
@@ -238,7 +239,7 @@ struct CPU {
         auto y = combo(literal) % 8;
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
-        if (m_pritty_print) std::cout << " --> B:" << y;
+        if (m_pritty_print) std::cout << " % 8 --> B:" << y;
 
       } break;
         //
@@ -250,6 +251,7 @@ struct CPU {
           m_reg['I'] = literal;
 //          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
           if (m_pritty_print) std::cout << " --> " << literal;
+          --m_loop_index; // 0..-8 for my input
         }
         else {
 //          std::cout << NL << T << " NOP";
@@ -604,6 +606,36 @@ namespace part2 {
       auto model = parse(in);
       Computer pc{model.registers,model.memory};
       auto output = pc.run("pp"); // Pritty Print
+      
+      //                                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+      // We want the program to output Program: 2,4,1,5,7,5,1,6,4,3,5,5,0,3,3,0
+
+      // The last iteration of program is:
+      
+      //  A = 8k + R < 2^((n*8) xor 6), B=0, C=*any*
+      //[0]:   bst A:2 % 8 --> B:2              A % 8 = 0 -> A = 8k + R, R = {0..7}. A = 8k + R < 2^((n*8) xor 6)
+      //
+      //  A < 2^((n*8) xor 6), B=0, C=*any*
+      //[2]:   bxl B xor 5 --> B:7    B xor 5 = (n*8) xor 6, --> B = (n*8) xor (110 xor 101) = (n*1000) xor 011 = 0
+      //
+      //  A < 2^((n*8) xor 6), B=(n*8) xor 6 ,C=*any*    A / 2^((n*8) xor 6) = 0 --> A < A / 2^((n*8) xor 6)
+      //[4]:   cdv B:7 A /  128 --> C:0
+      //
+      //  A:2 B=(n*8) xor 6 C=0                       B xor 6 = n*8 -> B = (n*8) xor 6
+      //[6]:   bxl B xor 6 --> B:1
+      //
+      //  A:2 B=n*8 C=0                       B xor C = n*8, Assume C=0
+      //[8]:   bxc B xor C --> B:1
+      //
+      //  A= B=n*8 C:0                       B = n*8
+      //[10]:   out B:1 % 8      ==> 1      0
+      //
+      //  A = 8n + R, B:1 C:0             n=
+      //[12]:   adv 3 A / 8 --> A:0       n=0 -> A < 8, A < R, R = {0..7}
+      //
+      //  A:0 B:1 C:0
+      //[14]:   jnz A:0
+
       result = output;
     }
     return result;
