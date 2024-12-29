@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
       else if (part=="2") {
         answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
       }
-      else if (part=="test") {
+      else if (part.starts_with("test")) {
         answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
       }
     }
