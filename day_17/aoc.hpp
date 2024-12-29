@@ -22,6 +22,14 @@
 
 namespace aoc {
 
+  struct Args {
+    std::map<std::string,std::string> arg{};
+    std::set<std::string> options{};
+    operator bool() const {
+      return (arg.size()>0) or (options.size()>0);
+    }
+  };
+
   namespace views {
     template <typename Iterator>
     class enumerate_iterator {
@@ -82,6 +90,29 @@ namespace aoc {
 
   namespace raw {
 
+    // advance for enums,integral types and iterators
+    template <typename T>
+    constexpr T advance(T value, int steps = 1) {
+      if constexpr (std::is_enum_v<T>) {
+        using underlying = std::underlying_type_t<T>;
+        return static_cast<T>(static_cast<underlying>(value) + steps);
+      } else if constexpr (std::is_integral_v<T>) {
+        return value + steps;
+      } else if constexpr (std::is_base_of_v<std::input_iterator_tag,
+                           typename std::iterator_traits<T>::iterator_category>) {
+        return std::next(value, steps);
+      } else {
+        static_assert(false, "Unsupported type for advance");
+      }
+    }
+
+    // ++ for enums, integers and iterators (See aoc::raw::advance)
+    template <typename T>
+    constexpr T operator++(T& value) {
+      value = aoc::raw::advance(value,1);
+      return value;
+    }
+  
     template <typename T>
     int sign(T value) {
         return (value > T(0)) - (value < T(0));
@@ -94,13 +125,6 @@ namespace aoc {
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
   
-    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << std::quoted(line);
-      }
-      return os;
-    }
-  
     template <typename T>
     concept Streamable = requires(std::ostream& os, T const& t) {
         { os << t } -> std::same_as<std::ostream&>;
@@ -109,47 +133,52 @@ namespace aoc {
     // A concept for integral types for operator<<(std::vector<Int>) below
     template <typename T>
     concept Integral = std::is_integral_v<T>;
-
-    // << std::vector<Integral>
-    template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::vector<T>& ints) {
-      os << "[";
-      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
-        if (ix>0) os << ',';
-        os << n;
-      }
-      os << "]";
+  
+    struct Indent {
+      int i{};
+      Indent& operator+=(int step) {i+=step;return *this;}
+    };
+  
+    std::ostream& operator<<(std::ostream& os,Indent indent) {
+      while (indent.i-- > 0) os << ' ';
       return os;
     }
-  
+
+    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << line;
+      }
+      return os;
+    }
+    
     template <typename U,typename V>
     requires Streamable<U> && Streamable<V>
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
 
+    template <typename T>
+    requires Integral<T>
+    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
+  
+    namespace detail {
+      template <typename T>
+      struct Member {
+        const T& value;
+        explicit Member(const T& val) : value(val) {}
+      };
 
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member);
+    }
+  
     // << std::vector
     template <typename T>
     std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
       os << "[";
       for (auto const& [ix,e] : aoc::views::enumerate(v)) {
         if (ix>0) os << ',';
-        os << e;
+        os << detail::Member(e);
       }
       os << "]";
-      return os;
-    }
-
-    // << std::set<Integral>
-    template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints) {
-      os << "{";
-      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
-        if (ix>0) os << ',';
-        os << n;
-      }
-      os << "}";
       return os;
     }
   
@@ -159,7 +188,7 @@ namespace aoc {
     std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
         os << "{ ";
         for (auto const& elem : s) {
-            os << elem << " ";
+            os << detail::Member(elem) << " ";
         }
         os << "}";
         return os;
@@ -169,10 +198,22 @@ namespace aoc {
     template <typename U,typename V>
     requires Streamable<U> && Streamable<V>
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp) {
-      os << "{ " << pp.first << "," << pp.second << "}";
+      os << "{ " << detail::Member(pp.first) << "," << detail::Member(pp.second) << "}";
       return os;
     }
-  
+
+    template<typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os,std::map<U,V> const& map) {
+      os << "[";
+      for (auto const& [ix,e] : aoc::views::enumerate(map)) {
+        if (ix>0) os << ',';
+        os << detail::Member(e);
+      }
+      os << "]";
+      return os;
+    }
+
     // Base case: printing an empty tuple
     std::ostream& operator<<(std::ostream& os, const std::tuple<>&) {
       return os;
@@ -181,13 +222,31 @@ namespace aoc {
     // Recursive case: printing the first element, then recursing on the rest
     template <typename T, typename... Types>
     std::ostream& operator<<(std::ostream& os, const std::tuple<T, Types...>& t) {
-      os << std::get<0>(t);  // Print the first element
+      os << detail::Member(std::get<0>(t));  // Print the first element
       if constexpr (sizeof...(Types) > 0) {  // If there are more elements
         os << ", ";  // Print a comma and a space
         operator<<(os, std::tuple<Types...>(std::get<Types>(t)...)); // Recurse on the rest of the tuple
       }
       return os;
     }
+  
+    namespace detail {
+
+      // Decide on how to format T
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member) {
+        if constexpr (std::is_same_v<T, std::string>) {
+          os << std::quoted(member.value); // Quote strings
+        } else if constexpr (std::is_same_v<T, char>) {
+          os << '\'' << member.value << '\''; // Single-quote chars
+        } else {
+          using aoc::raw::operator<<;
+          os << member.value; // Default behavior for other types
+        }
+        return os;
+      }
+    }
+
   
     bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
       if (out) {
@@ -204,7 +263,7 @@ namespace aoc {
       std::ofstream out{file};
       return write_to(out, lines);
     }
-  
+    
   } // namespace raw
   namespace parsing {
     class Splitter; // Forward
