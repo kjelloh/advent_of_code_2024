@@ -201,6 +201,20 @@ struct CPU {
   std::string operator++() {
     std::string result{};
     if (ip() >= m_mem.size()) return "";
+    bool repl{true};
+    if (repl) {
+      std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
+      std::cout << NL << "A B C:";
+      std::string input{};
+      if (std::getline(std::cin, input)) {
+        auto tokens = aoc::parsing::Splitter(input).splits(' ');
+        if (tokens.size()==3) {
+          m_reg['A'] = std::stoi(tokens[0]);
+          m_reg['B'] = std::stoi(tokens[1]);
+          m_reg['C'] = std::stoi(tokens[2]);
+        }
+      }
+    }
     if (m_pritty_print) std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
     auto op = to_op(next());
     auto literal = next();
@@ -605,35 +619,37 @@ namespace part2 {
     if (in) {
       auto model = parse(in);
       Computer pc{model.registers,model.memory};
-      auto output = pc.run("pp"); // Pritty Print
+      std::string arg{};
+      if (args.options.size()==1) arg = (*args.options.begin()).substr(1);
+      auto output = pc.run(arg); // pp, ux
       
       //                                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
       // We want the program to output Program: 2,4,1,5,7,5,1,6,4,3,5,5,0,3,3,0
-
-      // The last iteration of program is:
       
-      //  A = 8k + R < 2^((n*8) xor 6), B=0, C=*any*
-      //[0]:   bst A:2 % 8 --> B:2              A % 8 = 0 -> A = 8k + R, R = {0..7}. A = 8k + R < 2^((n*8) xor 6)
+      // Study second last loop (loop n: 8..0) and end loop 0
+
+      //  n:0 A:2 B:7 C:2
+      //[0]:   bst A:2 % 8 --> B:2
       //
-      //  A < 2^((n*8) xor 6), B=0, C=*any*
-      //[2]:   bxl B xor 5 --> B:7    B xor 5 = (n*8) xor 6, --> B = (n*8) xor (110 xor 101) = (n*1000) xor 011 = 0
+      //  n:0 A:2 B:2 C:2
+      //[2]:   bxl B xor 5 --> B:7
       //
-      //  A < 2^((n*8) xor 6), B=(n*8) xor 6 ,C=*any*    A / 2^((n*8) xor 6) = 0 --> A < A / 2^((n*8) xor 6)
+      //  n:0 A:2 B:7 C:2
       //[4]:   cdv B:7 A /  128 --> C:0
       //
-      //  A:2 B=(n*8) xor 6 C=0                       B xor 6 = n*8 -> B = (n*8) xor 6
+      //  n:0 A:2 B:7 C:0
       //[6]:   bxl B xor 6 --> B:1
       //
-      //  A:2 B=n*8 C=0                       B xor C = n*8, Assume C=0
+      //  n:0 A:2 B:1 C:0
       //[8]:   bxc B xor C --> B:1
       //
-      //  A= B=n*8 C:0                       B = n*8
-      //[10]:   out B:1 % 8      ==> 1      0
+      //  n:0 A:2 B:1 C:0
+      //[10]:   out B:1 % 8      ==> 1
       //
-      //  A = 8n + R, B:1 C:0             n=
-      //[12]:   adv 3 A / 8 --> A:0       n=0 -> A < 8, A < R, R = {0..7}
+      //  n:0 A:2 B:1 C:0
+      //[12]:   adv 3 A / 8 --> A:0
       //
-      //  A:0 B:1 C:0
+      //  n:0 A:0 B:1 C:0
       //[14]:   jnz A:0
 
       result = output;
@@ -683,6 +699,14 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  std::cout << NL << "Arguments:";
+  for (auto const& request : requests) {
+    auto const& [arg,options] = request;
+    using aoc::raw::operator<<;
+    std::cout << NL << "  {key,value} : " << arg;
+    std::cout << NL << "  options     : " << options;
+  }
+  
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
