@@ -655,35 +655,33 @@ namespace part1 {
 
 namespace part2 {
 
-  struct State {
-    std::size_t digit_ix;
-    Integer out_a;
-  };
-  Integer solve_for(State const& state,Memory const& output,auto const& f) {
-    // For end digit A[end] must be 0..7, B and C will come from A
-    //  --> one of these A's must create the output output[end]
-    // For digit end-1, A[end-1] must be one of A[end]*8 + 0..7
-    //  --> one of these A's must create output[end-1]
+  // Recursive function to solve best a that makes f(a_next) = ouput[index]
+  Integer solve_for(std::vector<int> const& output, int index, Integer a_current, auto const& f) {
+
+    if (index < 0) return a_current;
     
-    auto [digit_ix,out_a] = state;
-    Integer best{std::numeric_limits<Integer>::max()};
+    std::print("\n\n{} {},{},{}",std::string(index*2,' '),index,a_current,output[index]);
+    
+    Integer best_a = std::numeric_limits<Integer>::max();
+    for (Integer i = 0; i < 8; ++i) {
+      Integer a_next = a_current * 8 + i;
+      if (f(a_next) == output[index]) {
 
-
-    std::print("\n{}ix:{} in_a:{} target:{}",std::string(2*digit_ix,' '),digit_ix,out_a,output[digit_ix]);
-
-    // For any output[i] the possible A's we have to try is A[i+1]*8 + 0..7
-    for (int i=0;i<=7;++i) {
-      auto in_a = (out_a << 3) + i;
-      if (f(in_a) == output[digit_ix]) {
-        if (digit_ix == 0) {
-          std::cout << NL << "CANDIDATE A:" << in_a;
-          return in_a;
-        }
-        // recurse
-        best = std::min(best,solve_for({digit_ix-1,in_a},output,f));
+        // Recurse only for accepted candidates
+        best_a = std::min(best_a, solve_for(output, index - 1, a_next, f));
       }
     }
-    return best;
+    
+    return best_a; //  13427091588403 too low
+                   // 107416732707226
+  }
+
+  // Wrapper function to initiate the recursion
+  Integer find_lowest_a(const std::vector<int>& output, auto const& f) {
+    if (output.empty()) return std::numeric_limits<Integer>::max();
+    
+    auto start_index = static_cast<int>(output.size() - 1);
+    return solve_for(output,start_index,0,f);
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -699,11 +697,12 @@ namespace part2 {
         CPU cpu{registers,0,program};
         while (true) {
           auto output = ++cpu;
-          if (output.size()>0) return ('0' - output.back());
+          if (output.size()>0) return (output.back() - '0'
+                                       );
         }
       };
-      auto a = solve_for({model.memory.size()-1},model.memory,f);
-      if (a<std::numeric_limits<Integer>::max()) {
+      auto a = find_lowest_a(model.memory,f);
+      if (a < std::numeric_limits<Integer>::max()) {
         result = std::to_string(a);
       }
     }
