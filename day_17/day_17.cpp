@@ -148,13 +148,6 @@ std::string to_statement_string(Op const op,int literal) {
 }
 
 
-
-//using Statement = std::pair<Op,int>;
-//std::ostream& operator<<(std::ostream& os,Statement const& statement) {
-//  os << "statement:";
-//  os << "{" << statement.first << ":" << to_op_name(statement.first) << "," << statement.second << "}";
-//  return os;
-//}
 using Memory = std::vector<int>;
 std::ostream& operator<<(std::ostream& os,Memory const& memory) {
   os << " memory:" << memory.size() << " ";
@@ -203,7 +196,6 @@ struct CPU {
   Registers m_reg{};
   Memory m_mem{};
   Integer ip() {return m_reg['I'];}
-  bool m_pritty_print{false};
   int m_loop_index{0};
   CPU(Registers reg,int ip,Memory const& mem) : m_reg{reg},m_mem{mem} {
     m_reg['I'] = ip;
@@ -228,33 +220,23 @@ struct CPU {
       case 2:
       case 3:
         result = literal;
-//        std::cout << " literal ";
-        if (m_pritty_print) std::cout << " " << result;
         break;
 
       case 4:
         result = m_reg['A'];
-//        std::cout << " 'A' ";
-        if (m_pritty_print) std::cout << " A:" << result;
         break;
       case 5:
         result = m_reg['B'];
-//        std::cout << " 'B' ";
-        if (m_pritty_print) std::cout << " B:" << result;
         break;
       case 6:
         result = m_reg['C'];
-//        std::cout << " 'C' ";
-        if (m_pritty_print) std::cout << " C:" << result;
         break;
 
       case 7:
         result = -1; // signal invalid
     }
-//    std::cout << " --> " << result;
     return result;
   }
-  void pritty_print(bool flag) {m_pritty_print=flag;}
   std::string operator++() {
     constexpr int N = 32;
     std::string result{};
@@ -276,111 +258,77 @@ struct CPU {
         }
       }
     }
-    if (m_pritty_print) std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
     auto op = to_op(next());
     auto literal = next();
     std::print("\n{}:{}",m_reg['I']-2,to_statement_string(op, literal));
-//    std::cout << NL << "execute:" << op << " " << literal;
-    if (m_pritty_print) std::cout << NL << std::format("[{}]: ",m_reg['I']-2);
-    if (m_pritty_print) std::cout << T << to_op_name(op);
     switch (op) {
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
-//        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
         auto y = numerator >> combo(literal);
         std::print(" = {:b} >> {:b} = {:b}",numerator,combo(literal),y);
         m_reg['A'] = y;
-//        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
       } break;
         
         //
         //  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
       case bxl: {
-//        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor literal;
         std::print(" = {:b} xor {:b} = {:b}",m_reg['B'],literal,y);
-        if (m_pritty_print) std::cout << " B xor " << literal;
         m_reg['B'] = y;
-//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
-        if (m_pritty_print) std::cout << " --> B:" << y;
       } break;
         //
         //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
       case bst: {
-//        std::cout << NL << to_op_description(op);
         auto y = combo(literal) % 8;
         std::print(" = {:b} % 8 = {:0>3b}",combo(literal),y);
         m_reg['B'] = y;
-//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
-        if (m_pritty_print) std::cout << " % 8 --> B:" << y;
-
       } break;
         //
         //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
       case jnz: {
-//        std::cout << NL << to_op_description(op);
-        if (m_pritty_print) std::cout << " A:" <<  m_reg['A'];
         if (m_reg['A'] > 0) {
           m_reg['I'] = literal;
           std::print(" A = {} != 0, ip = {}",m_reg['A'],literal);
-
-//          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
-          if (m_pritty_print) std::cout << " --> " << literal;
           --m_loop_index; // 0..-8 for my input
         }
         else {
-//          std::cout << NL << T << " NOP";
         }
       } break;
         //
         //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
       case bxc: {
-//        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor m_reg['C'];
         std::print(" = {:b} xor {:b} = {:b}",m_reg['B'],m_reg['C'],y);
 
-        if (m_pritty_print) std::cout << " B xor C";
         m_reg['B'] = y;
-//        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
-        if (m_pritty_print) std::cout << " --> B:" << y;
       } break;
         //
         //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
       case out: {
-//        std::cout << NL << to_op_description(op);
         auto y = combo(literal) % 8;
         std::print(" = {:b} % 8 = {:0>3b} ---> {}",combo(literal),y,y);
-
         result.push_back('0'+y);
-        if (m_pritty_print) std::cout << " % 8 " << T << T << " ==> " << result.back();
       } break;
         //
         //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
       case bdv: {
-//        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
         auto y = numerator >> combo(literal);
         std::print(" = {:b} >> {} = {:b}",numerator,combo(literal),y);
         m_reg['B'] = y;
-//        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
       } break;
         //
         //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
       case cdv: {
-//        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
         auto y = numerator >> combo(literal);
         std::print(" = {:b} >> {} = {:b}",numerator,combo(literal),y);
-
         m_reg['C'] = y;
-//        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
       } break;
         
       default: {
-        std::cout << NL << T << "UNKNOWN OPERATOR - NOP";
         std::print(" UNKNOWN OPERATOR - NOP");
-
       } break;
     }
     return result;
@@ -411,7 +359,6 @@ struct Computer {
     bool pritty_print = arg == "pp";
     std::cout << NL << "run:" << m_cpu << " on " << m_mem;
     if (pritty_print) std::cout << " 'pritty print'";
-    m_cpu.pritty_print(pritty_print);
     while (m_cpu.ip()<m_mem.size()) {
       if (auto output = ++m_cpu;output.size()>0) {
         if (result.size()>0) result.push_back(',');
@@ -690,8 +637,6 @@ namespace test {
     if (part == "test0") return test0(args);
     return result;
   }
-
-
 }
 
 namespace part1 {
@@ -716,7 +661,22 @@ namespace part2 {
       auto model = parse(in);
       print_program(Program{model.memory});
       Computer pc{model.registers,model.memory};
-      auto output = pc.run("-pp");
+      // A    out
+      // 0 --> 3
+      // 1 --> 2
+      // 2 --> 1
+      // 3 --> 0
+      // 4 --> 5
+      // 5 --> 3
+      // 6 --> 5
+      // 7 --> 5
+      // 8 --> 3 2
+      // 9 --> 2 2
+      // 10 -->
+      
+      // program: 2,4,1,5,7,5,1,6,4,3,5,5,0,3,3,0
+      
+      
     }
     return result;
   }
@@ -805,15 +765,15 @@ int main(int argc, char *argv[]) {
   /*
 
    Xcode Debug -O2
-   
+   ./day_07 -all
+      
    ANSWERS
-   duration:5ms answer[test0 example.txt] passed
-   duration:4ms answer[test0 puzzle.txt] passed
+   duration:6ms answer[test0 example.txt] passed
+   duration:5ms answer[test0 puzzle.txt] passed
    duration:0ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
-   duration:0ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
+   duration:1ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
    duration:0ms answer[part2 example.txt] NO OPERATION
-   duration:0ms answer[part2 puzzle.txt] NO OPERATION
-
+   duration:1ms answer[part2 puzzle.txt] NO OPERATION
 
    */
   return 0;
