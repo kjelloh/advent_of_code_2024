@@ -23,6 +23,7 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
+#include <print>
 
 using aoc::raw::NL;
 using aoc::raw::T;
@@ -91,6 +92,29 @@ std::string to_op_name(Op op) {
     default: return "?";break;
   }
 }
+
+std::string to_combo_source(int literal) {
+  Integer result{};
+//    std::cout << " eval(" << combo << ")";
+  //    Combo operands 0 through 3 represent literal values 0 through 3.
+  //    Combo operand 4 represents the value of register A.
+  //    Combo operand 5 represents the value of register B.
+  //    Combo operand 6 represents the value of register C.
+  //    Combo operand 7 is reserved and will not appear in valid programs.
+  switch (literal) {
+    case 0:
+    case 1:
+    case 2:
+    case 3: return std::to_string(literal);
+    case 4: return "A";
+    case 5: return "B";
+    case 6: return "C";
+    case 7: return "?";
+  }
+}
+
+
+
 
 //using Statement = std::pair<Op,int>;
 //std::ostream& operator<<(std::ostream& os,Statement const& statement) {
@@ -369,6 +393,65 @@ struct Model {
   Memory memory{};
 };
 
+struct Program {
+  Memory memory;
+};
+
+template <>
+struct std::formatter<Program> : std::formatter<std::string> {
+  using Base = std::formatter<std::string>;
+
+  template<class FmtContext>
+  FmtContext::iterator format(const Program& program, FmtContext& ctx) const {
+//  auto format(const Program& program, auto& ctx) const {
+    auto const& vec = program.memory;
+    auto paired_view = std::views::iota(decltype(vec.size() / 2){}, vec.size() / 2)
+            | std::views::transform([&vec](auto i) {
+              return std::make_tuple(static_cast<Op>(vec[2 * i]), vec[2 * i + 1]);  // Pair consecutive elements
+            });
+    std::format_to(ctx.out(),"\n<Program>");
+    for (auto const& [ip,statement] : aoc::views::enumerate(paired_view)) {
+      auto const& [op,literal] = statement;
+      std::ostringstream oss{};
+      switch (op) {
+
+    //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
+        case adv: oss << "A = A / 1 << " << to_combo_source(literal);break;
+
+    //
+    //  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
+        case bxl: oss << "B = B xor " << literal;break;
+    //
+    //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
+        case bst: oss << "B = " << to_combo_source(literal) << " % 8";break;
+    //
+    //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
+        case jnz: oss << "jnz A " << literal;break;
+    //
+    //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
+        case bxc: oss << "B = B xor C";break;
+    //
+    //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
+        case out: oss << "out " << to_combo_source(literal) << " % 8";break;
+    //
+    //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
+        case bdv: oss << "B = A / 1 << " << to_combo_source(literal);break;
+    //
+    //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
+        case cdv: oss << "C = A / 1 << " << to_combo_source(literal);break;
+
+        default: oss << "?";break;
+      }
+      std::format_to(ctx.out(),"\n{} : {}",ip,oss.str());
+    }
+    return ctx.out();
+  }
+};
+
+void print_program(Program const& program) {
+  std::print(std::cout,"{}",program);
+}
+
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   os << "model:" << model.registers << model.memory;
   return os;
@@ -618,41 +701,7 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
-      Computer pc{model.registers,model.memory};
-      std::string arg{};
-      if (args.options.size()==1) arg = (*args.options.begin()).substr(1);
-      auto output = pc.run(arg); // pp, ux
-      
-      //                                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-      // We want the program to output Program: 2,4,1,5,7,5,1,6,4,3,5,5,0,3,3,0
-      
-      // Study second last loop (loop n: 8..0) and end loop 0
-
-      //  n:0 A:2 B:7 C:2
-      //[0]:   bst A:2 % 8 --> B:2
-      //
-      //  n:0 A:2 B:2 C:2
-      //[2]:   bxl B xor 5 --> B:7
-      //
-      //  n:0 A:2 B:7 C:2
-      //[4]:   cdv B:7 A /  128 --> C:0
-      //
-      //  n:0 A:2 B:7 C:0
-      //[6]:   bxl B xor 6 --> B:1
-      //
-      //  n:0 A:2 B:1 C:0
-      //[8]:   bxc B xor C --> B:1
-      //
-      //  n:0 A:2 B:1 C:0
-      //[10]:   out B:1 % 8      ==> 1
-      //
-      //  n:0 A:2 B:1 C:0
-      //[12]:   adv 3 A / 8 --> A:0
-      //
-      //  n:0 A:0 B:1 C:0
-      //[14]:   jnz A:0
-
-      result = output;
+      print_program(Program{model.memory});
     }
     return result;
   }
