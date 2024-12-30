@@ -740,8 +740,9 @@ int main(int argc, char *argv[]) {
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
 
-    std::vector<std::string> parts = {"test0", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    std::vector<std::string> parts = {"1", "2"};
+    std::vector<std::string> files = {"example.txt", "example2.txt"
+      , "puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
       Args args;
@@ -794,15 +795,14 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
    ./day_07 -all
-      
-   ANSWERS
-   duration:6ms answer[test0 example.txt] passed
-   duration:5ms answer[test0 puzzle.txt] passed
-   duration:0ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
-   duration:1ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
-   duration:0ms answer[part2 example.txt] NO OPERATION
-   duration:1ms answer[part2 puzzle.txt] NO OPERATION
 
+   ANSWERS
+   duration:1ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
+   duration:0ms answer[part1 example2.txt] 5,7,3,0
+   duration:1ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
+   duration:4ms answer[part2 example.txt] 29328
+   duration:7ms answer[part2 example2.txt] 117440
+   duration:216ms answer[part2 puzzle.txt] 107416732707226
    */
   return 0;
 }
