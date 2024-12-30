@@ -241,7 +241,7 @@ struct CPU {
     constexpr int N = 32;
     std::string result{};
     if (ip() >= m_mem.size()) return "";
-    bool repl{true};
+    bool repl{false};
     if (repl) {
       std::print("\n\nn:{}",(8 + m_loop_index));
       std::print("\n   A:{: >32b} : {}",m_reg['A'],m_reg['A']);
@@ -654,6 +654,38 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  struct State {
+    std::size_t digit_ix;
+    Integer out_a;
+  };
+  Integer solve_for(State const& state,Memory const& output,auto const& f) {
+    // For end digit A[end] must be 0..7, B and C will come from A
+    //  --> one of these A's must create the output output[end]
+    // For digit end-1, A[end-1] must be one of A[end]*8 + 0..7
+    //  --> one of these A's must create output[end-1]
+    
+    auto [digit_ix,out_a] = state;
+    Integer best{std::numeric_limits<Integer>::max()};
+
+
+    std::print("\n{}ix:{} in_a:{} target:{}",std::string(2*digit_ix,' '),digit_ix,out_a,output[digit_ix]);
+
+    // For any output[i] the possible A's we have to try is A[i+1]*8 + 0..7
+    for (int i=0;i<=7;++i) {
+      auto in_a = (out_a << 3) + i;
+      if (f(in_a) == output[digit_ix]) {
+        if (digit_ix == 0) {
+          std::cout << NL << "CANDIDATE A:" << in_a;
+          return in_a;
+        }
+        // recurse
+        best = std::min(best,solve_for({digit_ix-1,in_a},output,f));
+      }
+    }
+    return best;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
@@ -661,22 +693,19 @@ namespace part2 {
       auto model = parse(in);
       print_program(Program{model.memory});
       Computer pc{model.registers,model.memory};
-      // A    out
-      // 0 --> 3
-      // 1 --> 2
-      // 2 --> 1
-      // 3 --> 0
-      // 4 --> 5
-      // 5 --> 3
-      // 6 --> 5
-      // 7 --> 5
-      // 8 --> 3 2
-      // 9 --> 2 2
-      // 10 -->
-      
-      // program: 2,4,1,5,7,5,1,6,4,3,5,5,0,3,3,0
-      
-      
+      auto f = [&program = model.memory](Integer a) -> int {
+        Registers registers{};
+        registers['A'] = a;
+        CPU cpu{registers,0,program};
+        while (true) {
+          auto output = ++cpu;
+          if (output.size()>0) return ('0' - output.back());
+        }
+      };
+      auto a = solve_for({model.memory.size()-1},model.memory,f);
+      if (a<std::numeric_limits<Integer>::max()) {
+        result = std::to_string(a);
+      }
     }
     return result;
   }
