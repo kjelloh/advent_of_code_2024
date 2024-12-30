@@ -113,6 +113,39 @@ std::string to_combo_source(int literal) {
   }
 }
 
+std::string to_statement_string(Op const op,int literal) {
+  std::ostringstream oss{};
+  switch (op) {
+
+//  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
+    case adv: oss << "A = A >> " << to_combo_source(literal);break;
+
+//
+//  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
+    case bxl: oss << "B = B xor " << literal;break;
+//
+//  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
+    case bst: oss << "B = " << to_combo_source(literal) << " % 8";break;
+//
+//  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
+    case jnz: oss << "jnz A " << literal;break;
+//
+//  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
+    case bxc: oss << "B = B xor C";break;
+//
+//  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
+    case out: oss << "out " << to_combo_source(literal) << " % 8";break;
+//
+//  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
+    case bdv: oss << "B = A >> " << to_combo_source(literal);break;
+//
+//  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
+    case cdv: oss << "C = A >> " << to_combo_source(literal);break;
+
+    default: oss << "?";break;
+  }
+  return std::format("{} : {}",to_op_name(op),oss.str());
+}
 
 
 
@@ -223,12 +256,16 @@ struct CPU {
   }
   void pritty_print(bool flag) {m_pritty_print=flag;}
   std::string operator++() {
+    constexpr int N = 32;
     std::string result{};
     if (ip() >= m_mem.size()) return "";
     bool repl{true};
     if (repl) {
-      std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
-      std::cout << NL << "A B C:";
+      std::print("\n\nn:{}",(8 + m_loop_index));
+      std::print("\n   A:{: >32b} : {}",m_reg['A'],m_reg['A']);
+      std::print("\n   B:{: >32b} : {}",m_reg['B'],m_reg['B']);
+      std::print("\n   C:{: >32b} : {}",m_reg['C'],m_reg['C']);
+      std::print("\n    >");
       std::string input{};
       if (std::getline(std::cin, input)) {
         auto tokens = aoc::parsing::Splitter(input).splits(' ');
@@ -242,22 +279,19 @@ struct CPU {
     if (m_pritty_print) std::cout << NL << NL << T << "n:" << (8 + m_loop_index) << " A:" << m_reg['A'] << " B:" << m_reg['B'] << " C:" << m_reg['C'];
     auto op = to_op(next());
     auto literal = next();
+    std::print("\n{}:{}",m_reg['I']-2,to_statement_string(op, literal));
 //    std::cout << NL << "execute:" << op << " " << literal;
     if (m_pritty_print) std::cout << NL << std::format("[{}]: ",m_reg['I']-2);
     if (m_pritty_print) std::cout << T << to_op_name(op);
-
     switch (op) {
         //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
       case adv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo(literal);
-        auto y = numerator / denominator;
+        auto y = numerator >> combo(literal);
+        std::print(" = {:b} >> {:b} = {:b}",numerator,combo(literal),y);
         m_reg['A'] = y;
 //        std::cout << NL << T << "m_reg['A'] = " << m_reg['A'];
-        if (m_pritty_print) std::cout << " A / " << denominator << " --> A:" << y;
-
-
       } break;
         
         //
@@ -265,6 +299,7 @@ struct CPU {
       case bxl: {
 //        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor literal;
+        std::print(" = {:b} xor {:b} = {:b}",m_reg['B'],literal,y);
         if (m_pritty_print) std::cout << " B xor " << literal;
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
@@ -275,6 +310,7 @@ struct CPU {
       case bst: {
 //        std::cout << NL << to_op_description(op);
         auto y = combo(literal) % 8;
+        std::print(" = {:b} % 8 = {:0>3b}",combo(literal),y);
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
         if (m_pritty_print) std::cout << " % 8 --> B:" << y;
@@ -287,6 +323,8 @@ struct CPU {
         if (m_pritty_print) std::cout << " A:" <<  m_reg['A'];
         if (m_reg['A'] > 0) {
           m_reg['I'] = literal;
+          std::print(" A = {} != 0, ip = {}",m_reg['A'],literal);
+
 //          std::cout << NL << T << "m_reg['I'] = " << m_reg['I'];
           if (m_pritty_print) std::cout << " --> " << literal;
           --m_loop_index; // 0..-8 for my input
@@ -300,6 +338,8 @@ struct CPU {
       case bxc: {
 //        std::cout << NL << to_op_description(op);
         auto y = m_reg['B'] xor m_reg['C'];
+        std::print(" = {:b} xor {:b} = {:b}",m_reg['B'],m_reg['C'],y);
+
         if (m_pritty_print) std::cout << " B xor C";
         m_reg['B'] = y;
 //        std::cout << NL << T << "ignores " << literal << " m_reg['B'] = " << m_reg['B'];
@@ -310,6 +350,8 @@ struct CPU {
       case out: {
 //        std::cout << NL << to_op_description(op);
         auto y = combo(literal) % 8;
+        std::print(" = {:b} % 8 = {:0>3b} ---> {}",combo(literal),y,y);
+
         result.push_back('0'+y);
         if (m_pritty_print) std::cout << " % 8 " << T << T << " ==> " << result.back();
       } break;
@@ -318,26 +360,27 @@ struct CPU {
       case bdv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo(literal);
-        auto y = numerator / denominator;
+        auto y = numerator >> combo(literal);
+        std::print(" = {:b} >> {} = {:b}",numerator,combo(literal),y);
         m_reg['B'] = y;
 //        std::cout << NL << T << "m_reg['B'] = " << m_reg['B'];
-        if (m_pritty_print) std::cout << " A /  " << denominator << " --> B:" << y;
       } break;
         //
         //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
       case cdv: {
 //        std::cout << NL << to_op_description(op);
         auto numerator = m_reg['A'];
-        auto denominator = 1 << combo(literal);
-        auto y = numerator / denominator;
+        auto y = numerator >> combo(literal);
+        std::print(" = {:b} >> {} = {:b}",numerator,combo(literal),y);
+
         m_reg['C'] = y;
 //        std::cout << NL << T << "m_reg['C'] = " << m_reg['C'];
-        if (m_pritty_print) std::cout << " A /  " << denominator << " --> C:" << y;
       } break;
         
       default: {
         std::cout << NL << T << "UNKNOWN OPERATOR - NOP";
+        std::print(" UNKNOWN OPERATOR - NOP");
+
       } break;
     }
     return result;
@@ -412,37 +455,7 @@ struct std::formatter<Program> : std::formatter<std::string> {
     std::format_to(ctx.out(),"\n<Program>");
     for (auto const& [ip,statement] : aoc::views::enumerate(paired_view)) {
       auto const& [op,literal] = statement;
-      std::ostringstream oss{};
-      switch (op) {
-
-    //  The adv instruction (opcode 0) performs division. The numerator is the value in the A register. The denominator is found by raising 2 to the power of the instruction's combo operand. (So, an operand of 2 would divide A by 4 (2^2); an operand of 5 would divide A by 2^B.) The result of the division operation is truncated to an integer and then written to the A register.
-        case adv: oss << "A = A / 1 << " << to_combo_source(literal);break;
-
-    //
-    //  The bxl instruction (opcode 1) calculates the bitwise XOR of register B and the instruction's literal operand, then stores the result in register B.
-        case bxl: oss << "B = B xor " << literal;break;
-    //
-    //  The bst instruction (opcode 2) calculates the value of its combo operand modulo 8 (thereby keeping only its lowest 3 bits), then writes that value to the B register.
-        case bst: oss << "B = " << to_combo_source(literal) << " % 8";break;
-    //
-    //  The jnz instruction (opcode 3) does nothing if the A register is 0. However, if the A register is not zero, it jumps by setting the instruction pointer to the value of its literal operand; if this instruction jumps, the instruction pointer is not increased by 2 after this instruction.
-        case jnz: oss << "jnz A " << literal;break;
-    //
-    //  The bxc instruction (opcode 4) calculates the bitwise XOR of register B and register C, then stores the result in register B. (For legacy reasons, this instruction reads an operand but ignores it.)
-        case bxc: oss << "B = B xor C";break;
-    //
-    //  The out instruction (opcode 5) calculates the value of its combo operand modulo 8, then outputs that value. (If a Memory outputs multiple values, they are separated by commas.)
-        case out: oss << "out " << to_combo_source(literal) << " % 8";break;
-    //
-    //  The bdv instruction (opcode 6) works exactly like the adv instruction except that the result is stored in the B register. (The numerator is still read from the A register.)
-        case bdv: oss << "B = A / 1 << " << to_combo_source(literal);break;
-    //
-    //  The cdv instruction (opcode 7) works exactly like the adv instruction except that the result is stored in the C register. (The numerator is still read from the A register.)
-        case cdv: oss << "C = A / 1 << " << to_combo_source(literal);break;
-
-        default: oss << "?";break;
-      }
-      std::format_to(ctx.out(),"\n{} : {}",ip,oss.str());
+      std::format_to(ctx.out(),"\n{} : {}",ip,to_statement_string(op,literal));
     }
     return ctx.out();
   }
@@ -702,6 +715,8 @@ namespace part2 {
     if (in) {
       auto model = parse(in);
       print_program(Program{model.memory});
+      Computer pc{model.registers,model.memory};
+      auto output = pc.run("-pp");
     }
     return result;
   }
