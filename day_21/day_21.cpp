@@ -43,7 +43,7 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
+using aoc::Args;
 
 namespace test {
 
@@ -89,106 +89,52 @@ namespace test {
 
   using aoc::grid::Grid;
   using aoc::grid::Position;
-  class Robot {
-  public:
-    Robot(Grid grid) : m_grid(std::move(grid)) {
-      std::vector<std::pair<char,Position>> char2pos{};
-      for (int row=0;row<m_grid.height();++row) {
-        for (int col=0;col<m_grid.width();++col) {
-          Position pos{row,col};
-          auto ch = m_grid.at(pos);
-          if (ch!=' ') char2pos.push_back({m_grid.at(pos),pos});
-        }
+
+  // Return all options to press the remote to move the robot from key 'first' to key 'second' and press it
+  // E.g., 'A' -> '2' on numering keypad returns options '<^A' and '^<A'.
+  std::vector<std::string> to_remote_press_options(Grid const& grid,char first,char second) {
+    std::vector<std::string> result{};
+    auto start = grid.find_all(first)[0];
+    auto end = grid.find_all(second)[0];
+    using State = std::tuple<Position,std::string>; // path candidate to position
+    std::deque<State> q{};
+    q.push_back({start,""});
+    while (not q.empty()) {
+      auto [pos,path] = q.front();
+      q.pop_front();
+      if (pos == end) result.push_back(path+'A');
+      auto [r,c] = pos;
+      for (auto next : std::vector<std::pair<Position,char>>{{{r+1,c},'v'},{{r,c+1},'>'},{{r-1,c},'^'},{{r,c-1},'<'}}) {
+        if (not grid.on_map(next.first)) continue;
+        if (grid.at(next.first) == ' ') continue;
+        using aoc::raw::operator+;
+        q.push_front({next.first,path+next.second});
       }
-      // cache best path between all keys
-      // Assume best path is manhattan distance and at most one turn.
-      // That is, do all row steps and then all col steps
-      // Note: Choose so that ' ' is not passed!
-      auto gap_pos = m_grid.find(' ');
-      std::cout << NL << "gap_pos:" << gap_pos;
-      for (int i=0;i<char2pos.size();++i) {
-        for (int j=0;j<char2pos.size();j++) {
-          auto const& [ch1,from] = char2pos[i];
-          auto const& [ch2,to] = char2pos[j];
-          auto delta = to-from;
-          // Assume the shortest and best path for upstream robot
-          // is the shortest with the least turns?
-          // Because a turn will cause upstream robot to navigate to
-          // another key on the remote.
-          using aoc::grid::Direction;
-          Direction dp{aoc::raw::sign(delta.row),aoc::raw::sign(delta.col)};
-          Direction dr{dp.row,0};
-          Direction dc{0,dp.col};
-          char ch_dr = aoc::grid::to_dir_char(from, from+dr);
-          char ch_dc = aoc::grid::to_dir_char(from, from+dc);
-          std::string dc_steps{};
-          for (int i=0;i<std::abs(delta.col);++i) dc_steps.push_back(ch_dc);
-          std::string dr_steps{};
-          for (int i=0;i<std::abs(delta.row);++i) dr_steps.push_back(ch_dr);
-          if (from.row + dp.row == gap_pos.row) {
-            // row then column would pass gap
-            m_best[{ch1,ch2}].push_back(dc_steps+dr_steps+"A");
-          }
-          else if (from.col + dp.col == gap_pos.col) {
-              // column then row would pass gap
-            m_best[{ch1,ch2}].push_back(dr_steps+dc_steps+"A");
-          }
-          else {
-            // No risk passing gap
-            m_best[{ch1,ch2}].push_back(dc_steps+dr_steps+"A");
-            m_best[{ch1,ch2}].push_back(dr_steps+dc_steps+"A");
-          }
-        }
-      }
-      
     }
-    std::vector<std::string> to_best(char ch1,char ch2) {
-      if (m_best.contains({ch1,ch2})) {
-        return m_best[{ch1,ch2}];
-      }
-      return {};
+    return result;
+  }
+
+  // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
+  std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes) {
+    std::vector<std::string> result;
+    std::vector<std::vector<std::string>> segment_options{};
+    for (int i=0;i<keyes.size()-1;++i) {
+      segment_options.push_back({});
+      auto first = keyes[i];
+      auto second = keyes[i+1];
+      auto options = to_remote_press_options(grid, first, second);
+      using aoc::raw::operator+;
+      segment_options.back() = options; // options for moving from first to second and press it
     }
-    // Return a list of all the shortest pah of moves to press provided
-    // sortiment of keys
-    std::vector<std::string> press(std::vector<std::string> paths) {
-      std::vector<std::string> result{};
-      for (auto const& path : paths) {
-        std::cout << NL << T << "press:" << T << path;
-        // Shoot, we need something recursive!
-        
-        std::queue<std::string> q{}; // candidates
-        q.push({});
-        for (int i=1;i<path.size();++i) {
-          auto bests = m_best[{path[i-1],path[i]}]; // step candidates
-          std::cout << NL << T << path[i-1] << " -> " << path[i] << " bests:" << bests.size();
-          // expand candidates in the queue
-          auto const N = q.size();
-          for (int j=0;j<N;++j) {
-            auto current = q.front();
-            q.pop();
-            for (auto const& best : bests) {
-              q.push(current + best); // each candidate with a different expansion
-              std::cout << NL << T << i << " current:" << current <<  " + best:" << best;
-            }
-          }
-        }
-        for (int i=0;i<q.size();++i) {
-          auto candidate = q.front();
-          q.pop();
-          result.push_back(candidate);
-          std::cout << NL << T << "candidate:" << candidate;
-        }
-      }
-      return result;
-    }
-  private:
-    std::map<std::pair<char,char>,std::vector<std::string>> m_best{};
-    aoc::grid::Grid m_grid;
-  };
+    // Now all possible ways are to pick all combinations of optional segments to press each key
+    // This is the cartesian product of all segment options
+    // result = aoc::algo::cartesian_product<std::string>(segment_options);
+    
+    return result;
+  }
 
   std::optional<Result> test0(Args args) {
-    
-    aoc::raw::Lines answers{};
+    std::ostringstream oss{};
     std::cout << NL << NL << "test0";
     //    For example, to make the robot type 029A on the numeric keypad, one sequence of inputs on the directional keypad you could use is:
     //
@@ -203,27 +149,44 @@ namespace test {
       ,"123"
       ," 0A"
     });
-    Robot r(keypad);
-    auto moves = r.press({"029A"});
-    using aoc::grid::operator<<;
-    std::cout << NL << "moves:" <<  moves;
     
-    if (answers.size()>0) {
-      std::string acc{};
-      for (auto const& answer : answers) {
-        acc += NL + answer;
+    auto computed = to_remote_press_options(keypad,"029A");
+    std::set<std::string> expected = {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"}; // CTAD :)
+    std::print("\ncomputed:{} expected:{}",computed,expected);
+    if (computed.size() == expected.size()) {
+      if (std::all_of(computed.begin(), computed.end(), [&expected](std::string const& option) {
+        if (not expected.contains(option)) {
+          std::print(R"(Generated option "{}" not in expected {})",option,expected);
+          return false;
+        }
+        return true;
+      })) {
+        std::print(oss,"OK");
       }
-      return acc;
+      else {
+        std::print(oss,"FAILED");
+      }
     }
+    else {
+      if (computed.size() < expected.size()) {
+        std::print(oss,"Computed too few");
+      }
+      else {
+        std::print(oss,"Computed too many");
+      }
+    }
+
+    if (oss.str().size()>0) return oss.str();
     return std::nullopt;
   }
 
-  std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
+  std::optional<Result> test1(auto& in, Args args) {
     std::optional<Result> result{};
     aoc::raw::Lines answers{};
     std::cout << NL << NL << "test1";
     if (in) {
       auto model = ::parse(in);
+      std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
       if (doc_in) {
         auto log = test::parse(doc_in);
         using aoc::test::operator<<;
@@ -241,32 +204,24 @@ namespace test {
         
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
-        // Or?
         for (LogEntry const& entry : log) {
-          Robot robot0{keypad};
-          Robot robot1{remote};
-          Robot robot2{remote};
-          std::cout << NL << "best A --> < :" << robot2.to_best('A', '<');
-          auto moves0 = robot0.press({entry.code}); // single key series to press
-          auto moves1 = robot1.press(moves0);
-          auto moves2 = robot2.press(moves1);
-          for (auto const& move : moves2) {
-            std::cout << NL << T << "press:" << T << move;
-          }
           std::cout << NL << T << "expect:" << T << entry.expected_presses;
-        }
-        if (answers.size()>0) {
-          std::string acc{};
-          for (auto const& answer : answers) {
-            acc += NL + answer;
-          }
-          return acc;
         }
       }
     }
     return result;
   }
 
+  std::optional<Result> solve_for(std::istream& in,Args args) {
+    std::optional<Result> result{};
+    std::cout << NL << NL << "test";
+    if (args.arg["part"] == "test0") return test0(args);
+    else if (args.arg["part"] == "test1") return test1(in,args);
+    else {
+      return std::format("Sorry, Unknown 'part' \"{}\"",args.arg["part"] );
+    }
+    return std::nullopt;
+  }
 }
 
 namespace part1 {
@@ -285,29 +240,11 @@ namespace part1 {
          " ^A"
         ,"<v>"
       });
-      test::Robot robot0{keypad};
-      test::Robot robot1{remote};
-      test::Robot robot2{remote};
 
       Integer acc{};
       for (auto const& code : model) {
-        auto moves0 = robot0.press({code}); // single key series to press
-        auto moves1 = robot1.press(moves0);
-        auto moves2 = robot2.press(moves1);
-        for (auto const& move : moves2) {
-          std::cout << NL << T << "press:" << T << move;
-          std::regex pattern(R"((\d+))");
-          std::smatch match;
-          if (std::regex_search(code.begin(), code.end(), match, pattern)) {
-            auto num_part = std::stoi(match[0]);
-            auto len = move.size();
-            Integer complexity = len*num_part;
-            std::cout << NL << "Answer: num_part:" << num_part << " * length:" << len << " = " << complexity;
-            acc += complexity;
-          }
-        }
       }
-      result = std::to_string(acc);
+      if (acc>0) result = std::to_string(acc);
     }
     return result; // 185828 too high
   }
@@ -325,64 +262,66 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
 int main(int argc, char *argv[]) {
-  Args args{};
+  Args user_args{};
+  
+  // Override by any user input
   for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      Args args;
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111};
-//  std::vector<int> states = {0,111};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 211: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -395,11 +334,14 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   Xcode Debug -O2
+
+   >day_22 -all
 
    ANSWERS
    ...
-      
-  */
+   
+   */
   return 0;
 }

@@ -90,6 +90,11 @@ namespace aoc {
 
   namespace raw {
 
+    std::string operator+(std::string lhs,char rhs) {
+      lhs.push_back(rhs);
+      return lhs;
+    }
+
     // advance for enums,integral types and iterators
     template <typename T>
     constexpr T advance(T value, int steps = 1) {
