@@ -18,8 +18,17 @@
 #include <filesystem>
 #include <set>
 #include <deque>
+#include <iterator>
 
 namespace aoc {
+
+  struct Args {
+    std::map<std::string,std::string> arg{};
+    std::set<std::string> options{};
+    operator bool() const {
+      return (arg.size()>0) or (options.size()>0);
+    }
+  };
 
   namespace views {
     template <typename Iterator>
@@ -80,6 +89,29 @@ namespace aoc {
 
 
   namespace raw {
+
+    // advance for enums,integral types and iterators
+    template <typename T>
+    constexpr T advance(T value, int steps = 1) {
+      if constexpr (std::is_enum_v<T>) {
+        using underlying = std::underlying_type_t<T>;
+        return static_cast<T>(static_cast<underlying>(value) + steps);
+      } else if constexpr (std::is_integral_v<T>) {
+        return value + steps;
+      } else if constexpr (std::is_base_of_v<std::input_iterator_tag,
+                           typename std::iterator_traits<T>::iterator_category>) {
+        return std::next(value, steps);
+      } else {
+        static_assert(false, "Unsupported type for advance");
+      }
+    }
+
+    // ++ for enums, integers and iterators (See aoc::raw::advance)
+    template <typename T>
+    constexpr T operator++(T& value) {
+      value = aoc::raw::advance(value,1);
+      return value;
+    }
   
     template <typename T>
     int sign(T value) {
@@ -92,21 +124,147 @@ namespace aoc {
     using Line = std::string;
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
-    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << std::quoted(line);
-      }
-      return os;
-    }
-    std::ostream& operator<<(std::ostream& os,std::vector<int> const& ints) {
-      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
-        if (ix>0) os << ',';
-        os << n;
-      }
+  
+    template <typename T>
+    concept Streamable = requires(std::ostream& os, T const& t) {
+        { os << t } -> std::same_as<std::ostream&>;
+    };
+
+    // A concept for integral types for operator<<(std::vector<Int>) below
+    template <typename T>
+    concept Integral = std::is_integral_v<T>;
+  
+    struct Indent {
+      int i{};
+      Indent& operator+=(int step) {i+=step;return *this;}
+    };
+  
+    std::ostream& operator<<(std::ostream& os,Indent indent) {
+      while (indent.i-- > 0) os << ' ';
       return os;
     }
 
-  }
+    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << line;
+      }
+      return os;
+    }
+    
+    template <typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
+
+    template <typename T>
+    requires Integral<T>
+    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
+  
+    namespace detail {
+      template <typename T>
+      struct Member {
+        const T& value;
+        explicit Member(const T& val) : value(val) {}
+      };
+
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member);
+    }
+  
+    // << std::vector
+    template <typename T>
+    std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
+      os << "[";
+      for (auto const& [ix,e] : aoc::views::enumerate(v)) {
+        if (ix>0) os << ',';
+        os << detail::Member(e);
+      }
+      os << "]";
+      return os;
+    }
+  
+    // << std::set
+    template <typename T>
+    requires Streamable<T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
+        os << "{ ";
+        for (auto const& elem : s) {
+            os << detail::Member(elem) << " ";
+        }
+        os << "}";
+        return os;
+    }
+  
+    // std:.pair
+    template <typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp) {
+      os << "{ " << detail::Member(pp.first) << "," << detail::Member(pp.second) << "}";
+      return os;
+    }
+
+    template<typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os,std::map<U,V> const& map) {
+      os << "[";
+      for (auto const& [ix,e] : aoc::views::enumerate(map)) {
+        if (ix>0) os << ',';
+        os << detail::Member(e);
+      }
+      os << "]";
+      return os;
+    }
+
+    // Base case: printing an empty tuple
+    std::ostream& operator<<(std::ostream& os, const std::tuple<>&) {
+      return os;
+    }
+    
+    // Recursive case: printing the first element, then recursing on the rest
+    template <typename T, typename... Types>
+    std::ostream& operator<<(std::ostream& os, const std::tuple<T, Types...>& t) {
+      os << detail::Member(std::get<0>(t));  // Print the first element
+      if constexpr (sizeof...(Types) > 0) {  // If there are more elements
+        os << ", ";  // Print a comma and a space
+        operator<<(os, std::tuple<Types...>(std::get<Types>(t)...)); // Recurse on the rest of the tuple
+      }
+      return os;
+    }
+  
+    namespace detail {
+
+      // Decide on how to format T
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member) {
+        if constexpr (std::is_same_v<T, std::string>) {
+          os << std::quoted(member.value); // Quote strings
+        } else if constexpr (std::is_same_v<T, char>) {
+          os << '\'' << member.value << '\''; // Single-quote chars
+        } else {
+          using aoc::raw::operator<<;
+          os << member.value; // Default behavior for other types
+        }
+        return os;
+      }
+    }
+
+  
+    bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
+      if (out) {
+        for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+          if (lx>0) out << NL;
+          out << line;
+        }
+        return true;
+      }
+      return false;
+    }
+  
+    bool write_to_file(std::filesystem::path file,aoc::raw::Lines const& lines) {
+      std::ofstream out{file};
+      return write_to(out, lines);
+    }
+    
+  } // namespace raw
   namespace parsing {
     class Splitter; // Forward
     using Line = Splitter;
@@ -156,7 +314,10 @@ namespace aoc {
           auto line_indent_size = line.find_first_not_of(' ');
           if (line_indent_size != section_indent_size) {
             // New section
-            if (result.back().size()>0) result.push_back({}); // rdeuse previous if it is empty
+            if (result.back().size()>0 and line.size()>0) {
+              // new if current section not empty and new line is empty
+              result.push_back({});
+            }
             section_indent_size = line_indent_size;
           }
           if (line.size()>0) result.back().push_back(line);
@@ -229,9 +390,11 @@ namespace aoc {
   }
   
   namespace graph {
-    template <typename Vertex>
+  
+    template <typename T>
     class Graph {
     public:
+      using Vertex = T;
       using Vertices = std::set<Vertex>;
       using AdjList = std::map<Vertex,Vertices>;
       Graph(Vertices const& vertices) {
@@ -250,15 +413,153 @@ namespace aoc {
     };
   
     template <typename T>
+    std::ostream& operator<<(std::ostream& os,typename Graph<T>::AdjList const& adj_list) {
+      
+      return os;
+    }
+  
+    template <typename T>
     std::ostream& operator<<(std::ostream& os,Graph<T> const& graph) {
       std::cout << "vertices:" << graph.size();
       for (auto const& adjacency : graph.adj()) {
-        std::cout << raw::NL << raw::T << adjacency.first << " --> " << adjacency.second;
+        std::cout << raw::NL << raw::T << adjacency.first;
+        using aoc::raw::operator<<;
+        std::cout << " --> " << adjacency.second;
       }
       
       return os;
     }
   
+    template <typename T>
+    std::vector<std::string> to_graphviz_dot(Graph<T> const& graph) {
+      std::vector<std::string> result{};
+      //digraph G {
+      result.push_back("digraph G {");
+      //    A -> B;
+      //    B -> C;
+      //    A -> C;
+      for (auto const& [v1,vertices] : graph.adj()) {
+        for (auto const& v2 : vertices) {
+          // Graph::Vertex must be streamable by an operator<<
+          std::ostringstream oss{};
+          oss << v1 << " -> " << v2;
+          result.push_back(oss.str());
+        }
+      }
+      //}
+      result.push_back("}");
+      return result;
+    }
+  
+    template <typename T>
+    class GraphAdapter {
+    public:
+        using Graph = aoc::graph::Graph<T>;
+        using IntGraph = aoc::graph::Graph<int>;
+      GraphAdapter(Graph const& originalGraph) : intGraph({}) {
+            convertToIntGraph(originalGraph);
+        }
+
+        // Get the graph with int vertices
+        const IntGraph& getIntGraph() const {
+            return intGraph;
+        }
+
+        // Get the mapping from int to string
+        const std::unordered_map<int, std::string>& getIntToVertexMap() const {
+            return intToVertex;
+        }
+
+        // Get the mapping from string to int
+        const std::unordered_map<std::string, int>& getVertexToIntMap() const {
+            return vertexToInt;
+        }
+
+        // Get the original vertex from an int index
+        std::string getVertexFromInt(int idx) const {
+            auto it = intToVertex.find(idx);
+            if (it != intToVertex.end()) {
+                return it->second;
+            }
+            throw std::out_of_range("Index not found in the mapping");
+        }
+
+        // Get the int index from a vertex
+        int getIntFromVertex(const std::string& vertex) const {
+            auto it = vertexToInt.find(vertex);
+            if (it != vertexToInt.end()) {
+                return it->second;
+            }
+            throw std::out_of_range("Vertex not found in the mapping");
+        }
+
+    private:
+        IntGraph intGraph;
+        std::unordered_map<typename Graph::Vertex, int> vertexToInt;
+        std::unordered_map<int, typename Graph::Vertex> intToVertex;
+
+        // Helper method to perform the conversion
+        void convertToIntGraph(Graph const& originalGraph) {
+            int index = 0;
+
+            // Create mappings from string to int and int to string
+            for (const auto& [vertex, _] : originalGraph.adj()) {
+                vertexToInt[vertex] = index;
+                intToVertex[index] = vertex;
+                index++;
+            }
+
+            // Convert the adjacency list with string nodes to one with int nodes
+            for (const auto& [vertex, neighbors] : originalGraph.adj()) {
+                int u = vertexToInt[vertex];
+                for (const auto& neighbor : neighbors) {
+                    int v = vertexToInt[neighbor];
+                    intGraph.add_edge(u, v);
+                }
+            }
+        }
+    };
+  
+    template <typename T, typename W>
+    class WeightedGraph {
+    public:
+        using Vertex = T;
+        using Weight = W;
+        using AdjList = std::map<Vertex, std::vector<std::pair<Vertex, Weight>>>;
+
+        void add_vertex(Vertex const& v) {
+            m_adj[v]; // Ensures the vertex exists in the adjacency list
+        }
+
+        void add_edge(Vertex const& v1, Vertex const& v2, Weight const& weight) {
+            m_adj[v1].emplace_back(v2, weight);
+        }
+
+        auto get_neighbors(Vertex const& v) const {
+            auto it = m_adj.find(v);
+            if (it != m_adj.end()) return it->second;
+            throw std::runtime_error("Vertex not found");
+        }
+
+        W get_weight(Vertex const& v1, Vertex const& v2) const {
+            auto it = m_adj.find(v1);
+            if (it != m_adj.end()) {
+                for (const auto& [neighbor, weight] : it->second) {
+                    if (neighbor == v2) return weight;
+                }
+            }
+            throw std::runtime_error("Edge not found");
+        }
+
+        AdjList const& adj() const { return m_adj; }
+
+        auto size() const { return m_adj.size(); }
+
+    private:
+        AdjList m_adj;
+    };
+
+
   }
 
   namespace xy {
@@ -645,6 +946,17 @@ namespace aoc {
 
   } // namespace grid
 
+  namespace set {
+  
+    template <typename T>
+    std::set<T> operator&(const std::set<T>& lhs, const std::set<T>& rhs) {
+      std::set<T> result;
+      std::set_intersection(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(),
+                            std::inserter(result, result.begin()));
+      return result;
+    }
+  }
+
   namespace dfs {
     /*
      DFS to count number of created (visited) Keys.
@@ -806,6 +1118,19 @@ namespace aoc {
       return os;
     }
   } // namespace test
+
+  namespace algo {
+    template <typename T1, typename T2>
+    std::vector<std::pair<T1, T2>> cartesian_product(const std::vector<T1>& vec1, const std::vector<T2>& vec2) {
+        std::vector<std::pair<T1, T2>> result;
+        for (const auto& a : vec1) {
+            for (const auto& b : vec2) {
+                result.emplace_back(a, b);
+            }
+        }
+        return result;
+    }
+  }
 
 } // namespace aoc
 
