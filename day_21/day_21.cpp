@@ -282,6 +282,7 @@ namespace test {
         
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
+        bool all_did_pass{true};
         for (LogEntry const& entry : log) {
           auto to_press_1 = to_remote_press_options(keypad,entry.code);
           auto to_press_2 = to_remote_press_options(remote, to_press_1);
@@ -289,11 +290,14 @@ namespace test {
           std::print("\ncomputed:{}",to_press_3);
           std::cout << NL << T << "expect:" << T << entry.expected_presses;
           auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
-          if (iter != to_press_3.end()) {
-            return "OK";
+          if (iter == to_press_3.end()) {
+            all_did_pass = false;
           }
-          break; // Break on first
+          if (not all_did_pass) {
+            return "FAILED";
+          }
         }
+        return "OK";
       }
     }
     return result;
