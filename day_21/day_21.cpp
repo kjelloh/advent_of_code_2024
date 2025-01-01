@@ -129,7 +129,11 @@ namespace test {
     return result;
   }
 
-  void generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
+  std::vector<std::vector<std::string>> generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
+    std::vector<std::vector<std::string>> result{};
+    for (auto const& options : segment_options) {
+      print("\noptions:{}",options);
+    }
     // Initialize a queue that holds partial combinations
     std::queue<std::vector<std::string>> q;
     
@@ -144,10 +148,13 @@ namespace test {
       
       // If the current combination is complete, print it
       if (current_combination.size() == segment_options.size()) {
-        for (const auto& element : current_combination) {
-          std::cout << element << " ";
-        }
-        std::cout << std::endl;
+        result.push_back(current_combination);
+        std::print("\ncombination:{}",current_combination);
+//        std::cout << NL << "combination:";
+//        for (const auto& [ix,element] : aoc::views::enumerate(current_combination)) {
+//          if (ix>0) std::cout << ',';
+//          std::cout << element;
+//        }
       } else {
         // Otherwise, add all possibilities for the next vector to the current combination
         size_t depth = current_combination.size(); // which vector are we adding from?
@@ -159,6 +166,7 @@ namespace test {
         }
       }
     }
+    return result;
   }
   // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
   std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes) {
@@ -175,8 +183,11 @@ namespace test {
     }
     // Now all possible ways are to pick all combinations of optional segments to press each key
     // This is the cartesian product of all segment options
-    // result = aoc::algo::cartesian_product<std::string>(segment_options);
-    generate_combinations(segment_options);
+    auto combinations = generate_combinations(segment_options);
+    for (auto const& combination : combinations) {
+      auto candidate = std::accumulate(combination.begin(), combination.end(), std::string{});
+      result.push_back(candidate);
+    }
     return result;
   }
 
