@@ -191,6 +191,26 @@ namespace test {
     return result;
   }
 
+  std::vector<std::string> to_remote_press_options(Grid const& grid,std::vector<std::string> const& keyes_options) {
+    std::vector<std::string> result{};
+    
+    std::vector<std::string> all{};
+    for (auto const& [ix,keyes_option] : aoc::views::enumerate(keyes_options)) {
+      auto press_options = to_remote_press_options(grid, keyes_option); // all options to move on grid to press keyes
+      std::print("\n{}:{} -> {}",ix,keyes_option,press_options);
+      std::copy(press_options.begin(), press_options.end(), std::back_insert_iterator(all));
+    }
+    auto best = std::accumulate(all.begin(), all.end(), std::numeric_limits<std::size_t>::max(),[](auto acc,std::string const& path){
+      acc = std::min(acc,path.size());
+      return acc;
+    });
+    std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
+      return (path.size()==best);
+    });
+    std::print("\n{} : {}",best,result);
+    return result;
+  }
+
   std::optional<Result> test0(Args args) {
     std::ostringstream oss{};
     std::cout << NL << NL << "test0";
@@ -263,7 +283,16 @@ namespace test {
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
         for (LogEntry const& entry : log) {
+          auto to_press_1 = to_remote_press_options(keypad,entry.code);
+          auto to_press_2 = to_remote_press_options(remote, to_press_1);
+          auto to_press_3 = to_remote_press_options(remote, to_press_2);
+          std::print("\ncomputed:{}",to_press_3);
           std::cout << NL << T << "expect:" << T << entry.expected_presses;
+          auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
+          if (iter != to_press_3.end()) {
+            return "OK";
+          }
+          break; // Break on first
         }
       }
     }
