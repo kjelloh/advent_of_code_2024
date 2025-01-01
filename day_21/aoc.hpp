@@ -19,6 +19,7 @@
 #include <set>
 #include <deque>
 #include <iterator>
+#include <tuple>
 
 namespace aoc {
 

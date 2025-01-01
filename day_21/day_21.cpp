@@ -24,6 +24,8 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
+#include <tuple>
+#include <functional> // E.g., hash for std::tuple
 
 using aoc::raw::NL;
 using aoc::raw::T;
@@ -365,10 +367,24 @@ namespace part2 {
   class Cached {
   private:
     
+    using StepState = std::tuple<char,char,int>;
+    
+    struct StepStateHash {
+        template <typename T>
+        std::size_t operator()(T const& state) const {
+          std::size_t result = std::hash<char>()(std::get<0>(state));
+          result = (result << 1) xor std::hash<char>()(std::get<1>(state));
+          result = (result << 1) xor std::hash<int>()(std::get<2>(state));
+          return result;
+        }
+    };
+    std::unordered_map<StepState, std::vector<std::string>,StepStateHash> m_seen_step{};
+
     // Return all options to press the remote to move the robot from key 'first' to key 'second' and press it
     // E.g., 'A' -> '2' on numering keypad returns options '<^A' and '^<A'.
     std::vector<std::string> to_remote_press_options(Grid const& grid,char first,char second,int level) {
   //    std::cout << NL << first << second << std::flush;
+      if (m_seen_step.contains({first,second,level})) return m_seen_step[{first,second,level}];
       std::vector<std::string> result{};
       auto start = grid.find_all(first)[0];
       auto end = grid.find_all(second)[0];
@@ -402,12 +418,27 @@ namespace part2 {
           seen.insert(state);
         }
       }
+      m_seen_step[{first,second,level}] = result;
       return result;
     }
+    
+    using KeyesState = std::tuple<std::string,int>;
+    struct KeyesStateHash {
+      template <typename T>
+      std::size_t operator()(T const& state) const {
+        std::size_t result = std::hash<std::string>()(std::get<0>(state));
+        result = (result << 1) xor std::hash<int>()(std::get<1>(state));
+        return result;
+      }
+    };
+    
+    std::unordered_map<KeyesState, std::vector<std::string>,KeyesStateHash> m_seen_keyes{};
+
 
     // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
     std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes,int level) {
       std::cout << NL << keyes << std::flush;
+      if (m_seen_keyes.contains({keyes,level})) return m_seen_keyes[{keyes,level}];
       std::vector<std::string> result;
       std::vector<std::vector<std::string>> segment_options{};
       for (int i=-1;i<static_cast<int>(keyes.size()-1);++i) {
@@ -434,10 +465,35 @@ namespace part2 {
       std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
         return (path.size()==best);
       });
+      m_seen_keyes[{keyes,level}] = result;
       return result;
     }
 
+    struct StringVectorHash {
+      template <typename T>
+      std::size_t operator()(T const& sv) const {
+        std::size_t result{};
+        for (auto const& s : sv) {
+          result = (result << 1) xor std::hash<std::string>()(s);
+        }
+        return result;
+      }
+    };
+
+    using KeyesOptionsState = std::tuple<std::vector<std::string>,int>;
+    struct KeyesOptionsStateHash {
+      template <typename T>
+      std::size_t operator()(T const& state) const {
+        std::size_t result = StringVectorHash()(std::get<0>(state));
+        result = (result << 1) xor std::hash<int>()(std::get<1>(state));
+        return result;
+      }
+    };
+    
+    std::unordered_map<KeyesOptionsState, std::vector<std::string>,KeyesOptionsStateHash> m_seen_options{};
+
     std::vector<std::string> to_remote_press_options(Grid const& grid,std::vector<std::string> const& keyes_options,int level) {
+      if (m_seen_options.contains({keyes_options,level})) return m_seen_options[{keyes_options,level}];
       std::vector<std::string> result{};
       
       std::vector<std::string> all{};
@@ -454,6 +510,7 @@ namespace part2 {
         return (path.size()==best);
       });
   //    std::print("\n{} : {}",best,result);
+      m_seen_options[{keyes_options,level}] = result;
       return result;
     }
 
@@ -498,7 +555,7 @@ namespace part2 {
       Integer acc{};
       for (auto const& code : model) {
         Cached cached{};
-        auto to_press_count = cached.to_remote_press_count(code, 2);
+        auto to_press_count = cached.to_remote_press_count(code, 25);
         acc += test::to_num_part(code) * to_press_count;
       }
       if (acc>0) result = std::to_string(acc);
