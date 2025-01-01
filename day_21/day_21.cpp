@@ -517,12 +517,12 @@ namespace part2 {
     // Recurse robot stack down to level 0 (top or last robot)
     Integer to_remote_press_count(Grid const& grid,std::vector<std::string> const& keyes_options,int level) {
       std::cout << NL << level << std::flush;
-      if (level < 0) {
-        return keyes_options.back().size();
-      }
-      else {
+      if (level > 0) {
         auto to_press = to_remote_press_options(grid, keyes_options,level);
         return to_remote_press_count(grid, to_press, level-1);
+      }
+      else {
+        return keyes_options.back().size();
       }
     }
 
@@ -555,7 +555,7 @@ namespace part2 {
       Integer acc{};
       for (auto const& code : model) {
         Cached cached{};
-        auto to_press_count = cached.to_remote_press_count(code, 2);
+        auto to_press_count = cached.to_remote_press_count(code, 3);
         acc += test::to_num_part(code) * to_press_count;
       }
       if (acc>0) result = std::to_string(acc);
