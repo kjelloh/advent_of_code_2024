@@ -360,11 +360,54 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  std::vector<std::string> to_remote_press_options(test::Grid const& grid,std::vector<std::string> const& keyes_options,int level) {
+    std::vector<std::string> result{};
+    std::cout << NL << level << std::flush;
+    
+    // 1: auto to_press_2 = test::to_remote_press_options(remote, to_press_1);
+    // 0: auto to_press_3 = test::to_remote_press_options(remote, to_press_2);
+    //...
+    //25: auto to_press_26 = test::to_remote_press_options(remote, to_press_25);
+    if (level < 0) {
+      return keyes_options;
+    }
+    else {
+      auto to_press = test::to_remote_press_options(grid, keyes_options);
+      return to_remote_press_options(grid, to_press, level-1);
+    }
+
+    return result;
+  }
+
+  std::vector<std::string> to_remote_press_options(std::string const& keyes,int level) {
+    std::cout << NL << level << std::flush;
+    static aoc::grid::Grid keypad({
+       "789"
+      ,"456"
+      ,"123"
+      ," 0A"
+    });
+    static aoc::grid::Grid remote({
+       " ^A"
+      ,"<v>"
+    });
+    // Recurse down to 0
+    return to_remote_press_options(remote, test::to_remote_press_options(keypad, keyes), level-1);
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      Integer acc{};
+      for (auto const& code : model) {
+        auto to_press = to_remote_press_options(code, 2);
+        acc += test::to_num_part(code) * to_press.back().size();
+      }
+      if (acc>0) result = std::to_string(acc);
+
     }
     return result;
   }
