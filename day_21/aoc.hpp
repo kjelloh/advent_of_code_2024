@@ -720,6 +720,14 @@ namespace aoc {
     Direction const LEFT{0,-1};
     Direction const RIGHT{0,1};
 
+    auto to_manhattan_length(Position const& p) {
+      return (std::abs(p.row)+std::abs(p.col));
+    }
+    
+    auto to_manhattan_distance(Position const& p1, Position const& p2) {
+      return to_manhattan_length(p2-p1);
+    }
+
     class Grid {
     public:
       using Seen = std::set<Position>;

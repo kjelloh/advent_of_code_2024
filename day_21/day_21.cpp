@@ -99,29 +99,76 @@ namespace test {
     using State = std::tuple<Position,std::string>; // path candidate to position
     std::deque<State> q{};
     q.push_back({start,""});
+    std::set<State> seen{};
+    int lc{};
+    int const OPTIMAL_PATH_LENGTH{aoc::grid::to_manhattan_distance(start, end)};
     while (not q.empty()) {
-      auto [pos,path] = q.front();
+      auto curr = q.front();
       q.pop_front();
-      if (pos == end) result.push_back(path+'A');
+      auto [pos,path] = curr;
+      std::cout << NL << pos << " " << path;
+//      if (++lc > 1000) break;
+      if (pos == end) {
+        result.push_back(path+'A');
+        std::cout << " ! ";
+        continue;
+      }
+      if (path.size()>OPTIMAL_PATH_LENGTH) break;
       auto [r,c] = pos;
       for (auto next : std::vector<std::pair<Position,char>>{{{r+1,c},'v'},{{r,c+1},'>'},{{r-1,c},'^'},{{r,c-1},'<'}}) {
         if (not grid.on_map(next.first)) continue;
         if (grid.at(next.first) == ' ') continue;
+        if (next.first == pos) continue;
         using aoc::raw::operator+;
-        q.push_front({next.first,path+next.second});
+        State state{next.first,path+next.second};
+        if (seen.contains(state)) continue;
+        q.push_back(state); // bfs
+        seen.insert(state);
       }
     }
     return result;
   }
 
+  void generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
+    // Initialize a queue that holds partial combinations
+    std::queue<std::vector<std::string>> q;
+    
+    // Start with an empty combination
+    q.push({});
+    
+    // Process the queue until all combinations are generated
+    while (!q.empty()) {
+      // Get the current partial combination
+      std::vector<std::string> current_combination = q.front();
+      q.pop();
+      
+      // If the current combination is complete, print it
+      if (current_combination.size() == segment_options.size()) {
+        for (const auto& element : current_combination) {
+          std::cout << element << " ";
+        }
+        std::cout << std::endl;
+      } else {
+        // Otherwise, add all possibilities for the next vector to the current combination
+        size_t depth = current_combination.size(); // which vector are we adding from?
+        for (const auto& option : segment_options[depth]) {
+          // Copy the current combination, append the new option, and push it to the queue
+          std::vector<std::string> new_combination = current_combination;
+          new_combination.push_back(option);
+          q.push(new_combination);
+        }
+      }
+    }
+  }
   // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
   std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes) {
     std::vector<std::string> result;
     std::vector<std::vector<std::string>> segment_options{};
-    for (int i=0;i<keyes.size()-1;++i) {
+    for (int i=-1;i<static_cast<int>(keyes.size()-1);++i) {
       segment_options.push_back({});
-      auto first = keyes[i];
+      auto first = (i<0)?'A':keyes[i];
       auto second = keyes[i+1];
+      std::print("\nfirst:{},second:{}",first,second);
       auto options = to_remote_press_options(grid, first, second);
       using aoc::raw::operator+;
       segment_options.back() = options; // options for moving from first to second and press it
@@ -129,7 +176,7 @@ namespace test {
     // Now all possible ways are to pick all combinations of optional segments to press each key
     // This is the cartesian product of all segment options
     // result = aoc::algo::cartesian_product<std::string>(segment_options);
-    
+    generate_combinations(segment_options);
     return result;
   }
 
