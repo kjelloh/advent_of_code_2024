@@ -521,7 +521,7 @@ namespace part2 {
         return keyes_options.back().size();
       }
       else {
-        auto to_press = test::to_remote_press_options(grid, keyes_options);
+        auto to_press = to_remote_press_options(grid, keyes_options,level);
         return to_remote_press_count(grid, to_press, level-1);
       }
     }
@@ -542,7 +542,7 @@ namespace part2 {
         ,"<v>"
       });
       // Recurse down to 0
-      return to_remote_press_count(remote, test::to_remote_press_options(keypad, keyes), level-1);
+      return to_remote_press_count(remote, to_remote_press_options(keypad, keyes,level), level-1);
     }
 
   };
@@ -555,7 +555,7 @@ namespace part2 {
       Integer acc{};
       for (auto const& code : model) {
         Cached cached{};
-        auto to_press_count = cached.to_remote_press_count(code, 25);
+        auto to_press_count = cached.to_remote_press_count(code, 2);
         acc += test::to_num_part(code) * to_press_count;
       }
       if (acc>0) result = std::to_string(acc);
