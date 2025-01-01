@@ -87,12 +87,49 @@ namespace test {
     return result;
   }
 
+  std::vector<std::vector<std::string>> generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
+    std::vector<std::vector<std::string>> result{};
+  //    for (auto const& options : segment_options) {
+  //      print("\noptions:{}",options);
+  //    }
+    // Initialize a queue that holds partial combinations
+    std::queue<std::vector<std::string>> q;
+    
+    // Start with an empty combination
+    q.push({});
+    
+    // Process the queue until all combinations are generated
+    while (!q.empty()) {
+      // Get the current partial combination
+      std::vector<std::string> current_combination = q.front();
+      q.pop();
+      
+      // If the current combination is complete, print it
+      if (current_combination.size() == segment_options.size()) {
+        result.push_back(current_combination);
+  //        std::print("\ncombination:{}",current_combination);
+      } else {
+        // Otherwise, add all possibilities for the next vector to the current combination
+        size_t depth = current_combination.size(); // which vector are we adding from?
+        for (const auto& option : segment_options[depth]) {
+          // Copy the current combination, append the new option, and push it to the queue
+          std::vector<std::string> new_combination = current_combination;
+          new_combination.push_back(option);
+          q.push(new_combination);
+        }
+      }
+    }
+    return result;
+  }
+
+
   using aoc::grid::Grid;
   using aoc::grid::Position;
 
   // Return all options to press the remote to move the robot from key 'first' to key 'second' and press it
   // E.g., 'A' -> '2' on numering keypad returns options '<^A' and '^<A'.
   std::vector<std::string> to_remote_press_options(Grid const& grid,char first,char second) {
+//    std::cout << NL << first << second << std::flush;
     std::vector<std::string> result{};
     auto start = grid.find_all(first)[0];
     auto end = grid.find_all(second)[0];
@@ -106,11 +143,11 @@ namespace test {
       auto curr = q.front();
       q.pop_front();
       auto [pos,path] = curr;
-      std::cout << NL << pos << " " << path;
+//      std::cout << NL << pos << " " << path;
 //      if (++lc > 1000) break;
       if (pos == end) {
         result.push_back(path+'A');
-        std::cout << " ! ";
+//        std::cout << " ! ";
         continue;
       }
       if (path.size()>OPTIMAL_PATH_LENGTH) break;
@@ -129,54 +166,16 @@ namespace test {
     return result;
   }
 
-  std::vector<std::vector<std::string>> generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
-    std::vector<std::vector<std::string>> result{};
-    for (auto const& options : segment_options) {
-      print("\noptions:{}",options);
-    }
-    // Initialize a queue that holds partial combinations
-    std::queue<std::vector<std::string>> q;
-    
-    // Start with an empty combination
-    q.push({});
-    
-    // Process the queue until all combinations are generated
-    while (!q.empty()) {
-      // Get the current partial combination
-      std::vector<std::string> current_combination = q.front();
-      q.pop();
-      
-      // If the current combination is complete, print it
-      if (current_combination.size() == segment_options.size()) {
-        result.push_back(current_combination);
-        std::print("\ncombination:{}",current_combination);
-//        std::cout << NL << "combination:";
-//        for (const auto& [ix,element] : aoc::views::enumerate(current_combination)) {
-//          if (ix>0) std::cout << ',';
-//          std::cout << element;
-//        }
-      } else {
-        // Otherwise, add all possibilities for the next vector to the current combination
-        size_t depth = current_combination.size(); // which vector are we adding from?
-        for (const auto& option : segment_options[depth]) {
-          // Copy the current combination, append the new option, and push it to the queue
-          std::vector<std::string> new_combination = current_combination;
-          new_combination.push_back(option);
-          q.push(new_combination);
-        }
-      }
-    }
-    return result;
-  }
   // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
   std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes) {
+    std::cout << NL << keyes << std::flush;
     std::vector<std::string> result;
     std::vector<std::vector<std::string>> segment_options{};
     for (int i=-1;i<static_cast<int>(keyes.size()-1);++i) {
       segment_options.push_back({});
       auto first = (i<0)?'A':keyes[i];
       auto second = keyes[i+1];
-      std::print("\nfirst:{},second:{}",first,second);
+//      std::print("\nfirst:{},second:{}",first,second);
       auto options = to_remote_press_options(grid, first, second);
       using aoc::raw::operator+;
       segment_options.back() = options; // options for moving from first to second and press it
@@ -197,7 +196,7 @@ namespace test {
     std::vector<std::string> all{};
     for (auto const& [ix,keyes_option] : aoc::views::enumerate(keyes_options)) {
       auto press_options = to_remote_press_options(grid, keyes_option); // all options to move on grid to press keyes
-      std::print("\n{}:{} -> {}",ix,keyes_option,press_options);
+//      std::print("\n{}:{} -> {}",ix,keyes_option,press_options);
       std::copy(press_options.begin(), press_options.end(), std::back_insert_iterator(all));
     }
     auto best = std::accumulate(all.begin(), all.end(), std::numeric_limits<std::size_t>::max(),[](auto acc,std::string const& path){
@@ -207,7 +206,7 @@ namespace test {
     std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
       return (path.size()==best);
     });
-    std::print("\n{} : {}",best,result);
+//    std::print("\n{} : {}",best,result);
     return result;
   }
 
@@ -300,7 +299,8 @@ namespace test {
           auto to_press_2 = to_remote_press_options(remote, to_press_1);
           auto to_press_3 = to_remote_press_options(remote, to_press_2);
           std::print("\ncomputed:{}",to_press_3);
-          std::cout << NL << T << "expect:" << T << entry.expected_presses;
+          std::print("\nexpect:{}",entry.expected_presses);
+//          std::cout << NL << T << "expect:" << T << entry.expected_presses;
           auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
           all_did_pass = all_did_pass and (iter != to_press_3.end());
           if (not all_did_pass) break;
@@ -350,7 +350,7 @@ namespace part1 {
         auto to_press_1 = test::to_remote_press_options(keypad,code);
         auto to_press_2 = test::to_remote_press_options(remote, to_press_1);
         auto to_press_3 = test::to_remote_press_options(remote, to_press_2);
-        std::print("\ncomputed:{}",to_press_3);
+//        std::print("\ncomputed:{}",to_press_3);
         acc += test::to_num_part(code) * to_press_3.back().size();
       }
       if (acc>0) result = std::to_string(acc);
@@ -446,10 +446,15 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_22 -all
+   >day_21 -all
 
    ANSWERS
-   ...
+   duration:0ms answer[test example.txt] Sorry, Unknown 'part' "test"
+   duration:0ms answer[test puzzle.txt] Sorry, Unknown 'part' "test"
+   duration:6077ms answer[part1 example.txt] 126384
+   duration:82156ms answer[part1 puzzle.txt] 179444
+   duration:0ms answer[part2 example.txt] NO OPERATION
+   duration:0ms answer[part2 puzzle.txt] NO OPERATION
    
    */
   return 0;
