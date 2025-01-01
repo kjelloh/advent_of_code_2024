@@ -258,6 +258,16 @@ namespace test {
     return std::nullopt;
   }
 
+  int to_num_part(std::string const& code) {
+    std::regex pattern(R"((\d+))");
+    std::smatch match;
+    int result{-1};
+    if (std::regex_search(code.begin(), code.end(), match, pattern)) {
+      result = std::stoi(match[0]);
+    }
+    return result;
+  }
+
   std::optional<Result> test1(auto& in, Args args) {
     std::optional<Result> result{};
     aoc::raw::Lines answers{};
@@ -283,21 +293,24 @@ namespace test {
         // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
         // that is the shortest one!
         bool all_did_pass{true};
+        Integer acc{};
         for (LogEntry const& entry : log) {
-          auto to_press_1 = to_remote_press_options(keypad,entry.code);
+          auto code = entry.code;
+          auto to_press_1 = to_remote_press_options(keypad,code);
           auto to_press_2 = to_remote_press_options(remote, to_press_1);
           auto to_press_3 = to_remote_press_options(remote, to_press_2);
           std::print("\ncomputed:{}",to_press_3);
           std::cout << NL << T << "expect:" << T << entry.expected_presses;
           auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
-          if (iter == to_press_3.end()) {
-            all_did_pass = false;
-          }
-          if (not all_did_pass) {
-            return "FAILED";
-          }
+          all_did_pass = all_did_pass and (iter != to_press_3.end());
+          if (not all_did_pass) break;
+          acc += to_num_part(code) * to_press_3.back().size();
         }
-        return "OK";
+        if (not all_did_pass) {
+          return "FAILED";
+        }
+        if (acc == 126384) return "Complexity 126384 OK";
+        else return "FAILED";
       }
     }
     return result;
@@ -334,6 +347,11 @@ namespace part1 {
 
       Integer acc{};
       for (auto const& code : model) {
+        auto to_press_1 = test::to_remote_press_options(keypad,code);
+        auto to_press_2 = test::to_remote_press_options(remote, to_press_1);
+        auto to_press_3 = test::to_remote_press_options(remote, to_press_2);
+        std::print("\ncomputed:{}",to_press_3);
+        acc += test::to_num_part(code) * to_press_3.back().size();
       }
       if (acc>0) result = std::to_string(acc);
     }
