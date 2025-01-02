@@ -8,6 +8,7 @@
 #include <sstream> // E.g., std::istringstream, std::ostringstream
 #include <vector>
 #include <set>
+#include <unordered_set>
 #include <map>
 #include <unordered_map>
 #include <stack>
@@ -364,199 +365,79 @@ namespace part1 {
 
 namespace part2 {
 
-  class Cached {
-  private:
-    
-    using StepState = std::tuple<char,char,int>;
-    
-    struct StepStateHash {
-        template <typename T>
-        std::size_t operator()(T const& state) const {
-          std::size_t result = std::hash<char>()(std::get<0>(state));
-          result = (result << 1) xor std::hash<char>()(std::get<1>(state));
-          result = (result << 1) xor std::hash<int>()(std::get<2>(state));
-          return result;
-        }
-    };
-    std::unordered_map<StepState, std::vector<std::string>,StepStateHash> m_seen_step{};
-
-    // Return all options to press the remote to move the robot from key 'first' to key 'second' and press it
-    // E.g., 'A' -> '2' on numering keypad returns options '<^A' and '^<A'.
-    std::vector<std::string> to_remote_press_options(Grid const& grid,char first,char second,int level) {
-  //    std::cout << NL << first << second << std::flush;
-      if (m_seen_step.contains({first,second,level})) return m_seen_step[{first,second,level}];
-      std::vector<std::string> result{};
-      auto start = grid.find_all(first)[0];
-      auto end = grid.find_all(second)[0];
-      using State = std::tuple<Position,std::string>; // path candidate to position
-      std::deque<State> q{};
-      q.push_back({start,""});
-      std::set<State> seen{};
-      int lc{};
-      int const OPTIMAL_PATH_LENGTH{aoc::grid::to_manhattan_distance(start, end)};
-      while (not q.empty()) {
-        auto curr = q.front();
-        q.pop_front();
-        auto [pos,path] = curr;
-  //      std::cout << NL << pos << " " << path;
-  //      if (++lc > 1000) break;
-        if (pos == end) {
-          result.push_back(path+'A');
-  //        std::cout << " ! ";
-          continue;
-        }
-        if (path.size()>OPTIMAL_PATH_LENGTH) break;
-        auto [r,c] = pos;
-        for (auto next : std::vector<std::pair<Position,char>>{{{r+1,c},'v'},{{r,c+1},'>'},{{r-1,c},'^'},{{r,c-1},'<'}}) {
-          if (not grid.on_map(next.first)) continue;
-          if (grid.at(next.first) == ' ') continue;
-          if (next.first == pos) continue;
-          using aoc::raw::operator+;
-          State state{next.first,path+next.second};
-          if (seen.contains(state)) continue;
-          q.push_back(state); // bfs
-          seen.insert(state);
-        }
-      }
-      m_seen_step[{first,second,level}] = result;
-      return result;
-    }
-    
-    using KeyesState = std::tuple<std::string,int>;
-    struct KeyesStateHash {
-      template <typename T>
-      std::size_t operator()(T const& state) const {
-        std::size_t result = std::hash<std::string>()(std::get<0>(state));
-        result = (result << 1) xor std::hash<int>()(std::get<1>(state));
-        return result;
-      }
-    };
-    
-    std::unordered_map<KeyesState, std::vector<std::string>,KeyesStateHash> m_seen_keyes{};
-
-
-    // Returns all the options to press the remote to have the robot press all keyes in 'keyes'
-    std::vector<std::string> to_remote_press_options(Grid const& grid,std::string const& keyes,int level) {
-      std::cout << NL << keyes << std::flush;
-      if (m_seen_keyes.contains({keyes,level})) return m_seen_keyes[{keyes,level}];
-      std::vector<std::string> result;
-      std::vector<std::vector<std::string>> segment_options{};
-      for (int i=-1;i<static_cast<int>(keyes.size()-1);++i) {
-        segment_options.push_back({});
-        auto first = (i<0)?'A':keyes[i];
-        auto second = keyes[i+1];
-  //      std::print("\nfirst:{},second:{}",first,second);
-        auto options = to_remote_press_options(grid, first, second,level);
-        using aoc::raw::operator+;
-        segment_options.back() = options; // options for moving from first to second and press it
-      }
-      // Now all possible ways are to pick all combinations of optional segments to press each key
-      // This is the cartesian product of all segment options
-      std::vector<std::string> all{};
-      auto combinations = generate_combinations(segment_options);
-      for (auto const& combination : combinations) {
-        auto candidate = std::accumulate(combination.begin(), combination.end(), std::string{});
-        all.push_back(candidate);
-      }
-      auto best = std::accumulate(all.begin(), all.end(), std::numeric_limits<std::size_t>::max(),[](auto acc,std::string const& path){
-        acc = std::min(acc,path.size());
-        return acc;
-      });
-      std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
-        return (path.size()==best);
-      });
-      m_seen_keyes[{keyes,level}] = result;
-      return result;
-    }
-
-    struct StringVectorHash {
-      template <typename T>
-      std::size_t operator()(T const& sv) const {
-        std::size_t result{};
-        for (auto const& s : sv) {
-          result = (result << 1) xor std::hash<std::string>()(s);
-        }
-        return result;
-      }
-    };
-
-    using KeyesOptionsState = std::tuple<std::vector<std::string>,int>;
-    struct KeyesOptionsStateHash {
-      template <typename T>
-      std::size_t operator()(T const& state) const {
-        std::size_t result = StringVectorHash()(std::get<0>(state));
-        result = (result << 1) xor std::hash<int>()(std::get<1>(state));
-        return result;
-      }
-    };
-    
-    std::unordered_map<KeyesOptionsState, std::vector<std::string>,KeyesOptionsStateHash> m_seen_options{};
-
-    std::vector<std::string> to_remote_press_options(Grid const& grid,std::vector<std::string> const& keyes_options,int level) {
-      if (m_seen_options.contains({keyes_options,level})) return m_seen_options[{keyes_options,level}];
-      std::vector<std::string> result{};
-      
-      std::vector<std::string> all{};
-      for (auto const& [ix,keyes_option] : aoc::views::enumerate(keyes_options)) {
-        auto press_options = to_remote_press_options(grid, keyes_option,level); // all options to move on grid to press keyes
-  //      std::print("\n{}:{} -> {}",ix,keyes_option,press_options);
-        std::copy(press_options.begin(), press_options.end(), std::back_insert_iterator(all));
-      }
-      auto best = std::accumulate(all.begin(), all.end(), std::numeric_limits<std::size_t>::max(),[](auto acc,std::string const& path){
-        acc = std::min(acc,path.size());
-        return acc;
-      });
-      std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
-        return (path.size()==best);
-      });
-  //    std::print("\n{} : {}",best,result);
-      m_seen_options[{keyes_options,level}] = result;
-      return result;
-    }
-
-    // Recurse robot stack down to level 0 (top or last robot)
-    Integer to_remote_press_count(Grid const& grid,std::vector<std::string> const& keyes_options,int level) {
-      std::cout << NL << level << std::flush;
-      if (level > 0) {
-        auto to_press = to_remote_press_options(grid, keyes_options,level);
-        return to_remote_press_count(grid, to_press, level-1);
-      }
-      else {
-        return keyes_options.back().size();
-      }
-    }
-
-  public:
-
-    // Base case code on keypad
-    Integer to_remote_press_count(std::string const& keyes,int level) {
-      std::cout << NL << level << std::flush;
-      aoc::grid::Grid keypad({
-         "789"
-        ,"456"
-        ,"123"
-        ," 0A"
-      });
-      aoc::grid::Grid remote({
-         " ^A"
-        ,"<v>"
-      });
-      // Recurse down to 0
-      return to_remote_press_count(remote, to_remote_press_options(keypad, keyes,level), level-1);
-    }
-
-  };
+ // namespace hyperneutrino
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      /*
+       
+       N = layers of keypads (N:th keypad is the numeric keypad)
+       
+       N: --------------------------------------------------------------------------
+       
+       Press         0 2 9 A
+
+       Observation: The remote controlled robit starts at 'A'
+       
+       Visit       A 0 2 9 A
+                   | | | | |
+                   ---------
+                    | | | |   steps A->0, 0->2, 2->9,9->A
+                    < | | |
+                    | | | |
+                    | ^ | |   ...
+                    | | | |   options to move between each 'key'
+                    | | | |   ...
+                    | |^^>|
+                    or ^>^|
+                    or >^^|
+                    | | | |
+                    | | | |
+                    | | |vvv
+                    | | | |
+                    A A A A   and then action 'A' to press the 'key'
+
+       Observation: We can represent the options to move between keyes
+       as a list with members that are options to move between each key
+       
+        A->0, 0->2,         2->9      ,9->A    step
+          |     |            |           |
+         1x     1x          3x           1x    move options count
+       [  <     ,^   ,^^> | ^>^| >^^ ,  vvv]   moves list
+       |  A      A                 A      A]   presses
+       ------------------------
+
+       Observation: There needs an 'A' for each key to press.
+       Observation: The moves AND keypress are accomplished by pressing the remote.
+       
+       We can transform each list of move options per key to press,
+       into a list of options to moves per key
+       
+         [<,^,^^>,vvv]     this
+       | [<,^,^>^,vvv]  or this
+       | [<,^,>^^,vvv]  or this
+       & [A A   A   A] and this
+       ---------------
+
+         [<A,^A,^^>A,vvvA]    this 1
+       | [<A,^A,^>^A,vvvA] or this 2
+       | [<A,^A,>^^A,vvvA] or this 3
+       -----------------------------
+       count                       3
+      
+      N-1 --------------------------------------------------------------------------
+
+       [[<A,^A,^^>A,vvvA] | [<A,^A,^>^A,vvvA] | [<A,^A,>^^A,vvvA]]
+       
+
+       
+       
+       */
       Integer acc{};
       for (auto const& code : model) {
-        Cached cached{};
-        auto to_press_count = cached.to_remote_press_count(code, 3);
-        acc += test::to_num_part(code) * to_press_count;
       }
       if (acc>0) result = std::to_string(acc);
 
