@@ -448,13 +448,15 @@ namespace part2 {
 
   // The number of ways to press the remote to have robot enter all press_options on pad
   Integer to_shortest_possible_sequences_length(RemotePressOptions const& press_options,MoveOptionsMap const& move_options,int robot_stack_height) {
-    auto indent = "\n" + std::string(2*robot_stack_height,' ');
-    std::print("{}{} : to_shortest_possible_sequences_length : {}",indent,robot_stack_height,press_options);
+    static int loop_count{};
+    if (loop_count++ % 10000 == 0) std::print("\n{} {} {}",loop_count,robot_stack_height,press_options);
+//    auto indent = "\n" + std::string(2*robot_stack_height,' ');
+//    std::print("{}{} : to_shortest_possible_sequences_length : {}",indent,robot_stack_height,press_options);
     Integer result{};
     // sequence of options
     auto best_length = std::numeric_limits<Integer>::max();
     for (auto const& round_trip_options : press_options) {
-      std::print("{}{}",indent,round_trip_options);
+//      std::print("{}{}",indent,round_trip_options);
       // each actual option = keyes to press
       Integer remote_sequence_length{};
       for (auto const& keyes : round_trip_options) {
@@ -462,10 +464,10 @@ namespace part2 {
           // ["<A"]
           // Expand to options to press on remote
           auto press_options = to_remote_press_options(keyes,move_options);
-          std::print("{}On remote option:{}",indent,press_options);
+//          std::print("{}On remote option:{}",indent,press_options);
           // Flatten to actual options
           auto combinations = generate_combinations(press_options);
-          std::print("{}combinations:{}",indent,combinations);
+//          std::print("{}combinations:{}",indent,combinations);
           remote_sequence_length += to_shortest_possible_sequences_length(combinations, move_options, robot_stack_height-1);
         }
         else {
@@ -475,7 +477,7 @@ namespace part2 {
       best_length = std::min(best_length,remote_sequence_length);
     }
     result = best_length; // best total length to press on remote
-    std::print("{}result:{}",indent,result);
+//    std::print("{}result:{}",indent,result);
     return result;
   }
 
@@ -895,7 +897,7 @@ namespace part2 {
       for (auto const& [step,moves] : to_move_options_map(keypad)) move_options[step] = moves;
       for (auto const& [step,moves] : to_move_options_map(remote)) move_options[step] = moves;
       
-      int const ROBOT_STACK_HEIGHT{3};
+      int const ROBOT_STACK_HEIGHT{26};
       
       if (false) {
         // test single digit to see how it exapnds
