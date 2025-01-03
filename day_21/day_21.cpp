@@ -439,16 +439,21 @@ namespace part2 {
   RemotePressOptions to_remote_press_options(std::string const& keyes_to_press,MoveOptionsMap const& move_options) {
     RemotePressOptions result{};
     for (auto const& step : to_pad_steps(keyes_to_press)) {
-      result.push_back(move_options.at(step));
+      result.push_back({});
+      using aoc::raw::operator+;
+      for (auto keyes : move_options.at(step)) result.back().push_back(keyes + 'A');
     }
     return result;
   }
 
   // The number of ways to press the remote to have robot enter all press_options on pad
   Integer to_remote_options_count(RemotePressOptions const& press_options,int robot_stack_height,MoveOptionsMap const& move_options) {
+    std::cout << NL << aoc::raw::Indent(robot_stack_height*2);
+    std::print("{} : to_shortest_possible_sequences_count : {}",robot_stack_height,press_options);
     if (robot_stack_height==1) {
       Integer result{1};
       for (auto const& round_trip_options : press_options) {
+        std::print("\n\t{}",round_trip_options);
         result *= round_trip_options.size();
       }
       return result;
@@ -459,10 +464,11 @@ namespace part2 {
   }
 
   Integer to_shortest_possible_sequences_count(std::string const& code,int robot_stack_height,MoveOptionsMap const& move_options) {
-    Integer result{-1};
+    std::cout << NL << aoc::raw::Indent(robot_stack_height*2);
+    std::print("\n{} : to_shortest_possible_sequences_count : {}",robot_stack_height,code);
     // expand to what to press on the remote of robot that presses numeric keypad
-    auto remote_options = to_remote_press_options(code,move_options);
-    return result;
+    auto press_options = to_remote_press_options(code,move_options);
+    return to_remote_options_count(press_options, robot_stack_height, move_options);
   }
 
 
