@@ -446,7 +446,7 @@ namespace part2 {
     return result;
   }
 
-  using Seen = std::map<std::string,Integer>;
+  using Seen = std::map<std::pair<int,std::string>,Integer>;
 
   // The number of ways to press the remote to have robot enter all press_options on pad
   Integer to_shortest_possible_sequences_length(RemotePressOptions const& press_options,MoveOptionsMap const& move_options,int robot_stack_height,Seen& seen) {
@@ -465,17 +465,20 @@ namespace part2 {
         if (robot_stack_height>0) {
           // ["<A"]
           // Expand to options to press on remote
-          if (seen.contains(keyes)) {
-            remote_sequence_length += seen[keyes];
-            continue;
+          auto state = std::pair{robot_stack_height,keyes};
+          if (seen.contains(state)) {
+            remote_sequence_length += seen[state];
           }
-          auto press_options = to_remote_press_options(keyes,move_options);
-//          std::print("{}On remote option:{}",indent,press_options);
-          // Flatten to actual options
-          auto combinations = generate_combinations(press_options);
-//          std::print("{}combinations:{}",indent,combinations);
-          remote_sequence_length += to_shortest_possible_sequences_length(combinations, move_options, robot_stack_height-1,seen);
-          seen[keyes] = remote_sequence_length;
+          else {
+            auto press_options = to_remote_press_options(keyes,move_options);
+  //          std::print("{}On remote option:{}",indent,press_options);
+            // Flatten to actual options
+            auto combinations = generate_combinations(press_options);
+  //          std::print("{}combinations:{}",indent,combinations);
+            auto candidate = to_shortest_possible_sequences_length(combinations, move_options, robot_stack_height-1,seen);
+            remote_sequence_length += candidate;
+            seen[{robot_stack_height,keyes}] = candidate;
+          }
         }
         else {
           remote_sequence_length += keyes.size();
