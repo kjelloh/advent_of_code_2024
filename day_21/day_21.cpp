@@ -27,6 +27,8 @@
 #include <filesystem>
 #include <tuple>
 #include <functional> // E.g., hash for std::tuple
+#include <format>
+#include <print>
 
 using aoc::raw::NL;
 using aoc::raw::T;
@@ -365,7 +367,104 @@ namespace part1 {
 
 namespace part2 {
 
- // namespace hyperneutrino
+  using Step = std::pair<char,char>;
+  using Path = std::string; // keys to visit / press
+  using PathOptions = std::vector<Path>;
+  using MoveOptions = PathOptions;
+  using PressOptions = PathOptions;
+  using MoveOptionsMap = std::map<Step,MoveOptions>;
+  using RemotePressOptions = std::vector<PressOptions>;
+
+  MoveOptions to_move_options(Grid const& grid,Position const& start,Position const& end) {
+    MoveOptions result{};
+    using Path = std::vector<Position>;
+    std::queue<Path> q{};
+    q.push({start});
+    auto manhattan_distance = aoc::grid::to_manhattan_distance(end-start);
+//    if (manhattan_distance==1) std::cout << NL << "to_move_options " << start << " " << end;
+    while (not q.empty()) {
+      auto curr = q.front();
+
+      q.pop();
+//      if (manhattan_distance==1) std::cout << NL << T << curr << " " << *grid.at(curr.back());
+
+      if (curr.back() == end) {
+        result.push_back(aoc::grid::to_dir_steps(curr));
+//        if (manhattan_distance==1) std::cout << curr << " !";
+        continue; // Skip longer paths
+      }
+      for (auto const& neighbour : aoc::grid::to_ortho_neighbours(curr.back())) {
+        if (not grid.on_map(neighbour)) continue;
+        if (auto iter = std::ranges::find(curr,neighbour);iter!=curr.end()) continue; // No back-track
+        if (*grid.at(neighbour) == ' ') continue;
+        using aoc::raw::operator+;
+        auto next = curr + neighbour;
+        if (next.size()>manhattan_distance+1) continue;
+        q.push(next);
+      }
+    }
+    return result;
+  }
+
+  MoveOptionsMap to_move_options_map(Grid const& grid) {
+    MoveOptionsMap result{};
+    std::map<Position,char> key_map{};
+    auto capture_key = [&key_map](Position const& pos,char ch) {
+      if (ch != ' ') key_map[pos] = ch;
+    };
+    grid.for_each(capture_key);
+    for (int i=0;i<key_map.size();++i) {
+      for (int j=0;j<key_map.size();++j) {
+        using aoc::raw::operator+;
+        auto const& [first_pos,first] = *std::next(key_map.begin(),i);
+        auto const& [second_pos,second] = *std::next(key_map.begin(),j);
+        Step step{first,second};
+        result[step] = to_move_options(grid, first_pos, second_pos);
+        std::print("\nstep:{} options:{}",step,result[step]);
+      }
+    }
+    return result;
+  }
+
+  
+  // steps of keys to press keyes starting from 'A'
+  aoc::generatator<Step> to_pad_steps(std::string const& keyes) {
+    for (int i=0;i<keyes.size();++i) {
+      if (i==0) co_yield Step{'A',keyes[0]};
+      else co_yield Step{keyes[i-1],keyes[i]};
+    }
+  }
+
+  // Options to press the remote to have robot press keyes_to_press
+  RemotePressOptions to_remote_press_options(std::string const& keyes_to_press,MoveOptionsMap const& move_options) {
+    RemotePressOptions result{};
+    for (auto const& step : to_pad_steps(keyes_to_press)) {
+      result.push_back(move_options.at(step));
+    }
+    return result;
+  }
+
+  // The number of ways to press the remote to have robot enter all press_options on pad
+  Integer to_remote_options_count(RemotePressOptions const& press_options,int robot_stack_height,MoveOptionsMap const& move_options) {
+    if (robot_stack_height==1) {
+      Integer result{1};
+      for (auto const& round_trip_options : press_options) {
+        result *= round_trip_options.size();
+      }
+      return result;
+    }
+    else {
+      throw std::runtime_error(std::format("Sorry, to_remote_options_count for robot_stack_height {} noy yet implemented",robot_stack_height));
+    }
+  }
+
+  Integer to_shortest_possible_sequences_count(std::string const& code,int robot_stack_height,MoveOptionsMap const& move_options) {
+    Integer result{-1};
+    // expand to what to press on the remote of robot that presses numeric keypad
+    auto remote_options = to_remote_press_options(code,move_options);
+    return result;
+  }
+
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -758,7 +857,23 @@ namespace part2 {
        
        */
       Integer acc{};
+      aoc::grid::Grid keypad({
+         "789"
+        ,"456"
+        ,"123"
+        ," 0A"
+      });
+      aoc::grid::Grid remote({
+         " ^A"
+        ,"<v>"
+      });
+      MoveOptionsMap move_options{};
+      for (auto const& [step,moves] : to_move_options_map(keypad)) move_options[step] = moves;
+      for (auto const& [step,moves] : to_move_options_map(remote)) move_options[step] = moves;
+      
+      int const ROBOT_STACK_HEIGHT{1};
       for (auto const& code : model) {
+        acc += to_shortest_possible_sequences_count(code,ROBOT_STACK_HEIGHT,move_options);
       }
       if (acc>0) result = std::to_string(acc);
 

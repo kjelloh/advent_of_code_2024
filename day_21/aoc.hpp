@@ -20,8 +20,27 @@
 #include <deque>
 #include <iterator>
 #include <tuple>
+#include <coroutine>
+#include <format>
+#include <print>
+
 
 namespace aoc {
+
+  // For tool chain without std::print(thing) without format string
+  template <typename T>
+  void print(T t) {
+    std::print("{}",t);
+  }
+
+  void test_print() {
+    int i{};
+    aoc::print(i);
+    std::pair<char,char> step{};
+    std::print("{}",step);
+    aoc::print(step);
+  }
+
 
   struct Args {
     std::map<std::string,std::string> arg{};
@@ -88,8 +107,89 @@ namespace aoc {
     }
   } // namespace views
 
+  namespace coroutine {
+
+    // Until C++ library of comiler supports std::generator
+    template<typename T>
+    class Generator {
+    public:
+      struct promise_type {
+        T current_value;
+        
+        Generator get_return_object() {
+          return Generator{std::coroutine_handle<promise_type>::from_promise(*this)};
+        }
+        
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+        std::suspend_always yield_value(T value) {
+          current_value = value;
+          return {};
+        }
+        
+        void return_void() {}
+        void unhandled_exception() { std::terminate(); }
+      };
+      
+      using handle_type = std::coroutine_handle<promise_type>;
+      
+      explicit Generator(handle_type coroutine) : coroutine_(coroutine) {}
+      Generator(const Generator&) = delete;
+      Generator(Generator&& other) noexcept : coroutine_(other.coroutine_) {
+        other.coroutine_ = nullptr;
+      }
+      ~Generator() {
+        if (coroutine_) {
+          coroutine_.destroy();
+        }
+      }
+      
+      struct Iterator {
+        handle_type coroutine_;
+        
+        Iterator(handle_type coroutine) : coroutine_(coroutine) {
+          if (coroutine_) coroutine_.resume();
+        }
+        
+        Iterator& operator++() {
+          coroutine_.resume();
+          if (coroutine_.done()) coroutine_ = nullptr;
+          return *this;
+        }
+        
+        const T& operator*() const { return coroutine_.promise().current_value; }
+        const T* operator->() const { return &coroutine_.promise().current_value; }
+        
+        bool operator==(const Iterator& other) const { return coroutine_ == other.coroutine_; }
+        bool operator!=(const Iterator& other) const { return !(*this == other); }
+      };
+      
+      Iterator begin() {
+        return coroutine_ ? Iterator{coroutine_} : end();
+      }
+      
+      Iterator end() {
+        return Iterator{nullptr};
+      }
+      
+    private:
+      handle_type coroutine_;
+    };;
+
+
+  } // namespace coroutine
+
+  template <typename T>
+  using generatator = coroutine::Generator<T>;
+
 
   namespace raw {
+  
+    template <typename T>
+    std::vector<T> operator+(std::vector<T> v,T const& t) {
+      v.push_back(t);
+      return v;
+    }
 
     std::string operator+(std::string lhs,char rhs) {
       lhs.push_back(rhs);
@@ -721,12 +821,12 @@ namespace aoc {
     Direction const LEFT{0,-1};
     Direction const RIGHT{0,1};
 
-    auto to_manhattan_length(Position const& p) {
+    auto to_manhattan_distance(Position const& p) {
       return (std::abs(p.row)+std::abs(p.col));
     }
     
     auto to_manhattan_distance(Position const& p1, Position const& p2) {
-      return to_manhattan_length(p2-p1);
+      return to_manhattan_distance(p2-p1);
     }
 
     class Grid {
@@ -789,7 +889,8 @@ namespace aoc {
       void for_each(auto f) const {
         for (int row=0;row<height();++row) {
           for (int col=0;col<width();++col) {
-            f(*this,Position{row,col});
+            Position pos{row,col};
+            f(pos,*at(pos));
           }
         }
       }
@@ -804,10 +905,10 @@ namespace aoc {
         return result;
       }
       
-      Positions find_all(char ch) const {
+      Positions find_all(char ch_x) const {
         Positions result{};
-        auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
-          if (grid.at(pos) == ch) result.push_back(pos);
+        auto push_back_matched = [ch_x,&result](Position const& pos,char ch) {
+          if (ch == ch_x) result.push_back(pos);
         };
         for_each(push_back_matched);
         return result;
@@ -818,12 +919,7 @@ namespace aoc {
       }
       
       bool operator==(Grid const& other) const {
-        bool result{true};
-        auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
-          result = result and (this->at(pos) == other.at(pos));
-        };
-        this->for_each(all_equal);
-        return result;
+        return m_grid == other.m_grid;
       }
       
       Position top_left() const {return {0,0};}
@@ -908,6 +1004,22 @@ namespace aoc {
         case 2: result = '<'; break;
         case 3: result = '^'; break;
         case -1: break;
+      }
+      return result;
+    }
+  
+    std::string to_dir_steps(Path const& path) {
+      std::string result{};
+      for (int i=0;i<path.size()-1;++i) {
+        auto from = path[i];
+        auto to = path[i+1];
+        switch (to_direction_index(from, to)) {
+          case 0: result.push_back('>'); break;
+          case 1: result.push_back('v'); break;
+          case 2: result.push_back('<'); break;
+          case 3: result.push_back('^'); break;
+          default: result.push_back('?'); break;
+        }
       }
       return result;
     }
