@@ -32,7 +32,7 @@ using aoc::grid::Direction;
 using aoc::grid::Path;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using Model = Grid;
 
 Model parse(auto& in) {
@@ -43,7 +43,7 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
+using aoc::Args;
 
 std::set<Position> to_junctions(std::set<Position> const& reachable,auto to_neighbours) {
   std::set<Position> result{};
@@ -62,9 +62,9 @@ namespace test {
 
   struct LogEntry {
     Grid grid;
-    Result score{};
-    std::optional<Result> steps{};
-    std::optional<Result> turns{};
+    Integer score{};
+    std::optional<Integer> steps{};
+    std::optional<Integer> turns{};
     bool operator==(LogEntry const& other) const {
       bool result{true};
       result = result and grid == other.grid;
@@ -144,13 +144,31 @@ namespace test {
     }
     return os;
   }
+
+  aoc::parsing::Sections parse_doc(Args const& args) {
+    std::cout << NL << T << "parse puzzle doc text";
+    aoc::parsing::Sections result{};
+    using namespace aoc::parsing;
+    std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
+    auto sections = Splitter{doc_in}.same_indent_sections();
+    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+      std::cout << NL << "---------- section " << sx << " ----------";
+      result.push_back(section);
+      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+      }
+    }
+
+  }
+
+  aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
+    return {};
+  }
+
   
-  LogEntries parse(auto& in) {
-    std::cout << NL << T << "test::parse";
+  LogEntries to_log_entries(aoc::parsing::Sections const& sections,Args const& args) {
     LogEntries result{};
     using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto sections = input.sections();
     for (int i=0;i<sections.size();++i) {
       auto const& section = sections[i];
       using aoc::raw::operator<<;
@@ -191,11 +209,6 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test0(Args args) {
-    std::cout << NL << NL << "test0";
-    return std::nullopt;
-  }
-
   using Reachable = std::set<Position>;
   using Segments = std::vector<aoc::grid::Path>;
   Segments to_segments(Position const& start,Reachable const& reachable,Reachable const& junctions) {
@@ -206,21 +219,9 @@ namespace test {
     return result;
   }
 
-  const std::vector<Position> directions = {
-      {0, 1},  // Right
-      {1, 0},  // Down
-      {0, -1}, // Left
-      {-1, 0}  // Up
-  };
-
-  int to_direction_index(Position const& from, Position const& to) {
-    auto it = std::find(directions.begin(), directions.end(),to-from);
-    return (it != directions.end()) ? static_cast<int>(std::distance(directions.begin(), it)) : -1;
-  }
-
   struct Node {
       Position pos;
-      Result cost;
+      Integer cost;
       int direction;
       bool operator>(Node const& other) const { return cost > other.cost; }
   };
@@ -229,10 +230,10 @@ namespace test {
     Path result{};
       
       std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-      std::map<Position, Result> cost_map;
+      std::map<Position, Integer> cost_map;
       std::map<Position, Position> previous;
       std::set<Position> visited;
-      auto step_cost = [](int prev_dir, int curr_dir) -> Result {
+      auto step_cost = [](int prev_dir, int curr_dir) -> Integer {
           return 1 + (prev_dir != -1 && prev_dir != curr_dir ? 1000 : 0);
       };
 
@@ -252,7 +253,7 @@ namespace test {
           }
           visited.insert(current.pos);
   
-          for (auto const& next : default_neighbors(current.pos)) {
+          for (auto const& next : aoc::grid::to_ortho_neighbours(current.pos)) {
               if (not grid.on_map(next)) continue;
               if (visited.contains(next)) continue;
               if (grid.at(next) == '#') continue;
@@ -277,30 +278,6 @@ namespace test {
       std::reverse(result.begin(), result.end());
 
       return result;
-  }
-
-  Path to_marked_path(Position start,Grid const& grid,auto is_path_mark) {
-    Path result{};
-    std::deque<Position> q{};
-    aoc::grid::Seen visited{};
-    if (grid.on_map(start)) {
-      q.push_back(start);
-      char ch = *grid.at(start);
-      visited.insert(start);
-      result.push_back(start);
-      while (not q.empty()) {
-        auto curr = q.front();q.pop_front();
-        for (auto const& next : default_neighbors(curr)) {
-          if (not grid.on_map(next)) continue;
-          if (visited.contains(next)) continue;
-          if (not is_path_mark(*grid.at(next))) continue;
-          q.push_back(next);
-          visited.insert(next);
-          result.push_back(next);
-        }
-      }
-    }
-    return result;
   }
 
   using Turns = std::vector<std::pair<Position,char>>;
@@ -330,9 +307,9 @@ namespace test {
     return result;
   }
 
-  Result to_score(Path const& best_path,Turns const& turns) {
+  Integer to_score(Path const& best_path,Turns const& turns) {
     std::cout << NL << "to_score";
-    Result result{};
+    Integer result{};
     auto turn_count = turns.size();
     auto step_count = (best_path.size()-1); // steps one less than count
     result = turn_count*1000 + step_count;
@@ -340,16 +317,11 @@ namespace test {
   }
 
 
-  std::optional<Result> test1(auto& in, auto& log_in,Args args) {
+  std::optional<Result> test1(Model const& model,LogEntries const& log, Args args) {
     std::cout << NL << NL << "test1";
-    auto model = ::parse(in);
-    auto log = test::parse(log_in);
     
-    auto starts = model.find_all('S');
-    auto start = starts[0];
-    auto ends = model.find_all('E');
-    auto end = ends[0];
-
+    auto start = model.find('S');
+    auto end = model.find('E');
     
     if (log.size() == 1) {
       // Extract the exposed solution path from log
@@ -373,17 +345,18 @@ namespace test {
       std::cout << NL << "best_score:" << best_score;
 
       Grid grid = model;
-      for (int i=1;i<best_path.size()-1;++i) {
-        auto to = best_path[i+1];
-        auto from = best_path[i];
-        switch (to_direction_index(from, to)) {
-          case 0: grid.at(from) = '>'; break;
-          case 1: grid.at(from) = 'v'; break;
-          case 2: grid.at(from) = '<'; break;
-          case 3: grid.at(from) = '^'; break;
-          case -1: break;
-        }
-      }
+      aoc::grid::to_dir_traced(grid, best_path);
+//      for (int i=1;i<best_path.size()-1;++i) {
+//        auto to = best_path[i+1];
+//        auto from = best_path[i];
+//        switch (to_direction_index(from, to)) {
+//          case 0: grid.at(from) = '>'; break;
+//          case 1: grid.at(from) = 'v'; break;
+//          case 2: grid.at(from) = '<'; break;
+//          case 3: grid.at(from) = '^'; break;
+//          case -1: break;
+//        }
+//      }
       LogEntry best{grid,best_score,best_path.size()-1
         ,best_turns.size()};
       Outcome outcome{expected,best};
@@ -395,18 +368,52 @@ namespace test {
     return std::nullopt;
   }
 
+
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    std::ostringstream response{};
+    std::cout << NL << NL << "test";
+    if (in) {
+      auto model = parse(in);
+      auto doc = parse_doc(args);
+      auto example_lines = to_example(doc);
+      if (example_lines.size()>0) {
+        if (args.options.contains("-to_example")) {
+          auto example_file = aoc::to_working_dir_path("example.txt");
+          if (aoc::raw::write_to_file(example_file, example_lines)) {
+            response << "Created " << example_file;
+          }
+          else {
+            response << "Sorry, failed to create file " << example_file;
+          }
+          return response.str();
+        }
+        else {
+          std::ostringstream oss{};
+          aoc::raw::write_to(oss, example_lines);
+          std::istringstream example_in{oss.str()};
+          auto example_model = ::parse(example_in);
+          std::cout << NL << "example_model:" << example_model;
+          auto model = ::parse(in);
+          auto log = test::to_log_entries(doc, args);
+          return test1(model,log,args);
+
+        }
+      }
+    }
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
+  }
+
 }
 
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+    std::ostringstream response{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
-      auto starts = model.find_all('S');
-      auto start = starts[0];
-      auto ends = model.find_all('E');
-      auto end = ends[0];
+      auto start = model.find('S');
+      auto end = model.find('E');
       auto best_path = test::to_best_path(start, end, model);
       std::cout << NL << "best_path:" << best_path;
       auto best_turns = test::to_turns(best_path);
@@ -419,7 +426,7 @@ namespace part1 {
       for (int i=1;i<best_path.size()-1;++i) {
         auto to = best_path[i+1];
         auto from = best_path[i];
-        switch (test::to_direction_index(from, to)) {
+        switch (to_direction_index(from, to)) {
           case 0: grid.at(from) = '>'; break;
           case 1: grid.at(from) = 'v'; break;
           case 2: grid.at(from) = '<'; break;
@@ -429,81 +436,181 @@ namespace part1 {
       }
       std::cout << NL << grid;
       
-      result = best_score;
+      response << best_score;
     }
-    return result;
+    if (response.str().size()>0) return response.str();
+    return std::nullopt;
   }
 
 }
 namespace part2 {
+
+  using Paths = std::vector<Path>;
+
+  struct Node {
+    Position pos;
+    Integer cost;
+    int direction;
+    bool operator>(Node const& other) const { return cost > other.cost; }
+  };
+
+  Paths to_best_paths(Position const& start, Position const& end,Grid const& grid) {
+    Paths result{};
+    
+    std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
+    std::map<Position, Integer> cost_map;
+    std::map<Position, std::set<Position>> previous;
+    auto step_cost = [](int prev_dir, int curr_dir) -> Integer {
+      return 1 + (prev_dir != -1 && prev_dir != curr_dir ? 1000 : 0);
+    };
+    
+    pq.push({start, 0, -1});
+    cost_map[start] = 0;
+    
+    while (!pq.empty()) {
+      Node current = pq.top();
+      pq.pop();
+      
+      if (current.pos == end) {
+        break;
+      }
+      
+      if (current.pos == Position{7,4}) std::cout << NL << current.pos;
+                  
+      for (auto const& next : aoc::grid::to_ortho_neighbours(current.pos)) {
+        if (not grid.on_map(next)) continue;
+        if (grid.at(next) == '#') continue;
+        auto curr_dir = to_direction_index(current.pos, next);
+        auto new_cost = current.cost + step_cost(current.direction, curr_dir);
+                
+        if (current.pos == Position{7,4}) {
+          std::cout << NL << current.pos << " -> " << next << " " << new_cost << " <? ";
+          if (cost_map.contains(next)) std::cout  << cost_map[next];
+          else std::cout << "INF";
+        }
+
+        // Update if this path is same or better.
+        if (!cost_map.count(next) || new_cost < cost_map[next]) {
+          cost_map[next] = new_cost;
+          previous[next].clear(); // Previous back-track no löonger valid for new best path
+          previous[next].insert(current.pos);
+          pq.push({next, new_cost, curr_dir});
+          if (next == Position{7,5}) std::cout << NL << next << " - 0 -> " << previous[next];
+        }
+        else if (new_cost == cost_map[next]) {
+          previous[next].insert(current.pos); // Extend the set of previous
+          pq.push({next, new_cost, curr_dir});
+          if (next == Position{7,5}) std::cout << NL << next << " - * -> " << previous[next];
+        }
+      }
+    }
+            
+    // Reconstruct all found paths
+    std::queue<Path> q{};
+    q.push({end});
+    while (not q.empty()) {
+      auto curr = q.front();
+      q.pop();
+      if (curr.back() == start) {
+        result.push_back(curr);
+      }
+
+      if (previous[curr.back()].size()>1) std::cout << NL << curr << " <- " << previous[curr.back()];
+      for (auto const& prev : previous[curr.back()]) {
+        using aoc::raw::operator+;
+        q.push(curr + prev);
+      }
+    }
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
+      auto start = model.find('S');
+      auto end = model.find('E');
+      auto best_paths = part2::to_best_paths(start, end, model);
+      std::set<Position> visited{};
+      for (auto const& path : best_paths) {
+        std::ranges::copy(path,std::inserter(visited, visited.begin()));
+      }
+      {
+        auto marked = model;
+        aoc::grid::to_filled(marked, visited);
+        std::cout << NL << marked;
+      }
+      result = std::to_string(visited.size());
+
     }
     return result;
   }
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
+  Args user_args{};
+  
+  // Override by any user input
+  for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      Args args;
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111,112,11,10};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto log_file = aoc::to_working_dir_path("example.log");
-        std::ifstream log_in{log_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
-      } break;
-      case 112: {
-        auto log_file = aoc::to_working_dir_path("example2.log");
-        std::ifstream log_in{log_file};
-        auto file = aoc::to_working_dir_path("example2.txt");
-        std::ifstream in{file};
-        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -516,14 +623,17 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   Xcode Debug -O2
+
+   >day_16 -all
 
    ANSWERS
    duration:4ms answer[Part 1 Test Example vs Log] NO OPERATION
    duration:4ms answer[Part 1 Test Example vs Log] NO OPERATION
    duration:1ms answer[Part 1 Example] 7036
    duration:111ms answer[Part 1     ] 95476
-   
-  */
+
+   */
   return 0;
 }
