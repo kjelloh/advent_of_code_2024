@@ -51,29 +51,17 @@ Model parse(auto& in) {
 
 using aoc::Args;
 
+// Stack based bfs cartesian product
 std::vector<std::vector<std::string>> generate_combinations(const std::vector<std::vector<std::string>>& segment_options) {
   std::vector<std::vector<std::string>> result{};
-//    for (auto const& options : segment_options) {
-//      print("\noptions:{}",options);
-//    }
-  // Initialize a queue that holds partial combinations
   std::queue<std::vector<std::string>> q;
-  
-  // Start with an empty combination
   q.push({});
-  
-  // Process the queue until all combinations are generated
   while (!q.empty()) {
-    // Get the current partial combination
     std::vector<std::string> current_combination = q.front();
     q.pop();
-    
-    // If the current combination is complete, print it
     if (current_combination.size() == segment_options.size()) {
       result.push_back(current_combination);
-//        std::print("\ncombination:{}",current_combination);
     } else {
-      // Otherwise, add all possibilities for the next vector to the current combination
       size_t depth = current_combination.size(); // which vector are we adding from?
       for (const auto& option : segment_options[depth]) {
         // Copy the current combination, append the new option, and push it to the queue
@@ -92,7 +80,7 @@ using aoc::grid::Position;
 
 namespace test {
 
-  // Adapt to expected for day puzzle
+  // Adapted to expected for day puzzle
   struct LogEntry {
     aoc::raw::Line code;
     aoc::raw::Line expected_presses;
@@ -135,7 +123,6 @@ namespace test {
   // Return all options to press the remote to move the robot from key 'first' to key 'second' and press it
   // E.g., 'A' -> '2' on numering keypad returns options '<^A' and '^<A'.
   std::vector<std::string> to_remote_press_options(Grid const& grid,char first,char second) {
-//    std::cout << NL << first << second << std::flush;
     std::vector<std::string> result{};
     auto start = grid.find_all(first)[0];
     auto end = grid.find_all(second)[0];
@@ -149,11 +136,8 @@ namespace test {
       auto curr = q.front();
       q.pop_front();
       auto [pos,path] = curr;
-//      std::cout << NL << pos << " " << path;
-//      if (++lc > 1000) break;
       if (pos == end) {
         result.push_back(path+'A');
-//        std::cout << " ! ";
         continue;
       }
       if (path.size()>OPTIMAL_PATH_LENGTH) break;
@@ -181,7 +165,6 @@ namespace test {
       segment_options.push_back({});
       auto first = (i<0)?'A':keyes[i];
       auto second = keyes[i+1];
-//      std::print("\nfirst:{},second:{}",first,second);
       auto options = to_remote_press_options(grid, first, second);
       using aoc::raw::operator+;
       segment_options.back() = options; // options for moving from first to second and press it
@@ -202,7 +185,6 @@ namespace test {
     std::vector<std::string> all{};
     for (auto const& [ix,keyes_option] : aoc::views::enumerate(keyes_options)) {
       auto press_options = to_remote_press_options(grid, keyes_option); // all options to move on grid to press keyes
-//      std::print("\n{}:{} -> {}",ix,keyes_option,press_options);
       std::copy(press_options.begin(), press_options.end(), std::back_insert_iterator(all));
     }
     auto best = std::accumulate(all.begin(), all.end(), std::numeric_limits<std::size_t>::max(),[](auto acc,std::string const& path){
@@ -212,7 +194,6 @@ namespace test {
     std::copy_if(all.begin(), all.end(), std::back_insert_iterator(result), [best](std::string const& path){
       return (path.size()==best);
     });
-//    std::print("\n{} : {}",best,result);
     return result;
   }
 
@@ -233,7 +214,8 @@ namespace test {
       ," 0A"
     });
     
-    auto computed = to_remote_press_options(keypad,"029A");
+    std::string code{"029A"};
+    auto computed = to_remote_press_options(keypad,code);
     std::set<std::string> expected = {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"}; // CTAD :)
     std::print("\ncomputed:{} expected:{}",computed,expected);
     if (computed.size() == expected.size()) {
@@ -244,7 +226,7 @@ namespace test {
         }
         return true;
       })) {
-        std::print(oss,"OK");
+        std::print(oss,"{} -> {} (file ignored) OK",code,expected);
       }
       else {
         std::print(oss,"FAILED");
@@ -306,7 +288,6 @@ namespace test {
           auto to_press_3 = to_remote_press_options(remote, to_press_2);
           std::print("\ncomputed:{}",to_press_3);
           std::print("\nexpect:{}",entry.expected_presses);
-//          std::cout << NL << T << "expect:" << T << entry.expected_presses;
           auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
           all_did_pass = all_did_pass and (iter != to_press_3.end());
           if (not all_did_pass) break;
@@ -315,7 +296,7 @@ namespace test {
         if (not all_did_pass) {
           return "FAILED";
         }
-        if (acc == 126384) return "Complexity 126384 OK";
+        if (acc == 126384) return std::format("Five code example (file ignored) -> Complexity 126384 OK");
         else return "FAILED";
       }
     }
@@ -356,7 +337,6 @@ namespace part1 {
         auto to_press_1 = test::to_remote_press_options(keypad,code);
         auto to_press_2 = test::to_remote_press_options(remote, to_press_1);
         auto to_press_3 = test::to_remote_press_options(remote, to_press_2);
-//        std::print("\ncomputed:{}",to_press_3);
         acc += test::to_num_part(code) * to_press_3.back().size();
       }
       if (acc>0) result = std::to_string(acc);
@@ -375,22 +355,18 @@ namespace part2 {
   using MoveOptionsMap = std::map<Step,MoveOptions>;
   using RemotePressOptions = std::vector<PressOptions>;
 
+  // flood fill from start and exhaust all hits on end
   MoveOptions to_move_options(Grid const& grid,Position const& start,Position const& end) {
     MoveOptions result{};
     using Path = std::vector<Position>;
     std::queue<Path> q{};
     q.push({start});
     auto manhattan_distance = aoc::grid::to_manhattan_distance(end-start);
-//    if (manhattan_distance==1) std::cout << NL << "to_move_options " << start << " " << end;
     while (not q.empty()) {
       auto curr = q.front();
-
       q.pop();
-//      if (manhattan_distance==1) std::cout << NL << T << curr << " " << *grid.at(curr.back());
-
       if (curr.back() == end) {
         result.push_back(aoc::grid::to_dir_steps(curr));
-//        if (manhattan_distance==1) std::cout << curr << " !";
         continue; // Skip longer paths
       }
       for (auto const& neighbour : aoc::grid::to_ortho_neighbours(curr.back())) {
@@ -399,27 +375,28 @@ namespace part2 {
         if (*grid.at(neighbour) == ' ') continue;
         using aoc::raw::operator+;
         auto next = curr + neighbour;
-        if (next.size()>manhattan_distance+1) continue;
+        if (next.size()>manhattan_distance+1) continue; // filter out 'detoures' > manhattan distance steps
         q.push(next);
       }
     }
     return result;
   }
 
-  MoveOptionsMap to_move_options_map(Grid const& grid) {
+  // All options to move optimally between any key pairs on grid (pad)
+  MoveOptionsMap to_move_options_map(Grid const& pad) {
     MoveOptionsMap result{};
     std::map<Position,char> key_map{};
     auto capture_key = [&key_map](Position const& pos,char ch) {
       if (ch != ' ') key_map[pos] = ch;
     };
-    grid.for_each(capture_key);
+    pad.for_each(capture_key);
     for (int i=0;i<key_map.size();++i) {
       for (int j=0;j<key_map.size();++j) {
         using aoc::raw::operator+;
         auto const& [first_pos,first] = *std::next(key_map.begin(),i);
         auto const& [second_pos,second] = *std::next(key_map.begin(),j);
         Step step{first,second};
-        result[step] = to_move_options(grid, first_pos, second_pos);
+        result[step] = to_move_options(pad, first_pos, second_pos);
         std::print("\nstep:{} options:{}",step,result[step]);
       }
     }
@@ -449,45 +426,37 @@ namespace part2 {
   using Seen = std::map<std::pair<int,std::string>,Integer>;
 
   // The number of ways to press the remote to have robot enter all press_options on pad
-  Integer to_shortest_possible_sequences_length(RemotePressOptions const& press_options,MoveOptionsMap const& move_options,int robot_stack_height,Seen& seen) {
-    static int loop_count{};
-    if (loop_count++ % 10000 == 0) std::print("\n{} {} {}",loop_count,robot_stack_height,press_options);
-//    auto indent = "\n" + std::string(2*robot_stack_height,' ');
-//    std::print("{}{} : to_shortest_possible_sequences_length : {}",indent,robot_stack_height,press_options);
+  // pad_ix is the index to all robot remotes 0..N-1 + the numeric pad N
+  Integer to_shortest_possible_sequences_length(RemotePressOptions const& press_options,MoveOptionsMap const& move_options,int pad_ix,Seen& seen) {
     Integer result{};
     // sequence of options
     auto best_length = std::numeric_limits<Integer>::max();
     for (auto const& round_trip_options : press_options) {
-//      std::print("{}{}",indent,round_trip_options);
-      // each actual option = keyes to press
       Integer remote_sequence_length{};
       for (auto const& keyes : round_trip_options) {
-        if (robot_stack_height>0) {
-          // ["<A"]
+        if (pad_ix>0) {
           // Expand to options to press on remote
-          auto state = std::pair{robot_stack_height,keyes};
+          auto state = std::pair{pad_ix,keyes};
           if (seen.contains(state)) {
             remote_sequence_length += seen[state];
           }
           else {
             auto press_options = to_remote_press_options(keyes,move_options);
-  //          std::print("{}On remote option:{}",indent,press_options);
-            // Flatten to actual options
+            // 'Flatten' to spelled out options (cartesian product)
             auto combinations = generate_combinations(press_options);
-  //          std::print("{}combinations:{}",indent,combinations);
-            auto candidate = to_shortest_possible_sequences_length(combinations, move_options, robot_stack_height-1,seen);
+            auto candidate = to_shortest_possible_sequences_length(combinations, move_options, pad_ix-1,seen);
             remote_sequence_length += candidate;
-            seen[{robot_stack_height,keyes}] = candidate;
+            seen[state] = candidate;
           }
         }
         else {
+          // Remote of robot 1 (pad_ix 0) is pressed by YOU
           remote_sequence_length += keyes.size();
         }
       }
       best_length = std::min(best_length,remote_sequence_length);
     }
     result = best_length; // best total length to press on remote
-//    std::print("{}result:{}",indent,result);
     return result;
   }
 
@@ -499,7 +468,8 @@ namespace part2 {
     press_options.push_back({});
     press_options.back().push_back(code);
     Seen seen{};
-    return to_shortest_possible_sequences_length(press_options,move_options, robot_stack_height,seen);
+    // Start the serach from pad N = robot_stack_height + 1 (the numeric pad)
+    return to_shortest_possible_sequences_length(press_options,move_options, robot_stack_height+1,seen);
   }
 
 
@@ -510,11 +480,12 @@ namespace part2 {
       auto model = parse(in);
       /*
        
-       N+1 layers of keypads numbvered 0..N
+       N+1 layers of keypads indexed 0..N
        Pad N is the final numerical keypad where the code is to be entered
-       Each pad is operated by an 'actuator' (A robot or you)
+       The stacking makes pad N-1 is Remote N (pad N is the numeric keypad)
+       Each pad is operated by an 'actuator' (a robot or you)
        
-       level
+       level                                                                 (pad N)
        N     : numeric keypad (where code is to be entered)    Robot N ----> numeric
        N-1   : Remote control pad to control robot N              \---<----- remote N  <----- Robot N-1
        ...   : ...                                             Robot N-2 --> remote N-1 -->------/
@@ -525,6 +496,7 @@ namespace part2 {
        ...   : ...                                                \---<----- remote 3 <---- Robot 2
        ...   : ...                                             Robot 1 ----> remote 2 ---->------/
        0     : Remote control pad to control Robot 1              \---<----- remote 1 <---- YOU
+                                                                              (pad 0)
        
        You enters keys on remote 1 to control robot 1 (out of 2 or 25 robots)
        
@@ -851,47 +823,38 @@ namespace part2 {
        +---+---+---+
        | < | v | > |
        +---+---+---+
-       
-       Hm... We need a way to propagate the 'count' down the stack of robots...
 
-       Suppose we propagate the combination count for each set of round-trip options 'so faar'?
        
-                  count     count    count   count   ...
+       
        In  list [ set   ,   set   ,  set  ,  set   , ...] to press on pad 0
 
-                  each step --> in_count * (number of options for step) = out count?
 
-                  A029A   -> one way
+        Press on Pad:      029A
+        Visit on Remote:   A->0->2->9->A
+        Press on remote       A  A  A  A
        
-                   1     1     1     1
          N:       A->0, 0->2, 2->9, 9->A
                   ----------------------
-                              "^^>"
+                  ...   ...   "^^>" ...    Move options to move key-to-key on remote
                               "^>^"
                               ">^^"
-                   1x    1x    3x    1x
-                  ----------------------
-                   1     1     3     1
-                               |
-         N-1:                  |
-                        --------------
-                         3x   3x   3x
-                        step step step
-                        set  set  set
-                        ---  ---  ---
-                         |    |    |
-                        The count for each of these OUT sets out are 3x (combination increase by step)
-                        And the combination increase is the number of round-trips in the set for the step
+                   |      |     |     |
+                   |      |     |     \----------------\
+                   |      |     |                      |
+                   |      |     \----------\           |
+                   |      |                |           |
+                   |      \----\           |           |
+                   |           |           |           |
+                  +'A'        +'A'        +'A'        +'A'      Add 'A' to each move option
+                   |           |           |           |        to have robot press the key we moved to
+        list [set<keyes>, set<keyes>, set<keyes>, set<keyes> ]
        
-                        
+        Observation: We now have several ways to pick an option for each key-to-key move.
+                     We have to try out each such combination to move and press keys on the remote
        
-                 
-       
-
-       OUT  list [ set   ,   set   ,  set  ,  set   , ...] to press on remote i (pad i-1)
-                   count     count    count   count   ...
-
-       
+        Observation: The shortest sequence to press on the remote are all combinations of the shortest
+                     sequences to have robot press each key.
+              
        */
       Integer acc{};
       aoc::grid::Grid keypad({
@@ -908,11 +871,12 @@ namespace part2 {
       for (auto const& [step,moves] : to_move_options_map(keypad)) move_options[step] = moves;
       for (auto const& [step,moves] : to_move_options_map(remote)) move_options[step] = moves;
       
-      int const ROBOT_STACK_HEIGHT{26};
+      int ROBOT_STACK_HEIGHT{25};
+      if (args.arg.at("file") == "example.txt") ROBOT_STACK_HEIGHT=2;
       
       if (false) {
         // test single digit to see how it exapnds
-        return std::to_string(to_shortest_possible_sequences_length("029A",move_options,3));
+        return std::to_string(to_shortest_possible_sequences_length("029A",move_options,2));
       }
       
       for (auto const& code : model) {
@@ -959,10 +923,11 @@ int main(int argc, char *argv[]) {
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
 
-    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> parts = {"test0","test1","1", "2"};
     std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
       Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
@@ -1006,14 +971,14 @@ int main(int argc, char *argv[]) {
    Xcode Debug -O2
 
    >day_21 -all
-
+   
    ANSWERS
-   duration:0ms answer[test example.txt] Sorry, Unknown 'part' "test"
-   duration:0ms answer[test puzzle.txt] Sorry, Unknown 'part' "test"
-   duration:6077ms answer[part1 example.txt] 126384
-   duration:82156ms answer[part1 puzzle.txt] 179444
-   duration:0ms answer[part2 example.txt] NO OPERATION
-   duration:0ms answer[part2 puzzle.txt] NO OPERATION
+   duration:2ms answer[test0 example.txt] 029A -> {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"} (file ignored) OK
+   duration:6925ms answer[test1 example.txt] Five code example (file ignored) -> Complexity 126384 OK
+   duration:6175ms answer[part1 example.txt] 126384
+   duration:81229ms answer[part1 puzzle.txt] 179444
+   duration:8ms answer[part2 example.txt] 126384
+   duration:47ms answer[part2 puzzle.txt] 223285811665866
    
    */
   return 0;
