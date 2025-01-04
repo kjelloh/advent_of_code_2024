@@ -447,10 +447,11 @@ namespace part2 {
 
   using Paths = std::vector<Path>;
 
+  using Sprite = std::pair<Position,Direction>;
+
   struct Node {
-    Position pos;
+    Sprite deer;
     Integer cost;
-    int direction;
     bool operator>(Node const& other) const { return cost > other.cost; }
   };
 
@@ -458,49 +459,58 @@ namespace part2 {
     Paths result{};
     
     std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-    std::map<Position, Integer> cost_map;
+    std::map<Sprite, Integer> cost_map;
     std::map<Position, std::set<Position>> previous;
-    auto step_cost = [](int prev_dir, int curr_dir) -> Integer {
-      return 1 + (prev_dir != -1 && prev_dir != curr_dir ? 1000 : 0);
+    auto step_cost = [](Sprite prev, Sprite curr) -> Integer {
+      return (prev.first != curr.first)?1:0 + (prev.second != curr.second ? 1000 : 0);
     };
     
-    pq.push({start, 0, -1});
-    cost_map[start] = 0;
+    Sprite begin{start,{0,1}};
+    
+    pq.push({begin, 0});
+    cost_map[begin] = 0;
     
     while (!pq.empty()) {
-      Node current = pq.top();
+      using aoc::raw::operator<<;
+      std::cout << NL << NL << pq.size() << " curr:"  << pq.top().deer << " " << pq.top().cost;
+      auto const& [deer,cost] = pq.top();
       pq.pop();
       
-      if (current.pos == end) {
+      auto const& [pos,dir] = deer;
+      if (pos == end) {
         break;
       }
       
-      if (current.pos == Position{7,4}) std::cout << NL << current.pos;
+      if (pos == Position{7,4}) std::cout << NL << pos;
+      
+      auto [r,c] = pos;
+      auto [dr,dc] = dir;
                   
-      for (auto const& next : aoc::grid::to_ortho_neighbours(current.pos)) {
-        if (not grid.on_map(next)) continue;
-        if (grid.at(next) == '#') continue;
-        auto curr_dir = to_direction_index(current.pos, next);
-        auto new_cost = current.cost + step_cost(current.direction, curr_dir);
+      // Next is turn left, turn right or go forward
+      for (auto const& next : std::vector<Sprite>{{{r,c},{-dc,dr}},{{r,c},{dc,-dr}},{{r+dr,c+dc},{dr,dc}}}    ) {
+        std::cout << NL << "next " << next;
+        if (not grid.on_map(next.first)) continue;
+        if (grid.at(next.first) == '#') continue;
+        auto new_cost = cost + step_cost(deer,next);
                 
-        if (current.pos == Position{7,4}) {
-          std::cout << NL << current.pos << " -> " << next << " " << new_cost << " <? ";
+//        if (pos == Position{7,4}) {
+          std::cout << NL << pos << " -> " << next << " " << new_cost << " <? ";
           if (cost_map.contains(next)) std::cout  << cost_map[next];
           else std::cout << "INF";
-        }
+//        }
 
         // Update if this path is same or better.
         if (!cost_map.count(next) || new_cost < cost_map[next]) {
           cost_map[next] = new_cost;
-          previous[next].clear(); // Previous back-track no löonger valid for new best path
-          previous[next].insert(current.pos);
-          pq.push({next, new_cost, curr_dir});
-          if (next == Position{7,5}) std::cout << NL << next << " - 0 -> " << previous[next];
+          previous[next.first].clear(); // Previous back-track no löonger valid for new best path
+          previous[next.first].insert(pos);
+          pq.push({next, new_cost});
+          if (next.first == Position{7,5}) std::cout << NL << next.first << " - 0 -> " << previous[next.first];
         }
         else if (new_cost == cost_map[next]) {
-          previous[next].insert(current.pos); // Extend the set of previous
-          pq.push({next, new_cost, curr_dir});
-          if (next == Position{7,5}) std::cout << NL << next << " - * -> " << previous[next];
+          previous[next.first].insert(pos); // Extend the set of previous
+          pq.push({next, new_cost});
+          if (next.first == Position{7,5}) std::cout << NL << next.first << " - * -> " << previous[next.first];
         }
       }
     }
