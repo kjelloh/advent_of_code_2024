@@ -473,10 +473,11 @@ namespace part2 {
     while (!pq.empty()) {
       using aoc::raw::operator<<;
       std::cout << NL << NL << pq.size() << " curr:"  << pq.top().deer << " " << pq.top().cost;
-      auto const& [deer,cost] = pq.top();
+      auto const
+      [deer,curr_cost] = pq.top();
       pq.pop();
       
-      auto const& [pos,dir] = deer;
+      auto [pos,dir] = deer;
       if (pos == end) {
         break;
       }
@@ -488,15 +489,17 @@ namespace part2 {
                   
       // Next is turn left, turn right or go forward
       for (auto const& next : std::vector<Sprite>{{{r,c},{-dc,dr}},{{r,c},{dc,-dr}},{{r+dr,c+dc},{dr,dc}}}    ) {
-        std::cout << NL << "next " << next;
+//        std::cout << NL << "next " << next;
         if (not grid.on_map(next.first)) continue;
         if (grid.at(next.first) == '#') continue;
-        auto new_cost = cost + step_cost(deer,next);
+        std::cout << NL << curr_cost << " + " << step_cost(deer,next);
+        
+        auto new_cost = curr_cost + step_cost(deer,next);
                 
 //        if (pos == Position{7,4}) {
-          std::cout << NL << pos << " -> " << next << " " << new_cost << " <? ";
-          if (cost_map.contains(next)) std::cout  << cost_map[next];
-          else std::cout << "INF";
+//          std::cout << NL << pos << " -> " << next << " new cost:" << new_cost << " <? ";
+//          if (cost_map.contains(next)) std::cout  << cost_map[next];
+//          else std::cout << "INF";
 //        }
 
         // Update if this path is same or better.
@@ -505,12 +508,14 @@ namespace part2 {
           previous[next.first].clear(); // Previous back-track no löonger valid for new best path
           previous[next.first].insert(pos);
           pq.push({next, new_cost});
-          if (next.first == Position{7,5}) std::cout << NL << next.first << " - 0 -> " << previous[next.first];
+          std::cout << NL << next << " := " << new_cost;
+          if (next.first == Position{7,5})  std::cout << NL << next.first << " - 0 -> " << previous[next.first] << " " << new_cost;
         }
         else if (new_cost == cost_map[next]) {
           previous[next.first].insert(pos); // Extend the set of previous
           pq.push({next, new_cost});
-          if (next.first == Position{7,5}) std::cout << NL << next.first << " - * -> " << previous[next.first];
+          std::cout << NL << next << " ++ " << new_cost;
+          if (next.first == Position{7,5}) std::cout << NL << next.first << " - * -> " << previous[next.first] << " " << new_cost;
         }
       }
     }
