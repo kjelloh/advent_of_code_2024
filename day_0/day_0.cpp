@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_22 -all
+   >day_xx -all
 
    ANSWERS
    ...
