@@ -64,18 +64,18 @@ struct Args {
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
-    bool operator==(LogEntry const& other) const {
+  struct TestConfig {
+    bool operator==(TestConfig const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,TestConfig const& entry) {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using LogEntries = aoc::test::LogEntries<TestConfig>;
 
   aoc::parsing::Sections parse_doc(Args const& args) {
     std::cout << NL << T << "parse puzzle doc text";
@@ -94,6 +94,10 @@ namespace test {
   }
 
   aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
+    return {};
+  }
+
+  std::vector<TestConfig> to_test_configs(aoc::parsing::Sections const& doc_sections) {
     return {};
   }
 
@@ -187,6 +191,7 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
       Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
