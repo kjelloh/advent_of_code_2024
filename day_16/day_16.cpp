@@ -45,19 +45,6 @@ Model parse(auto& in) {
 
 using aoc::Args;
 
-std::set<Position> to_junctions(std::set<Position> const& reachable,auto to_neighbours) {
-  std::set<Position> result{};
-  for (auto const& pos : reachable) {
-    int count{};
-    for (auto const& adj : to_neighbours(pos)) {
-      if (not reachable.contains(adj)) continue;
-      ++count;
-    }
-    if (count > 2) result.insert(pos);
-  }
-  return result;
-}
-
 namespace test {
 
   struct LogEntry {
@@ -67,8 +54,8 @@ namespace test {
     std::optional<Integer> turns{};
     bool operator==(LogEntry const& other) const {
       bool result{true};
-      result = result and grid == other.grid;
-      result = result and score == other.score;
+      result = result and (grid == other.grid);
+      result = result and (score == other.score);
       result = result and (steps and other.steps)?steps.value() == other.steps.value():true;
       result = result and (turns and other.turns)?turns.value() == other.turns.value():true;
       return result;
@@ -115,32 +102,32 @@ namespace test {
     auto max_lines = std::max(expected_lines.size(),deduced_lines.size());
     std::size_t
     last_width{};
-    std::cout << NL << "Expected " << T << "Deduced";
+    os << NL << NL << T << "Expected " << T << "Deduced";
     for (int i=0;i<max_lines;++i) {
-      std::cout << NL;
+      os << NL;
       if (i==0) {
-        std::cout << NL << T << "Expected:" << expected_lines[i];
-        std::cout << NL << T << " Deduced:" << deduced_lines[i];
+        os << NL << T << "Expected:" << expected_lines[i];
+        os << NL << T << "Deduced:" << deduced_lines[i];
       }
       else {
         if (i<expected_lines.size()) {
-          std::cout << expected_lines[i];
+          os << expected_lines[i];
           last_width = expected_lines[i].size();
         }
         else {
-          std::cout << std::string(last_width,' ');
+          os << std::string(last_width,' ');
         }
-        std::cout << T;
+        os << T;
         if (i < deduced_lines.size()) {
-          std::cout << deduced_lines[i];
+          os << deduced_lines[i];
         }
       }
     }
     if (outcome.deduced == outcome.expected) {
-      std::cout << NL << "SAME OK!";
+      os << NL << "SAME OK!";
     }
     else {
-      
+      os << NL << "DIFFERS!";
     }
     return os;
   }
@@ -158,64 +145,58 @@ namespace test {
         std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
       }
     }
-
-  }
-
-  aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
-    return {};
-  }
-
-  
-  LogEntries to_log_entries(aoc::parsing::Sections const& sections,Args const& args) {
-    LogEntries result{};
-    using namespace aoc::parsing;
-    for (int i=0;i<sections.size();++i) {
-      auto const& section = sections[i];
-      using aoc::raw::operator<<;
-      std::cout << NL << std::format("sections[{}]:{}",i,section.size()) << to_raw(section);
-    }
-    
-    if (sections.size()>=2) {
-      // example: "a score of only 7036"
-      // example: "36 steps"
-      // example: "turning 90 degrees a total of 7 times"
-      
-      // example2: "the best paths cost 11048 points"
-      auto line = sections[0][0];
-      std::cout << NL << T << line.str();
-      {
-        auto groups = line.groups("(\\d+)\\D+?(\\d+)\\D+?(\\d+)\\D+?(\\d+)");
-        if (groups.size()==4) {
-          auto score = std::stoi(groups[0]);
-          std::cout << " --> score:" << score;
-          auto steps = std::stoi(groups[1]);
-          std::cout << " --> steps:" << steps;
-          auto turns = std::stoi(groups[3]);
-          std::cout << " --> turns:" << turns;
-          result.push_back({Grid{to_raw(sections[1])},score,steps,turns});
-        }
-      }
-      if (result.size()==0){
-        auto groups = line.groups("(\\d+)");
-        if (groups.size()==1) {
-          auto score = std::stoi(groups[0]);
-          std::cout << " --> score:" << score;
-          result.push_back({to_raw(sections[1]),score});
-        }
-
-      }
-    }
-    std::cout << NL << result;
     return result;
   }
 
-  using Reachable = std::set<Position>;
-  using Segments = std::vector<aoc::grid::Path>;
-  Segments to_segments(Position const& start,Reachable const& reachable,Reachable const& junctions) {
-    std::cout << NL << "to_segments";
-    Segments result{};
-    aoc::graph::Graph<Position> graph{reachable};
-    std::cout << NL << graph;
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    result.push_back(aoc::parsing::to_raw(sections[11]));
+    result.push_back(aoc::parsing::to_raw(sections[15]));
+    return result;
+  }
+
+  
+  LogEntries to_log_entries(aoc::parsing::Sections const& sections,int config_ix,Args const& args) {
+    LogEntries result{};
+        
+    if (config_ix == 0) {
+      // config_ix 0
+      //---------- section 12 ----------
+      //    line[0]:69 "   There are many paths through this maze, but taking any of the best"
+      //    line[1]:73 "   paths would incur a score of only 7036. This can be achieved by taking"
+      //    line[2]:73 "   a total of 36 steps forward and turning 90 degrees a total of 7 times:"
+      auto lines = sections[12];
+      aoc::parsing::Line line{""};
+      for (auto const& s : lines) line.str() += s;
+      std::cout << NL << NL << std::quoted(line.str());
+      auto groups = line.groups("(\\d+)\\D+?(\\d+)\\D+?(\\d+)\\D+?(\\d+)");
+      if (groups.size()==4) {
+        auto score = std::stoi(groups[0]);
+        std::cout << NL << T << " --> score:" << score;
+        auto steps = std::stoi(groups[1]);
+        std::cout << NL << T <<  " --> steps:" << steps;
+        auto turns = std::stoi(groups[3]);
+        std::cout << NL << T << " --> turns:" << turns;
+        result.push_back({Grid{to_raw(sections[13])},score,steps,turns});
+      }
+    }
+    else if (config_ix == 1) {
+      // config_ix 1
+      //---------- section 16 ----------
+      //    line[0]:74 "   In this maze, the best paths cost 11048 points; following one such path"
+      //    line[1]:24 "   would look like this:"
+      // ...
+      auto lines = sections[16];
+      aoc::parsing::Line line{""};
+      for (auto const& s : lines) line.str() += s;
+      std::cout << NL << NL << std::quoted(line.str());
+      auto groups = line.groups("(\\d+)");
+      if (groups.size()==1) {
+        auto score = std::stoi(groups[0]);
+        std::cout << NL << T << " --> score:" << score;
+        result.push_back({to_raw(sections[17]),score});
+      }
+    }
     return result;
   }
 
@@ -283,7 +264,7 @@ namespace test {
   using Turns = std::vector<std::pair<Position,char>>;
   std::ostream& operator<<(std::ostream& os,Turns const& turns) {
     for (auto const& [pos,ch] : turns) {
-      std::cout << NL << T << pos << " " << ch;
+      os << NL << T << pos << " " << ch;
     }
     return os;
   }
@@ -308,7 +289,6 @@ namespace test {
   }
 
   Integer to_score(Path const& best_path,Turns const& turns) {
-    std::cout << NL << "to_score";
     Integer result{};
     auto turn_count = turns.size();
     auto step_count = (best_path.size()-1); // steps one less than count
@@ -316,8 +296,8 @@ namespace test {
     return result;
   }
 
-
   std::optional<Result> test1(Model const& model,LogEntries const& log, Args args) {
+    std::ostringstream response{};
     std::cout << NL << NL << "test1";
     
     auto start = model.find('S');
@@ -326,15 +306,15 @@ namespace test {
     if (log.size() == 1) {
       // Extract the exposed solution path from log
       auto expected = log[0];
-//      auto deduced_path = to_marked_path(start, expected.grid, [](char ch){
-//        std::set<char> const PATH_MARK{'S','<','^','>','v','E'};
-//        return PATH_MARK.contains(ch);
-//      });
-//      std::cout << NL << "Deduced path:" << deduced_path;
-//      auto deduced_turns = to_turns(deduced_path);
-//      std::cout << NL << "Deduced turns:" << deduced_turns;
-//      auto deduced_score = to_score(deduced_path,deduced_turns);
-//      std::cout << NL << "deduced score:" << deduced_score;
+      auto deduced_path = aoc::doc::to_marked_path(start, expected.grid, [](char ch){
+        std::set<char> const PATH_MARK{'S','<','^','>','v','E'};
+        return PATH_MARK.contains(ch);
+      });
+      std::cout << NL << "Deduced path:" << deduced_path;
+      auto deduced_turns = to_turns(deduced_path);
+      std::cout << NL << "Deduced turns:" << deduced_turns;
+      auto deduced_score = to_score(deduced_path,deduced_turns);
+      std::cout << NL << "deduced score:" << deduced_score;
       
       auto best_path = to_best_path(start, end, model);
       std::cout << NL << "best_path:" << best_path;
@@ -346,25 +326,17 @@ namespace test {
 
       Grid grid = model;
       aoc::grid::to_dir_traced(grid, best_path);
-//      for (int i=1;i<best_path.size()-1;++i) {
-//        auto to = best_path[i+1];
-//        auto from = best_path[i];
-//        switch (to_direction_index(from, to)) {
-//          case 0: grid.at(from) = '>'; break;
-//          case 1: grid.at(from) = 'v'; break;
-//          case 2: grid.at(from) = '<'; break;
-//          case 3: grid.at(from) = '^'; break;
-//          case -1: break;
-//        }
-//      }
       LogEntry best{grid,best_score,best_path.size()-1
         ,best_turns.size()};
       Outcome outcome{expected,best};
       std::cout << NL << outcome;
+      if (outcome.expected == outcome.deduced) response << " PASSED";
+      else response << " failed";
     }
     else {
-      std::cout << NL << "UNEXPECTED: Read Log has more that one entry, entires:" << log.size();
+      std::cout << NL << "UNEXPECTED: Read Log expected to have one entry, entires:" << log.size();
     }
+    if (response.str().size() > 0) return response.str();
     return std::nullopt;
   }
 
@@ -375,28 +347,27 @@ namespace test {
     if (in) {
       auto model = parse(in);
       auto doc = parse_doc(args);
-      auto example_lines = to_example(doc);
-      if (example_lines.size()>0) {
+      auto examples = to_examples(doc);
+      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
         if (args.options.contains("-to_example")) {
-          auto example_file = aoc::to_working_dir_path("example.txt");
+          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
           if (aoc::raw::write_to_file(example_file, example_lines)) {
             response << "Created " << example_file;
           }
           else {
             response << "Sorry, failed to create file " << example_file;
           }
-          return response.str();
         }
         else {
           std::ostringstream oss{};
           aoc::raw::write_to(oss, example_lines);
           std::istringstream example_in{oss.str()};
           auto example_model = ::parse(example_in);
-          std::cout << NL << "example_model:" << example_model;
-          auto model = ::parse(in);
-          auto log = test::to_log_entries(doc, args);
-          return test1(model,log,args);
-
+          std::cout << NL << NL << "example_model:" << example_model;
+          auto log = test::to_log_entries(doc, ix,args);
+          if (auto result = test1(example_model,log,args)) {
+            response << *result;
+          }
         }
       }
     }
@@ -416,26 +387,18 @@ namespace part1 {
       auto end = model.find('E');
       auto best_path = test::to_best_path(start, end, model);
       std::cout << NL << "best_path:" << best_path;
+
       auto best_turns = test::to_turns(best_path);
       using test::operator<<;
-      std::cout << NL << "best_turns:" << best_turns;
-      auto best_score = test::to_score(best_path,best_turns);
-      std::cout << NL << "best_score:" << best_score;
-
+      std::cout << NL << NL << "best_turns:" << best_turns;
+      
       Grid grid = model;
-      for (int i=1;i<best_path.size()-1;++i) {
-        auto to = best_path[i+1];
-        auto from = best_path[i];
-        switch (to_direction_index(from, to)) {
-          case 0: grid.at(from) = '>'; break;
-          case 1: grid.at(from) = 'v'; break;
-          case 2: grid.at(from) = '<'; break;
-          case 3: grid.at(from) = '^'; break;
-          case -1: break;
-        }
-      }
+      aoc::grid::to_dir_traced(grid, best_path);
       std::cout << NL << grid;
       
+      auto best_score = test::to_score(best_path,best_turns);
+      std::cout << NL << NL << "best_score:" << best_score;
+
       response << best_score;
     }
     if (response.str().size()>0) return response.str();
@@ -541,7 +504,7 @@ namespace part2 {
       }
     }
     std::print("\nSearch consumed {} iterations",loop_count);
-    std::print("\n{}",previous_of);
+
     
     // Back-track previous_of to find all members of the best paths found
     std::set<aoc::grid::Position> result{};
@@ -628,6 +591,7 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
       Args args;
       args.arg["part"] = part;
       args.arg["file"] = file;
@@ -671,12 +635,13 @@ int main(int argc, char *argv[]) {
    Xcode Debug -O2
 
    >day_16 -all
-
+      
    ANSWERS
-   duration:4ms answer[Part 1 Test Example vs Log] NO OPERATION
-   duration:4ms answer[Part 1 Test Example vs Log] NO OPERATION
-   duration:1ms answer[Part 1 Example] 7036
-   duration:111ms answer[Part 1     ] 95476
+   duration:11ms answer[test example.txt]  PASSED PASSED
+   duration:1ms answer[part1 example.txt] 7036
+   duration:108ms answer[part1 puzzle.txt] 95476
+   duration:7ms answer[part2 example.txt] 45
+   duration:3575ms answer[part2 puzzle.txt] 511
 
    */
   return 0;

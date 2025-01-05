@@ -474,6 +474,7 @@ namespace aoc {
       }
 
       std::string const& str() const {return m_s;}
+      std::string& str() {return m_s;}
       operator std::string() const {return m_s;}
       auto size() const {return m_s.size();}
     private:
