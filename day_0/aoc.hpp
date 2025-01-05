@@ -24,7 +24,6 @@
 #include <format>
 #include <print>
 
-
 namespace aoc {
 
   // For tool chain without std::print(thing) without format string
@@ -369,8 +368,9 @@ namespace aoc {
       std::ofstream out{file};
       return write_to(out, lines);
     }
-    
+  
   } // namespace raw
+
   namespace parsing {
     class Splitter; // Forward
     using Line = Splitter;
@@ -474,6 +474,7 @@ namespace aoc {
       }
 
       std::string const& str() const {return m_s;}
+      std::string& str() {return m_s;}
       operator std::string() const {return m_s;}
       auto size() const {return m_s.size();}
     private:
@@ -856,11 +857,11 @@ namespace aoc {
       }
       
       // Retrieves the character at a given position, if valid
-      std::optional<char> at(Position const& pos) const {
+      char at(Position const& pos) const {
         if (on_map(pos)) {
           return m_grid[pos.row][pos.col];
         }
-        return std::nullopt;
+        return '?';
       }
       char& at(Position const& pos) {
         if (on_map(pos)) {
@@ -870,8 +871,7 @@ namespace aoc {
       }
       
       char operator[](Position const pos) const {
-        if (auto och = at(pos)) return *och;
-        throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+        return at(pos);
       }
       
       std::optional<std::string> at_row(int r) const {
@@ -890,12 +890,12 @@ namespace aoc {
         for (int row=0;row<height();++row) {
           for (int col=0;col<width();++col) {
             Position pos{row,col};
-            f(pos,*at(pos));
+            f(pos,at(pos));
           }
         }
       }
       
-      Position find(char ch) {
+      Position find(char ch) const {
         Position result{-1,-1};
         for (int row=0;row<height();++row) {
           for (int col=0;col<width();++col) {
@@ -913,9 +913,10 @@ namespace aoc {
         for_each(push_back_matched);
         return result;
       }
-      
+
+      // For compability with sparse grid mapping pos -> ch only for occupied posititions
       bool contains(Position const& pos) const {
-        return at(pos).has_value();
+        return on_map(pos);
       }
       
       bool operator==(Grid const& other) const {
@@ -1053,7 +1054,7 @@ namespace aoc {
       Seen visited{};
       if (grid.on_map(start)) {
         q.push_back(start);
-        char ch = *grid.at(start);
+        char ch = grid.at(start);
         visited.insert(start);
         while (not q.empty()) {
           auto curr = q.front();q.pop_front();
@@ -1256,6 +1257,61 @@ namespace aoc {
         }
         return result;
     }
+  }
+
+  // for processing text documenting the puzzle
+  namespace doc {
+  
+    using namespace aoc::raw;
+    using namespace aoc::parsing;
+  
+    aoc::parsing::Sections parse_doc(Args const& args) {
+      std::cout << NL << T << "parse puzzle doc text";
+      aoc::parsing::Sections result{};
+      using namespace aoc::parsing;
+      std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
+      auto sections = Splitter{doc_in}.same_indent_sections();
+      for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+        std::cout << NL << "---------- section " << sx << " ----------";
+        result.push_back(section);
+        for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+          std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+        }
+      }
+      return result;
+    }
+
+    using aoc::grid::Position;
+    using aoc::grid::Path;
+    using aoc::grid::Grid;
+  
+    // Traces a path marked on the grid defguned by predicate is_path_mark
+    // Used to read examples of expected paths on grid as presented on AoC day web page (the doc)
+    Path to_marked_path(Position start,Grid const& grid,auto is_path_mark) {
+      Path result{};
+      std::deque<Position> q{};
+      aoc::grid::Seen visited{};
+      if (grid.on_map(start)) {
+        q.push_back(start);
+        char ch = grid.at(start);
+        visited.insert(start);
+        result.push_back(start);
+        while (not q.empty()) {
+          auto curr = q.front();q.pop_front();
+          for (auto const& next : aoc::grid::to_ortho_neighbours(curr)) {
+            if (not grid.on_map(next)) continue;
+            if (visited.contains(next)) continue;
+            if (not is_path_mark(grid.at(next))) continue;
+            q.push_back(next);
+            visited.insert(next);
+            result.push_back(next);
+          }
+        }
+      }
+      return result;
+    }
+
+
   }
 
 } // namespace aoc
