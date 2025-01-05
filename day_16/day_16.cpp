@@ -446,11 +446,10 @@ namespace part1 {
 namespace part2 {
 
   using Paths = std::vector<Path>;
-
-  using Sprite = std::pair<Position,Direction>;
+  using Pose = std::pair<Position,Direction>;
 
   struct Node {
-    Sprite deer;
+    Pose pose;
     Integer cost;
     bool operator>(Node const& other) const { return cost > other.cost; }
   };
@@ -460,78 +459,21 @@ namespace part2 {
     
     // Priority queue sorted on lowest cost
     std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-    std::map<Sprite, Integer> lowest_cost_of;
-    std::map<Position, std::set<Position>> previous_of;
+    std::map<Pose, Integer> lowest_cost_of;
+    std::map<Pose, std::set<Pose>> previous_of;
     auto lowest_cost_to_end_so_far = std::numeric_limits<Integer>::max();
 
-    auto step_cost = [](Sprite prev, Sprite curr) -> Integer {
+    auto step_cost = [](Pose prev, Pose curr) -> Integer {
       return (prev.first != curr.first)?1:0 + (prev.second != curr.second ? 1000 : 0);
     };
     
-    Sprite begin{start,{0,1}};
-    
-    pq.push({begin, 0});
+    Direction const EAST{0,1};
+    Pose begin{start,EAST};
+    pq.push({begin,0});
     lowest_cost_of[begin] = 0;
     
     while (!pq.empty()) {
-//      static int loop_count{};
-//      if (++loop_count > 20) break;
-      auto curr = pq.top(); pq.pop();
-      auto [sprite,cost] = curr;
-      // Ensure cost of unexplored states (sprite) is intilialised to 'larger-than-largest' cost
-      if (not lowest_cost_of.contains(sprite)) lowest_cost_of[sprite] = std::numeric_limits<Integer>::max();
-      // Don't process more expensive, that is sprites with cost worse than found-so-far
-      if (cost > lowest_cost_to_end_so_far) continue; // ?Why not break?
-      auto [pos,dir] = sprite;
-      auto [row,col] = pos;
-      auto [dr,dc] = dir;
-      if (pos==end) {
-        // Break on cost to end gerater than best found
-        if (cost > lowest_cost_to_end_so_far) break; // All in priority queue now have higher cost so stop exploring
-        lowest_cost_to_end_so_far = cost; // this is now the known lowest cost to end so far
-      }
-      // The state we are processing is now known to be better than all future ones
-      if (not previous_of.contains(pos)) previous_of[pos]; // For clarity (but first access to previous_of[pos] will create member anyhow)
-      std::cout << NL << "explore " << pos << dir << " cost:" << cost;
-      for (auto const& next : std::vector<Sprite>{{{row,col},{-dc,dr}},{{row,col},{dc,-dr}},{{row+dr,col+dc},{dr,dc}}}    ) {
-        auto [next_pos,next_dir] = next;
-        if (not grid.on_map(next_pos)) continue; // For clarity (but '#' border of grid makes this never trigger)
-        if (grid.at(next_pos) == '#') continue;
-        // Ensure cost of unexplored next is intilised to 'higher-than-highest' cost
-        if (not lowest_cost_of.contains(next)) lowest_cost_of[next] = std::numeric_limits<Integer>::max();
-        // Skip 'early' on next already being reached with a lower cost that unqueued one
-        // Note: The 'Don't-process more expensive' after pop above will be triggered if we don't do this, but early skip saves time
-        auto lowest_cost_of_next = lowest_cost_of[next];
-        if (cost > lowest_cost_of_next) continue;
-        auto next_cost = cost + step_cost(sprite, next); // cost + 1 or cost + 1000
-        pq.push({next,next_cost}); // explore this option
-        // Update lowest_cost and backtrack link for accepted (to explore) next
-        if (next_cost < lowest_cost_of[next]) {
-          // Better than any we found previous
-          previous_of[next_pos].clear(); // get rid of any links made for previous found best cost
-          lowest_cost_of[next] = next_cost; // store the cheaper cost found
-        }
-        // In any case, add backtrack link for the next to explore
-        previous_of[next_pos].insert(pos); // insert link-back option
-        std::cout << NL << T << "next " << next_pos << next_dir << " cost:" << next_cost;
-
-      }
-
-    }
-            
-    // Reconstruct all found paths
-    std::queue<Path> q{};
-    q.push({end});
-    while (not q.empty()) {
-      auto curr = q.front();
-      q.pop();
-      if (curr.back() == start) {
-        result.push_back(curr);
-      }
-      for (auto const& prev : previous_of[curr.back()]) {
-        using aoc::raw::operator+;
-        q.push(curr + prev);
-      }
+      
     }
     return result;
   }
