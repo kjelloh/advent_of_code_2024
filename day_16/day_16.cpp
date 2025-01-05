@@ -444,37 +444,64 @@ namespace part1 {
 
 }
 namespace part2 {
-
   using Paths = std::vector<Path>;
-  using Pose = std::pair<Position,Direction>;
-
-  struct Node {
-    Pose pose;
-    Integer cost;
-    bool operator>(Node const& other) const { return cost > other.cost; }
-  };
+  using Position = std::tuple<int,int>; // row,col
 
   Paths to_best_paths(Position const& start, Position const& end,Grid const& grid) {
+    using Direction = std::tuple<int,int>; // dr,dc
+    using Pose = std::tuple<Position,Direction>;
+    using Poses = std::vector<Pose>;
+    using Cost = int;
+    using Node = std::tuple<Cost,Pose>; // Natural ordering Cost then Pose will work for our priority_queue
     Paths result{};
     
-    // Priority queue sorted on lowest cost
+    // Priority queue sorted on lowest cost (first in tuple 'Node')
     std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
     std::map<Pose, Integer> lowest_cost_of;
     std::map<Pose, std::set<Pose>> previous_of;
     auto lowest_cost_to_end_so_far = std::numeric_limits<Integer>::max();
-
-    auto step_cost = [](Pose prev, Pose curr) -> Integer {
-      return (prev.first != curr.first)?1:0 + (prev.second != curr.second ? 1000 : 0);
-    };
+    std::set<Pose> processed{};
     
     Direction const EAST{0,1};
     Pose begin{start,EAST};
-    pq.push({begin,0});
+    pq.push({0,begin});
     lowest_cost_of[begin] = 0;
+    processed.insert(begin);
     
     while (!pq.empty()) {
-      
+      auto curr = pq.top();pq.pop();
+      // std::print("\nprocess {}",curr);
+      auto [cost,pose] = curr;
+      auto [pos,dir] = pose;
+      if (pos==end) {
+        std::print("\n*END* at {}",curr);
+        if (cost < lowest_cost_to_end_so_far) {
+          lowest_cost_to_end_so_far = cost;
+        }
+        continue;
+      }
+      processed.insert(pose);
+      auto [r,c] = pos;
+      auto [dr,dc] = dir;
+      // next cost,pos{nr,nc}, dir{ndr,ndc}
+      for (auto [step_cost,nr,nc,ndr,ndc] : std::vector<std::tuple<Cost,int,int,int,int>>{
+         {1000,r,c,-dc,dr} // rotate e.g., +,0 to 0,+ = left cost 1000
+        ,{1000,r,c,dc,-dr} // rotate e.g., +,0 to 0,-1 = right cost 1000
+        ,{1,r+dr,c+dc,dr,dc} // step 'forward' cost 1
+      }) {
+        Position next_pos{nr,nc};
+        Direction next_dir{ndr,ndc};
+        Pose next_pose{next_pos,next_dir};
+        auto next_cost = cost + step_cost;
+        
+        if (grid.at({r,c}) == '#') continue;
+        if (processed.contains(next_pose)) continue; // skip processed next
+        pq.push({next_cost,next_pose});
+        
+        
+      }
     }
+    
     return result;
   }
 
@@ -483,10 +510,11 @@ namespace part2 {
     std::cout << NL << NL << "part2";
     if (in) {
       auto model = parse(in);
-      auto start = model.find('S');
-      auto end = model.find('E');
-      auto best_paths = part2::to_best_paths(start, end, model);
-      std::set<Position> visited{};
+      // A bit convoluted from trying out 'raw' C++ types for part_2 search (not my aoc-types)
+      auto [sr,sc] = model.find('S');
+      auto [er,ec] = model.find('E');
+      auto best_paths = part2::to_best_paths({sr,sc},{er,ec}, model); // returns vector<aoc::grid::path>
+      std::set<aoc::grid::Position> visited{};
       for (auto const& path : best_paths) {
         std::ranges::copy(path,std::inserter(visited, visited.begin()));
       }
