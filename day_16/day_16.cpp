@@ -447,13 +447,12 @@ namespace part2 {
   using Paths = std::vector<Path>;
   using Position = std::tuple<int,int>; // row,col
 
-  Paths to_best_paths(Position const& start, Position const& end,Grid const& grid) {
+  std::set<aoc::grid::Position> to_visited(Position const& start, Position const& end,Grid const& grid) {
     using Direction = std::tuple<int,int>; // dr,dc
     using Pose = std::tuple<Position,Direction>;
     using Poses = std::vector<Pose>;
     using Cost = int;
     using Node = std::tuple<Cost,Pose>; // Natural ordering Cost then Pose will work for our priority_queue
-    Paths result{};
     
     // Priority queue sorted on lowest cost (first in tuple 'Node')
     std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
@@ -468,40 +467,107 @@ namespace part2 {
     lowest_cost_of[begin] = 0;
     processed.insert(begin);
     
+    int loop_count{};
     while (!pq.empty()) {
+      ++loop_count;
       auto curr = pq.top();pq.pop();
       // std::print("\nprocess {}",curr);
       auto [cost,pose] = curr;
       auto [pos,dir] = pose;
+      // Skip if we 'already' explore a cost largest than one found
+      // NOTE: We can't break as the queue may still not contain the best one
+      if (cost > lowest_cost_to_end_so_far) {
+        // Reduces iterations 1521 -> 1194 for small example
+        // Still, example grid is 15*15 = 225 positions.
+        // And around half(?) are walls anyhow.
+        // Assume each free position corresponds to 5 states (four rotaions and one step)
+        // 5*225 = 1225.
+        // How can we get more than 1225 iterations?
+        continue;
+      }
       if (pos==end) {
+        // We may end up here taking a path more costly than the overall best one.
+        // That is, a better one is not yet on queue but may be added later
+        // as we explore more paths.
         std::print("\n*END* at {}",curr);
         if (cost < lowest_cost_to_end_so_far) {
+          // Reduce best so faar.
           lowest_cost_to_end_so_far = cost;
         }
         continue;
       }
-      processed.insert(pose);
+      processed.insert(pose); // Now properly processed for best path to end
+      // Note: We have to pick a candidate for next to be able to
+      //       update the 'back track' mapping pos <-- previous_of(next)
       auto [r,c] = pos;
       auto [dr,dc] = dir;
+
+      // Expand into candidates.
+      // From all my studies of prefssional solvers I have gotten
+      // influenced to use this short hand design.
+      // Loop over known 'steps' and ascociated cost in one go.
       // next cost,pos{nr,nc}, dir{ndr,ndc}
       for (auto [step_cost,nr,nc,ndr,ndc] : std::vector<std::tuple<Cost,int,int,int,int>>{
          {1000,r,c,-dc,dr} // rotate e.g., +,0 to 0,+ = left cost 1000
         ,{1000,r,c,dc,-dr} // rotate e.g., +,0 to 0,-1 = right cost 1000
         ,{1,r+dr,c+dc,dr,dc} // step 'forward' cost 1
       }) {
+        // Conveniance re-pack
         Position next_pos{nr,nc};
         Direction next_dir{ndr,ndc};
         Pose next_pose{next_pos,next_dir};
         auto next_cost = cost + step_cost;
         
+        // filter candidate
         if (grid.at({r,c}) == '#') continue;
-        if (processed.contains(next_pose)) continue; // skip processed next
-        pq.push({next_cost,next_pose});
-        
-        
+        if (processed.contains(next_pose)) continue; // skip already processed 'next'
+
+        // Update cost map and backtrack linking
+        auto lowest_cost_of_next
+          =   lowest_cost_of.contains(next_pose)
+            ? lowest_cost_of.at(next_pose)
+            : std::numeric_limits<Integer>::max();
+        if (next_cost<lowest_cost_of_next) {
+          // New best
+          lowest_cost_of[next_pose] = next_cost;
+          previous_of[next_pose].clear(); // Throw away any previous record of 'best'
+          previous_of[next_pose].insert(pose); // add to link options
+        }
+        else if (next_cost == lowest_cost_of_next) {
+          // same as previous best
+          previous_of[next_pose].insert(pose); // add another link option
+        }
+        pq.push({next_cost,next_pose}); // Accept/Explore candidate
       }
     }
+    std::print("\nSearch consumed {} iterations",loop_count);
+    std::print("\n{}",previous_of);
     
+    // Back-track previous_of to find all members of the best paths found
+    std::set<aoc::grid::Position> result{};
+
+    std::queue<std::vector<Pose>> q{};
+    auto [er,ec] = end;
+    Position e{er,ec};
+    for (auto pose : std::vector<Pose>{{e,{0,1}},{e,{0,-1}},{e,{1,0}},{e,{-1,0}}}) {
+      q.push({pose}); // all possibel end poses to track from
+    }
+    while (not q.empty()) {
+      auto path = q.front(); q.pop();
+      auto [pos,dir] = path.back();
+      if (pos == start) {
+        for (auto [pos,dir] : path) {
+          auto [r,c] = pos;
+          result.insert({r,c});
+        }
+      }
+      for (auto prev : previous_of[path.back()]) {
+        auto next_path = path;
+        next_path.push_back(prev);
+        q.push(next_path);
+      }
+    }
+          
     return result;
   }
 
@@ -513,11 +579,7 @@ namespace part2 {
       // A bit convoluted from trying out 'raw' C++ types for part_2 search (not my aoc-types)
       auto [sr,sc] = model.find('S');
       auto [er,ec] = model.find('E');
-      auto best_paths = part2::to_best_paths({sr,sc},{er,ec}, model); // returns vector<aoc::grid::path>
-      std::set<aoc::grid::Position> visited{};
-      for (auto const& path : best_paths) {
-        std::ranges::copy(path,std::inserter(visited, visited.begin()));
-      }
+      auto visited = part2::to_visited({sr,sc},{er,ec}, model); // returns set of aoc::grid::Position
       {
         auto marked = model;
         aoc::grid::to_filled(marked, visited);
