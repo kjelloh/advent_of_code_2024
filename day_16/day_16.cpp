@@ -156,7 +156,7 @@ namespace test {
   }
 
   
-  LogEntries to_log_entries(aoc::parsing::Sections const& sections,int config_ix,Args const& args) {
+  LogEntries to_log_entries(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
     LogEntries result{};
         
     if (config_ix == 0) {
