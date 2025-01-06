@@ -486,6 +486,60 @@ namespace part2 {
     return grid;
   }
 
+  std::vector<Object> to_connected(Objects const& objects, Object const& first, Direction const& dir) {
+    // Move the initial object in the given direction
+    auto moved = to_moved(first.aabb, dir);
+    std::cout << "\nfirst:" << first.aabb.upper_left.row << ", " << first.aabb.upper_left.col
+    << " moved:" << moved.upper_left.row << ", " << moved.upper_left.col;
+    
+    std::vector<Object> result{};
+    std::set<Position> visited; // Keep track of visited objects
+    std::queue<Object> queue;   // Queue for BFS
+    
+    for (auto const& [pos, object] : objects) {
+      if (does_overlap(object.aabb, moved)) {
+        queue.push(object);
+        visited.insert(pos);
+        result.push_back(object);
+        std::cout << "\nInitial push: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
+        << " " << object.caption;
+        break; // We only need the first overlapping object to start the BFS
+      }
+    }
+    
+    while (!queue.empty()) {
+      auto current = queue.front();
+      queue.pop();
+      auto moved = to_moved(current.aabb,dir);
+      // Explore neighbors
+      for (auto const& [pos, object] : objects) {
+        if (visited.find(pos) == visited.end() && does_overlap(object.aabb, moved)) {
+          queue.push(object);
+          visited.insert(pos);
+          result.push_back(object);
+          std::cout << "\nConnected: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
+          << " " << object.caption;
+        }
+      }
+    }
+    
+    return result;
+  }
+
+
+//    auto moved = to_moved(first.aabb, dir);
+//    std::cout << NL << "first:" << first.aabb.upper_left << " moved:" << moved.upper_left;
+//    std::vector<Object> result{};
+//    for (auto const& [pos,object] : objects) {
+//      if (does_overlap(object.aabb, moved)) result.push_back(object);
+//    }
+//
+//
+//    for (auto const& object : result) std::cout << NL << T << "pushed:" << object.aabb.upper_left
+//      << " " << object.caption;
+//    return result;
+//  }
+
   Objects to_next(Objects objects,Move move) {
     Objects result{objects};
     auto dir = to_direction(move);
@@ -493,14 +547,7 @@ namespace part2 {
       return entry.second.caption == "@";
     });
     auto [pos,robot] = *iter;
-    auto moved = to_moved(robot.aabb, dir);
-    std::cout << NL << "robot:" << robot.aabb.upper_left << " moved:" << moved.upper_left;
-    std::set<Object> pushed{};
-    for (auto const& [pos,object] : objects) {
-      if (does_overlap(object.aabb, moved)) pushed.insert(object);
-    }
-    for (auto const& object : pushed) std::cout << NL << T << "pushed:" << object.aabb.upper_left
-      << " " << object.caption;
+    auto pushed = to_connected(objects, robot, dir);
     return result;
   }
 
