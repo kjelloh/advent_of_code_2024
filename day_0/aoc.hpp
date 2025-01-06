@@ -1182,10 +1182,10 @@ namespace aoc {
 
   namespace test {
     template <class T>
-    using LogEntries = std::vector<T>;
+    using Expecteds = std::vector<T>;
   
     template <class T>
-    std::ostream& operator<<(std::ostream& os,LogEntries<T> const& log) {
+    std::ostream& operator<<(std::ostream& os,Expecteds<T> const& log) {
       for (auto const& entry : log) {
         os << raw::NL << entry;
       }

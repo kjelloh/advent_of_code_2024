@@ -30,12 +30,14 @@ using aoc::raw::NT;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
 using Result = aoc::raw::Line;
-using Model = aoc::raw::Lines;
+struct Model {
+  aoc::raw::Lines entries;
+};
 
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   os << NL << "Model:";
   using aoc::raw::operator<<;
-  os << NL << model;
+  os << NL << model.entries;
   return os;
 }
 
@@ -47,7 +49,7 @@ Model parse(auto& in) {
     std::cout << NL << "---------- section " << sx << " ----------";
     for (auto const& [lx,line] : aoc::views::enumerate(section)) {
       std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      result.push_back(line);
+      result.entries.push_back(line);
     }
   }
   return result;
@@ -64,18 +66,18 @@ struct Args {
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct TestConfig {
-    bool operator==(TestConfig const& other) const {
+  struct Expected {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,TestConfig const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<TestConfig>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
   aoc::parsing::Sections parse_doc(Args const& args) {
     std::cout << NL << T << "parse puzzle doc text";
@@ -93,13 +95,17 @@ namespace test {
     return result;
   }
 
-  aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
-    return {};
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    //result.push_back(aoc::parsing::to_raw(sections[??]));
+    return result;
   }
 
-  std::vector<TestConfig> to_test_configs(aoc::parsing::Sections const& doc_sections) {
-    return {};
+  std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
+    Expecteds result{};
+    return result;
   }
+
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
@@ -107,24 +113,26 @@ namespace test {
     if (in) {
       auto model = parse(in);
       auto doc = parse_doc(args);
-      auto example_lines = to_example(doc);
-      if (args.options.contains("-to_example")) {
-        auto example_file = aoc::to_working_dir_path("example.txt");
-        if (aoc::raw::write_to_file(example_file, example_lines)) {
-          response << "Created " << example_file;
+      auto examples = to_examples(doc);
+      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
+        if (args.options.contains("-to_example")) {
+          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
+          if (aoc::raw::write_to_file(example_file, example_lines)) {
+            response << "Created " << example_file;
+          }
+          else {
+            response << "Sorry, failed to create file " << example_file;
+          }
         }
         else {
-          response << "Sorry, failed to create file " << example_file;
+          std::ostringstream oss{};
+          aoc::raw::write_to(oss, example_lines);
+          std::istringstream example_in{oss.str()};
+          auto example_model = ::parse(example_in);
+          std::cout << NL << NL << "example_model:" << example_model;
+          auto log = test::to_expecteds(doc, ix,args);
+          /* Call tests here */
         }
-        return response.str();
-      }
-      else {
-        std::ostringstream oss{};
-        aoc::raw::write_to(oss, example_lines);
-        std::istringstream example_in{oss.str()};
-        auto example_model = ::parse(example_in);
-        using ::operator<<;
-        std::cout << NL << "example_model:" << example_model;
       }
     }
     if (response.str().size()>0) return response.str();
