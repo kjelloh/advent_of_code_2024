@@ -487,58 +487,28 @@ namespace part2 {
   }
 
   std::vector<Object> to_connected(Objects const& objects, Object const& first, Direction const& dir) {
-    // Move the initial object in the given direction
-    auto moved = to_moved(first.aabb, dir);
-    std::cout << "\nfirst:" << first.aabb.upper_left.row << ", " << first.aabb.upper_left.col
-    << " moved:" << moved.upper_left.row << ", " << moved.upper_left.col;
-    
+    std::cout << NL << "to_connected:" << first.aabb.upper_left << " " << first.caption;
     std::vector<Object> result{};
     std::set<Position> visited; // Keep track of visited objects
     std::queue<Object> queue;   // Queue for BFS
-    
-    for (auto const& [pos, object] : objects) {
-      if (does_overlap(object.aabb, moved)) {
-        queue.push(object);
-        visited.insert(pos);
-        result.push_back(object);
-        std::cout << "\nInitial push: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
-        << " " << object.caption;
-        break; // We only need the first overlapping object to start the BFS
-      }
-    }
-    
+    queue.push(first);
     while (!queue.empty()) {
       auto current = queue.front();
       queue.pop();
       auto moved = to_moved(current.aabb,dir);
-      // Explore neighbors
+      // Explore new overlapping
       for (auto const& [pos, object] : objects) {
         if (visited.find(pos) == visited.end() && does_overlap(object.aabb, moved)) {
           queue.push(object);
           visited.insert(pos);
           result.push_back(object);
-          std::cout << "\nConnected: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
+          std::cout << NL << T << "Connected: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
           << " " << object.caption;
         }
       }
     }
-    
     return result;
   }
-
-
-//    auto moved = to_moved(first.aabb, dir);
-//    std::cout << NL << "first:" << first.aabb.upper_left << " moved:" << moved.upper_left;
-//    std::vector<Object> result{};
-//    for (auto const& [pos,object] : objects) {
-//      if (does_overlap(object.aabb, moved)) result.push_back(object);
-//    }
-//
-//
-//    for (auto const& object : result) std::cout << NL << T << "pushed:" << object.aabb.upper_left
-//      << " " << object.caption;
-//    return result;
-//  }
 
   Objects to_next(Objects objects,Move move) {
     Objects result{objects};
@@ -548,6 +518,16 @@ namespace part2 {
     });
     auto [pos,robot] = *iter;
     auto pushed = to_connected(objects, robot, dir);
+    if (std::all_of(pushed.begin(), pushed.end(), [](Object const& object){
+      return object.is_movable();
+    })) {
+      pushed.push_back(robot);
+      for (auto to_push : pushed) {
+        result.erase(to_push.aabb.upper_left);
+        to_push.aabb.upper_left = to_push.aabb.upper_left + dir;
+        result[to_push.aabb.upper_left] = to_push;
+      }
+    }
     return result;
   }
 
@@ -564,7 +544,6 @@ namespace part2 {
     });
     return result;
   }
-
 
   namespace test {
   
@@ -623,7 +602,7 @@ namespace part2 {
 
     std::optional<Result> test2(aoc::parsing::Sections const& doc_sections,Args args) {
       bool result{true};
-      std::cout << NL << "TEST1";
+      std::cout << NL << "test2";
       auto doc = ::test::parse_doc(args);
       auto expecteds = test::to_expecteds(doc, 0,args);
       Grid grid{aoc::parsing::to_raw(doc_sections[56])};
@@ -654,6 +633,31 @@ namespace part2 {
       if (result) return "PASSED (file ignored)";
       else return "Failed";
     }
+  
+    std::optional<Result> test3(aoc::parsing::Sections const& doc_sections,Args args) {
+      bool result{false};
+      auto doc = ::test::parse_doc(args);
+      auto groups = doc[75].back().groups(R"(\D+(\d+).*)");
+      auto expected_gps_sum = std::stoi(groups[0]);
+      auto examples = ::test::to_examples(doc);
+      auto in = aoc::test::to_example_in(examples.back());
+      auto model = ::parse(in);
+      model.grid = part2::to_expanded_grid(model.grid);
+      std::cout << NL << model;
+      auto objects = to_objects(model.grid);
+      for (auto move : model.moves) {
+        objects = to_next(objects, move);
+      }
+      auto end_grid = to_grid(objects);
+      auto expected_grid = Grid{aoc::parsing::to_raw(doc[74])};
+      aoc::test::Outcome<Grid> outcome{expected_grid,end_grid};
+      std::cout << NL << outcome;
+      auto sum = to_result(end_grid);
+      result = (sum == expected_gps_sum);
+      if (result) return "PASSED (file ignored)";
+      else return "Failed";
+    }
+
 
   } // namespace part2::test
 
@@ -666,6 +670,7 @@ namespace part2 {
         if (option == "-test0") return test::test0(doc_sections);
         if (option == "-test1") return test::test1(doc_sections);
         if (option == "-test2") return test::test2(doc_sections,args);
+        if (option == "-test3") return test::test3(doc_sections,args);
         return std::format("Unknown option '{}'",option);
       }
     }

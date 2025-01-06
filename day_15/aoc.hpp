@@ -1187,6 +1187,13 @@ namespace aoc {
 
   namespace test {
   
+    std::istringstream to_example_in(aoc::raw::Lines const&  example_lines) {
+      std::ostringstream oss{};
+      aoc::raw::write_to(oss, example_lines);
+      std::istringstream example_in{oss.str()};
+      return example_in;
+    }
+
     template <class T>
     using Expecteds = std::vector<T>;
 
