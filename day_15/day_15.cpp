@@ -429,44 +429,23 @@ namespace part2 {
   }
 
   bool does_overlap(const AABB& a, const AABB& b) {
-    return not (a.upper_left.col + a.width <= b.upper_left.col ||
-                b.upper_left.col + b.width <= a.upper_left.col ||
-                a.upper_left.row + a.height <= b.upper_left.row ||
-                b.upper_left.row + b.height <= a.upper_left.row);
+    // Find the overlapping boundaries
+    int overlap_left   = std::max(a.upper_left.col, b.upper_left.col);
+    int overlap_right  = std::min(a.upper_left.col + a.width, b.upper_left.col + b.width);
+    int overlap_top    = std::max(a.upper_left.row, b.upper_left.row);
+    int overlap_bottom = std::min(a.upper_left.row + a.height, b.upper_left.row + b.height);
+    
+    // Check if there is no overlap
+    return not (overlap_left >= overlap_right || overlap_top >= overlap_bottom);
   }
 
   struct Object {
     std::string caption;
     AABB aabb;
     bool is_movable() const {return caption != "#";}
+    bool operator<(Object const& other) const {return aabb.upper_left<other.aabb.upper_left;}
   };
-
   using Objects = std::map<Position,Object>;
-
-  Objects to_connected(Objects const& objects,Object const& object,Direction dir) {
-    std::cout << NL << "to_connected" << std::flush;
-    Objects result;
-    std::deque<AABB> dq{};
-    auto start = to_moved(object.aabb, dir);
-    dq.push_back(start);
-    std::set<AABB> seen{};
-    while (not dq.empty()) {
-      auto curr = dq.front();dq.pop_front();
-      std::cout << NL << dq.size() << " " << curr.upper_left << " " << dir << std::flush;
-      seen.insert(curr);
-      for (auto const& [pos,next] : objects) {
-        if (seen.contains(next.aabb)) continue;
-        if (does_overlap(curr, next.aabb)) {
-          result[pos] = next;
-          auto moved_next = to_moved(next.aabb, dir);
-          if (moved_next.upper_left == curr.upper_left) continue;
-          std::cout << " next " << moved_next.upper_left;
-          dq.push_back(moved_next); // moved also overlaps?
-        }
-      }
-    }
-    return result;
-  }
 
   Objects to_objects(Grid const& grid) {
     Objects result{};
@@ -507,32 +486,22 @@ namespace part2 {
     return grid;
   }
 
-  bool attempt_push(Objects& objects, Object& to_move, const Position& dir) {
-    auto connected = to_connected(objects, to_move, dir);
-    for (auto& [pos,next] : connected) {
-      if (next.is_movable()) {
-        if (not attempt_push(objects, next, dir)) {
-          return false; // all must be movable
-        }
-      }
-      else {
-        return false; // all must be movable
-      }
-    }
-    to_move.aabb = to_moved(to_move.aabb, dir);
-    return true;
-  }
-
-  Objects& to_next(Objects& curr,Move move) {
+  Objects to_next(Objects objects,Move move) {
+    Objects result{objects};
     auto dir = to_direction(move);
-    auto iter = std::find_if(curr.begin(), curr.end(), [](auto const& entry){
+    auto iter = std::find_if(objects.begin(), objects.end(), [](auto const& entry){
       return entry.second.caption == "@";
     });
     auto [pos,robot] = *iter;
-    if (attempt_push(curr, robot, dir)) {
-      
+    auto moved = to_moved(robot.aabb, dir);
+    std::cout << NL << "robot:" << robot.aabb.upper_left << " moved:" << moved.upper_left;
+    std::set<Object> pushed{};
+    for (auto const& [pos,object] : objects) {
+      if (does_overlap(object.aabb, moved)) pushed.insert(object);
     }
-    return curr;
+    for (auto const& object : pushed) std::cout << NL << T << "pushed:" << object.aabb.upper_left
+      << " " << object.caption;
+    return result;
   }
 
   Integer to_gps_coordinate(Position const& pos) {
@@ -616,7 +585,7 @@ namespace part2 {
       Model model{expanded,moves};
       auto start = model.grid.find('@');
       Simulation curr{start,expanded};
-      auto objects = to_objects(expanded);
+      auto  objects = to_objects(expanded);
       for (int i=0;i<expecteds.size()-1;++i) {
         std::cout << NL << NL << "step[" << i << "]";
         if (i>0) std::cout << NL << T << "After move " << model.moves[i-1];
