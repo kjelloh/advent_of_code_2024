@@ -390,6 +390,30 @@ namespace part1 {
 
 namespace part2 {
 
+  Grid to_expanded_grid(Grid const& part_1_grid) {
+    Grid result{{}};
+    std::ranges::transform(part_1_grid.base(), std::back_inserter(result.base()), [](std::string const& part_1_row) {
+      std::string expanded_row{};
+      for (char tile : part_1_row) {
+        switch (tile) {
+          case '#': expanded_row += "##"; break;
+          case 'O': expanded_row += "[]"; break;
+          case '.': expanded_row += ".."; break;
+          case '@': expanded_row += "@."; break;
+          default:  expanded_row += tile; // Default case for unsupported tiles
+        }
+      }
+      return expanded_row;
+    });
+    return result;
+  }
+
+  Simulation& to_next(Simulation& curr,Move move) {
+    auto dir = to_direction(move);
+    std::cout << NL << "to_next - NOT YET IMPLEMENTED!";
+    return curr;
+  }
+
   Integer to_gps_coordinate(Position const& pos) {
     return 100*pos.row + pos.col;
   }
@@ -408,7 +432,7 @@ namespace part2 {
   namespace test {
   
     using ::test::Expected;
-  using ::test::Expecteds;
+    using ::test::Expecteds;
 
     std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
       std::vector<aoc::raw::Lines> result{};
@@ -460,25 +484,39 @@ namespace part2 {
       else return "Failed";
     }
 
-  } // namespace part2::test
-
-  Grid to_expanded_grid(Grid const& part_1_grid) {
-    Grid result{{}};
-    std::ranges::transform(part_1_grid.base(), std::back_inserter(result.base()), [](std::string const& part_1_row) {
-      std::string expanded_row{};
-      for (char tile : part_1_row) {
-        switch (tile) {
-          case '#': expanded_row += "##"; break;
-          case 'O': expanded_row += "[]"; break;
-          case '.': expanded_row += ".."; break;
-          case '@': expanded_row += "@."; break;
-          default:  expanded_row += tile; // Default case for unsupported tiles
-        }
+    std::optional<Result> test2(aoc::parsing::Sections const& doc_sections,Args args) {
+      bool result{true};
+      std::cout << NL << "TEST1";
+      auto doc = ::test::parse_doc(args);
+      auto expecteds = test::to_expecteds(doc, 0,args);
+      Grid grid{aoc::parsing::to_raw(doc_sections[56])};
+      auto moves = aoc::parsing::to_raw(doc_sections[57].back());
+      auto expanded = to_expanded_grid(grid);
+      Model model{expanded,moves};
+      auto start = model.grid.find('@');
+      Simulation curr{start,model.grid};
+      for (int i=0;i<expecteds.size()-1;++i) {
+        std::cout << NL << NL << "step[" << i << "]";
+        if (i>0) std::cout << NL << T << "After move " << model.moves[i-1];
+        ::test::State state{curr,expecteds[i]};
+        std::cout << NL << state;
+        result = result and (curr.grid == expecteds[i].grid);
+        if (not result) break;
+        char move = model.moves[i];
+        if (move != expecteds[i+1].move) break;
+        curr = part2::to_next(curr,move);
       }
-      return expanded_row;
-    });
-    return result;
-  }
+      if (result) {
+        std::cout << NL << T << "passed";
+        std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
+      }
+      else std::cout << NL << T << "FAILED";
+
+      if (result) return "PASSED (file ignored)";
+      else return "Failed";
+    }
+
+  } // namespace part2::test
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
@@ -488,6 +526,8 @@ namespace part2 {
       for (auto option : args.options) {
         if (option == "-test0") return test::test0(doc_sections);
         if (option == "-test1") return test::test1(doc_sections);
+        if (option == "-test2") return test::test2(doc_sections,args);
+        return std::format("Unknown option '{}'",option);
       }
     }
     else if (in) {
