@@ -242,20 +242,6 @@ namespace test {
     return os;
   }
 
-//  Expecteds parse_log(auto& in) {
-//    using namespace aoc::parsing;
-//    auto input = Splitter{in};
-//    auto sections = input.sections();
-//    std::cout << NL << "Log Parse:" << sections.size();
-//    Expecteds result{};
-//    std::ranges::transform(sections,std::back_inserter(result),[](Section section){
-//      auto move = *(section[0].str().rbegin()+1);
-//      section.erase(section.begin());
-//      return Expected{move,Grid{to_raw(section)}};
-//    });
-//    return result;
-//  }
-
   // return range to shift [begin,end[
   // The range includes the robot position
   // "##@.O..#" <
@@ -403,11 +389,97 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  Integer to_gps_coordinate(Position const& pos) {
+    return 100*pos.row + pos.col;
+  }
+
+  Integer to_result(Grid const& grid) {
+    Integer result{};
+    auto lanterns = grid.find_all('[');
+    result = std::accumulate(lanterns.begin(), lanterns.end(), result,[](auto acc,Position const& pos){
+      acc += to_gps_coordinate(pos);
+      return acc;
+    });
+    return result;
+  }
+
+
+  namespace test {
+  
+    using ::test::Expected;
+  using ::test::Expecteds;
+
+    std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+      std::vector<aoc::raw::Lines> result{};
+      result.push_back({});
+      // grid
+      std::ranges::copy(aoc::parsing::to_raw(sections[54]),std::back_inserter(result.back()));
+      result.back().push_back("");
+      // moves
+      std::ranges::copy(aoc::parsing::to_raw(sections[15]),std::back_inserter(result.back()));
+      return result;
+    }
+
+    std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
+      std::cout << NL << "Log Parse:" << doc_sections.size();
+      Expecteds result{};
+      for (auto [sx,section] : aoc::views::enumerate(doc_sections)) {
+        if (sx>= 59 and sx <= 70) {
+          auto move = *(section[0].str().rbegin()+1);
+          section.erase(section.begin());
+          result.push_back(Expected{move,Grid{to_raw(section)}});
+        }
+      }
+      return result;
+    }
+  
+    std::optional<Result> test0(aoc::parsing::Sections const& doc_sections) {
+      auto matches = doc_sections[71].back().groups(R"(\D*(\d+)\D+(\d+)\D+(\d+)\D+(\d+)\D*)");
+      auto expected_row = std::stoi(matches[1]);
+      auto expected_col = std::stoi(matches[2]);
+      auto expected_gps = std::stoi(matches[3]);
+      Grid grid{aoc::parsing::to_raw(doc_sections[72])};
+      std::cout << NL << grid;
+      auto grid_gps = part2::to_result(grid);
+      std::cout << NL << T << "grid_gps:" << grid_gps << " expected:" << expected_gps;
+      bool result = (to_result(grid) == expected_gps);
+      if (result) return "PASSED";
+      else return "Failed";
+    }
+  }
+
+  Grid to_expanded_grid(Grid const& part_1_grid) {
+    Grid result{{}};
+    std::ranges::transform(part_1_grid.base(), std::back_inserter(result.base()), [](std::string const& part_1_row) {
+      std::string expanded_row{};
+      for (char tile : part_1_row) {
+        switch (tile) {
+          case '#': expanded_row += "##"; break;
+          case 'O': expanded_row += "[]"; break;
+          case '.': expanded_row += ".."; break;
+          case '@': expanded_row += "@."; break;
+          default:  expanded_row += tile; // Default case for unsupported tiles
+        }
+      }
+      return expanded_row;
+    });
+    return result;
+  }
+
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
-    if (in) {
+    if (args.options.size()>0) {
+      auto doc_sections = ::test::parse_doc(args);
+      for (auto option : args.options) {
+        if (option == "-test0") return test::test0(doc_sections);
+      }
+    }
+    else if (in) {
       auto model = parse(in);
+      Model expanded{to_expanded_grid(model.grid),model.moves};
+      std::cout << NL << expanded;
     }
     return result;
   }
