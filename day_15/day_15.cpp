@@ -444,10 +444,23 @@ namespace part2 {
       auto grid_gps = part2::to_result(grid);
       std::cout << NL << T << "grid_gps:" << grid_gps << " expected:" << expected_gps;
       bool result = (to_result(grid) == expected_gps);
-      if (result) return "PASSED";
+      if (result) return "PASSED (file ignored)";
       else return "Failed";
     }
-  }
+  
+    std::optional<Result> test1(aoc::parsing::Sections const& doc_sections) {
+      auto matches = doc_sections[75].back().groups(R"(\D*(\d+)\D*)");
+      auto expected_gps = std::stoi(matches[0]);
+      Grid grid{aoc::parsing::to_raw(doc_sections[74])};
+      std::cout << NL << grid;
+      auto grid_gps = part2::to_result(grid);
+      std::cout << NL << T << "grid_gps:" << grid_gps << " expected:" << expected_gps;
+      bool result = (to_result(grid) == expected_gps);
+      if (result) return "PASSED (file ignored)";
+      else return "Failed";
+    }
+
+  } // namespace part2::test
 
   Grid to_expanded_grid(Grid const& part_1_grid) {
     Grid result{{}};
@@ -474,6 +487,7 @@ namespace part2 {
       auto doc_sections = ::test::parse_doc(args);
       for (auto option : args.options) {
         if (option == "-test0") return test::test0(doc_sections);
+        if (option == "-test1") return test::test1(doc_sections);
       }
     }
     else if (in) {
@@ -540,7 +554,7 @@ int main(int argc, char *argv[]) {
         answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
       }
       else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+        answers.push_back({std::format("{} part{} {}",request.options, part,file.filename().string()),part2::solve_for(in,request)});
       }
       else if (part.starts_with("test")) {
         answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
