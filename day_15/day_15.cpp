@@ -61,7 +61,7 @@ std::filesystem::path to_working_dir_path(std::string const& file_name) {
 }
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 
 using aoc::grid::Grid;
 using aoc::grid::Position;
@@ -89,19 +89,19 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
+using aoc::Args;
 
 struct Simulation {
   Position pos{};
   Grid grid;
 };
 
-Result to_gps_coordinate(Position const& pos) {
+Integer to_gps_coordinate(Position const& pos) {
   return 100*pos.row + pos.col;
 }
 
-Result to_result(Grid const& grid) {
-  Result result{};
+Integer to_result(Grid const& grid) {
+  Integer result{};
   auto lanterns = grid.find_all('O');
   result = std::accumulate(lanterns.begin(), lanterns.end(), result,[](auto acc,Position const& pos){
     acc += to_gps_coordinate(pos);
@@ -172,24 +172,69 @@ Simulation& to_next(Simulation& curr,Move move) {
 }
 
 namespace test {
-  struct LogEntry {
+
+  // Adapt to expected for day puzzle
+  struct Expected {
     char move;
     Grid grid;
+    bool operator==(Expected const& other) const {
+      bool result{true};
+      return result;
+    }
   };
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     os << "Logged Move " << entry.move << ":";
     os << NL << entry.grid;
     return os;
   }
-  using Log = std::vector<LogEntry>;
-  std::ostream& operator<<(std::ostream& os,Log const& log) {
-    for (auto const& entry : log) {
-      std::cout << NL << entry;
+
+  using Expecteds = aoc::test::Expecteds<Expected>;
+
+  aoc::parsing::Sections parse_doc(Args const& args) {
+    std::cout << NL << T << "parse puzzle doc text";
+    aoc::parsing::Sections result{};
+    using namespace aoc::parsing;
+    std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
+    auto sections = Splitter{doc_in}.same_indent_sections();
+    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+      std::cout << NL << "---------- section " << sx << " ----------";
+      result.push_back(section);
+      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+      }
     }
-    return os;
+    return result;
   }
 
-  using State = std::pair<Simulation,LogEntry>;
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    result.push_back({});
+    std::ranges::copy(aoc::parsing::to_raw(sections[19]),std::back_inserter(result.back()));
+    result.back().push_back("");
+    std::ranges::copy(aoc::parsing::to_raw(sections[20]),std::back_inserter(result.back()));
+
+    result.push_back({});
+    std::ranges::copy(aoc::parsing::to_raw(sections[14]),std::back_inserter(result.back()));
+    result.back().push_back("");
+    std::ranges::copy(aoc::parsing::to_raw(sections[15]),std::back_inserter(result.back()));
+    return result;
+  }
+
+  std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
+    std::cout << NL << "Log Parse:" << doc_sections.size();
+    Expecteds result{};
+    for (auto [sx,section] : aoc::views::enumerate(doc_sections)) {
+      if (sx>= 22 and sx <= 37) {
+        auto move = *(section[0].str().rbegin()+1);
+        section.erase(section.begin());
+        result.push_back(Expected{move,Grid{to_raw(section)}});
+      }
+    }
+    return result;
+  }
+
+  using State = std::pair<Simulation,Expected>;
 
   std::ostream& operator<<(std::ostream& os,State const& state) {
     std::cout << NL << T << "Evaluated" << T << "Expected";
@@ -197,20 +242,19 @@ namespace test {
     return os;
   }
 
-
-  Log parse(auto& in) {
-    using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto sections = input.sections();
-    std::cout << NL << "Log Parse:" << sections.size();
-    Log result{};
-    std::ranges::transform(sections,std::back_inserter(result),[](Section section){
-      auto move = *(section[0].str().rbegin()+1);
-      section.erase(section.begin());
-      return LogEntry{move,Grid{to_raw(section)}};
-    });
-    return result;
-  }
+//  Expecteds parse_log(auto& in) {
+//    using namespace aoc::parsing;
+//    auto input = Splitter{in};
+//    auto sections = input.sections();
+//    std::cout << NL << "Log Parse:" << sections.size();
+//    Expecteds result{};
+//    std::ranges::transform(sections,std::back_inserter(result),[](Section section){
+//      auto move = *(section[0].str().rbegin()+1);
+//      section.erase(section.begin());
+//      return Expected{move,Grid{to_raw(section)}};
+//    });
+//    return result;
+//  }
 
   // return range to shift [begin,end[
   // The range includes the robot position
@@ -221,7 +265,7 @@ namespace test {
 
   bool test0() {
     bool result{};
-    Result expected{104};
+    Integer expected{104};
     char const* s = R"(#######
 #...O..
 #......)";
@@ -234,22 +278,22 @@ namespace test {
     return result;
   }
 
-  bool test1(Model const& model,Log const& log) {
+  bool test1(Model const& model,Expecteds const& expecteds) {
     bool result{true};
     std::cout << NL << "TEST1";
     auto starts = model.grid.find_all('@');
     if (starts.size()==1) {
       auto start = starts[0];
       Simulation curr{start,model.grid};
-      for (int i=0;i<log.size()-1;++i) {
+      for (int i=0;i<expecteds.size()-1;++i) {
         std::cout << NL << NL << "step[" << i << "]";
         if (i>0) std::cout << NL << T << "After move " << model.moves[i-1];
-        State state{curr,log[i]};
+        State state{curr,expecteds[i]};
         std::cout << NL << state;
-        result = result and (curr.grid == log[i].grid);
+        result = result and (curr.grid == expecteds[i].grid);
         if (not result) break;
         char move = model.moves[i];
-        if (move != log[i+1].move) break;
+        if (move != expecteds[i+1].move) break;
         curr = to_next(curr,move);
       }
       if (result) {
@@ -283,6 +327,40 @@ namespace test {
     return true;
   }
 
+  std::optional<Result> solve_for(std::istream& in,Args args) {
+    std::ostringstream response{};
+    std::cout << NL << NL << "test";
+    if (in) {
+      auto model = parse(in);
+      auto doc = parse_doc(args);
+      auto examples = to_examples(doc);
+      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
+        if (args.options.contains("-to_example")) {
+          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
+          if (aoc::raw::write_to_file(example_file, example_lines)) {
+            response << "Created " << example_file;
+          }
+          else {
+            response << "Sorry, failed to create file " << example_file;
+          }
+        }
+        else {
+          std::ostringstream oss{};
+          aoc::raw::write_to(oss, example_lines);
+          std::istringstream example_in{oss.str()};
+          auto example_model = ::parse(example_in);
+          std::cout << NL << NL << "example_model:" << example_model;
+          auto expecteds = test::to_expecteds(doc, ix,args);
+          /* Call tests here */
+          if (args.arg["part"] == "test0") return std::string(test0()?"PASSED":"Failed");
+          if (args.arg["part"] == "test1") return test1(model, expecteds)?"PASSED":"Failed";
+          if (args.arg["part"] == "test2") return test2(model)?"PASSED":"Failed";
+        }
+      }
+    }
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
+  }
 }
 
 namespace part1 {
@@ -294,16 +372,10 @@ namespace part1 {
       
       if (model.grid.width() == 8) {
         bool test_result{};
-        auto log_file_path = to_working_dir_path("example.log");
-        std::ifstream in{log_file_path};
-        if (in) {
-          auto log = test::parse(in);
-          test_result = test::test1(model,log);
-        }
-        else {
-          std::cerr << NL << "Sorry, no log file" << log_file_path;
-        }
-        std::cout << NL;
+        auto doc = test::parse_doc(args);
+        auto expecteds = test::to_expecteds(doc, 1, args);
+        test_result = test::test1(model,expecteds);
+        
         if (test_result) std::cout << " passed";
         else std::cout << "FAILED";
       }
@@ -321,7 +393,7 @@ namespace part1 {
             Move move = model.moves[i];
             curr = to_next(curr,move);
           }
-          result = to_result(curr.grid);
+          result = std::to_string(to_result(curr.grid));
           std::cout << NL << NL << "After:" << NL << curr;
         }
       }
@@ -342,59 +414,68 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
+  Args user_args{};
+  
+  // Override by any user input
+  for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
+      Args args;
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {11,12,10};
-  for (auto state : states) {
-    switch (state) {
-      case 101: {
-        if (test::test0()) std::cout << NL << "passed test0";
-        else std::cout << NL << "FAILED test0";
-      } break;
-      case 11: {
-        auto file = to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 12: {
-        auto file = to_working_dir_path("example2.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example 2",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        auto file = to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        auto file = to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        auto file = to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
+    exec_times.push_back(std::chrono::system_clock::now());
   }
   
   std::cout << "\n\nANSWERS";
@@ -406,13 +487,17 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-  For my input:
+
+   Xcode Debug -O2
+
+   >day_xx -all
 
    ANSWERS
    duration:3ms answer[Part 1 Example] 2028
    duration:2ms answer[Part 1 Example 2] 10092
    duration:15ms answer[Part 1     ] 1471826
+   ...
    
-  */
+   */
   return 0;
 }
