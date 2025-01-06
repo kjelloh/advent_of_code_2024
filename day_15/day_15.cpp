@@ -408,9 +408,130 @@ namespace part2 {
     return result;
   }
 
-  Simulation& to_next(Simulation& curr,Move move) {
+  // Axis alligned bounding box
+  struct AABB {
+    Position upper_left;
+    int width;
+    int height;
+    bool occupies(Position pos) const {
+      return (upper_left.col <= pos.col < upper_left.col + width)
+      and (upper_left.row <= pos.row < upper_left.row + height);
+    }
+    bool operator<(AABB const& other) const {return std::tie(upper_left) < std::tie(other.upper_left);}
+  };
+
+  AABB to_moved(AABB const& aabb, Position const& dir) {
+    return {
+      {aabb.upper_left.row + dir.row, aabb.upper_left.col + dir.col},
+      aabb.width,
+      aabb.height
+    };
+  }
+
+  bool does_overlap(const AABB& a, const AABB& b) {
+    return not (a.upper_left.col + a.width <= b.upper_left.col ||
+                b.upper_left.col + b.width <= a.upper_left.col ||
+                a.upper_left.row + a.height <= b.upper_left.row ||
+                b.upper_left.row + b.height <= a.upper_left.row);
+  }
+
+  struct Object {
+    std::string caption;
+    AABB aabb;
+    bool is_movable() const {return caption != "#";}
+  };
+
+  using Objects = std::map<Position,Object>;
+
+  Objects to_connected(Objects const& objects,Object const& object,Direction dir) {
+    std::cout << NL << "to_connected" << std::flush;
+    Objects result;
+    std::deque<AABB> dq{};
+    auto start = to_moved(object.aabb, dir);
+    dq.push_back(start);
+    std::set<AABB> seen{};
+    while (not dq.empty()) {
+      auto curr = dq.front();dq.pop_front();
+      std::cout << NL << dq.size() << " " << curr.upper_left << " " << dir << std::flush;
+      seen.insert(curr);
+      for (auto const& [pos,next] : objects) {
+        if (seen.contains(next.aabb)) continue;
+        if (does_overlap(curr, next.aabb)) {
+          result[pos] = next;
+          auto moved_next = to_moved(next.aabb, dir);
+          if (moved_next.upper_left == curr.upper_left) continue;
+          std::cout << " next " << moved_next.upper_left;
+          dq.push_back(moved_next); // moved also overlaps?
+        }
+      }
+    }
+    return result;
+  }
+
+  Objects to_objects(Grid const& grid) {
+    Objects result{};
+    auto pick_object = [&result](Position pos,char ch) {
+      Object obj;
+      obj.aabb.upper_left = pos;
+      if (ch == '[') {
+        obj.caption = "[]";
+        obj.aabb.width = 2;
+        obj.aabb.height = 1;
+      } else if (ch == '@') {
+        obj.caption = "@";
+        obj.aabb.width = 1;
+        obj.aabb.height = 1;
+      } else if (ch == '#') {
+        obj.caption = "#";
+        obj.aabb.width = 1;
+        obj.aabb.height = 1;
+      }
+      else return;
+      result[pos] = obj;
+    };
+    grid.for_each(pick_object);
+    return result;
+  }
+
+  Grid to_grid(Objects const& objects) {
+    auto [height,width] = std::ranges::fold_left(objects,Position{},[](Position acc,auto const& entry){
+      acc.row = std::max(acc.row,entry.first.row+1); // size is one more than index
+      acc.col = std::max(acc.col,entry.first.col+1);
+      return acc;
+    });
+    Grid grid{std::vector(height,std::string(width,'.'))};
+    for (auto const& [pos,object] : objects) {
+      grid.at(pos) = object.caption[0];
+      if (object.caption.size()==2) grid.at(pos + aoc::grid::RIGHT) = object.caption[1];
+    }
+    return grid;
+  }
+
+  bool attempt_push(Objects& objects, Object& to_move, const Position& dir) {
+    auto connected = to_connected(objects, to_move, dir);
+    for (auto& [pos,next] : connected) {
+      if (next.is_movable()) {
+        if (not attempt_push(objects, next, dir)) {
+          return false; // all must be movable
+        }
+      }
+      else {
+        return false; // all must be movable
+      }
+    }
+    to_move.aabb = to_moved(to_move.aabb, dir);
+    return true;
+  }
+
+  Objects& to_next(Objects& curr,Move move) {
     auto dir = to_direction(move);
-    std::cout << NL << "to_next - NOT YET IMPLEMENTED!";
+    auto iter = std::find_if(curr.begin(), curr.end(), [](auto const& entry){
+      return entry.second.caption == "@";
+    });
+    auto [pos,robot] = *iter;
+    if (attempt_push(curr, robot, dir)) {
+      
+    }
     return curr;
   }
 
@@ -494,7 +615,8 @@ namespace part2 {
       auto expanded = to_expanded_grid(grid);
       Model model{expanded,moves};
       auto start = model.grid.find('@');
-      Simulation curr{start,model.grid};
+      Simulation curr{start,expanded};
+      auto objects = to_objects(expanded);
       for (int i=0;i<expecteds.size()-1;++i) {
         std::cout << NL << NL << "step[" << i << "]";
         if (i>0) std::cout << NL << T << "After move " << model.moves[i-1];
@@ -504,7 +626,8 @@ namespace part2 {
         if (not result) break;
         char move = model.moves[i];
         if (move != expecteds[i+1].move) break;
-        curr = part2::to_next(curr,move);
+        objects = part2::to_next(objects,move);
+        curr.grid = to_grid(objects);
       }
       if (result) {
         std::cout << NL << T << "passed";
