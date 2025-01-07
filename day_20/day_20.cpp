@@ -44,8 +44,6 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 using aoc::grid::Position;
 using aoc::grid::Positions;
 using aoc::grid::Grid;
@@ -69,6 +67,18 @@ namespace test {
 
   using Expecteds = aoc::test::Expecteds<Expected>;
 
+
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    //result.push_back(aoc::parsing::to_raw(sections[??]));
+    return result;
+  }
+
+  std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
+    Expecteds result{};
+    return result;
+  }
+
   Expecteds parse(auto& doc_in) {
     std::cout << NL << T << "test::parse";
     Expecteds result{};
@@ -81,11 +91,6 @@ namespace test {
       }
     }
     return result;
-  }
-
-  std::optional<Result> test0(Args args) {
-    std::cout << NL << NL << "test0";
-    return std::nullopt;
   }
 
   std::size_t to_saving(Path track,PositionPair cheat) {
@@ -149,15 +154,12 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test1(auto& in, auto& doc_in,Args args) {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     Integer acc{};
-    std::cout << NL << NL << "test1";
+    std::cout << NL << NL << "test";
     if (in) {
       auto model = ::parse(in);
-      if (doc_in) {
-        auto expecteds = test::parse(doc_in);
-      }
       std::cout << NL << model;
       auto [track,cheats] = to_cheats(model);
       auto computed = aoc::grid::to_dir_traced(model, track);
@@ -172,7 +174,7 @@ namespace test {
       }
       for (auto const& [saving,cheats] : savings) {
         std::cout << NL << "There are " << cheats.size() << " cheats saving " << saving << " picoseconds.";
-        if (saving >= 100) acc += cheats.size();
+        if (saving >= 1) acc += cheats.size();
       }
       result = std::to_string(acc);
     }
@@ -188,9 +190,9 @@ namespace part1 {
     if (in) {
       Integer acc{};
       auto model = parse(in);
-      bool is_example = (model.height()==15);
       std::cout << NL << model;
       auto [track,cheats] = test::to_cheats(model);
+      bool is_example = (model.height()==15);
       if (is_example) {
         auto computed = aoc::grid::to_dir_traced(model, track);
         std::cout << NL << computed;
@@ -295,72 +297,69 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
 int main(int argc, char *argv[]) {
-  Args args{};
+  Args user_args{};
+  
+  // Override by any user input
   for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
+      Args args;
+      args.arg["part"] = part;
+      args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {11,10,21,20};
-//  std::vector<int> states = {0,111};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 101: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 211: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and doc_in) answers.push_back({"Part 2 Test Example vs Log",test::test1(in,doc_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or doc_file " << doc_file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -373,14 +372,18 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   Xcode Debug -O2
+
+   >day_20 -all
    
    ANSWERS
-   duration:3ms answer[Part 1 Example] 44
-   duration:593ms answer[Part 1     ] 1497
-   duration:1ms answer[Part 2 Example] 285
-   duration:5468ms answer[Part 2     ] 1030809
+   duration:1ms answer[test example.txt] 44
+   duration:1ms answer[part1 example.txt] 44
+   duration:574ms answer[part1 puzzle.txt] 1497
+   duration:1ms answer[part2 example.txt] 285
+   duration:5679ms answer[part2 puzzle.txt] 1030809
    
-  */
+   */
   return 0;
 }
