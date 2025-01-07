@@ -833,11 +833,13 @@ namespace aoc {
     class Grid {
     public:
       using Seen = std::set<Position>;
+      using Base = std::vector<std::string>;
+
       Grid& push_back(raw::Line const& row) {
         m_grid.push_back(row);
         return *this;
       }
-      Grid(std::vector<std::string> grid = {}) : m_grid(std::move(grid)) {}
+      Grid(Base base = {}) : m_grid(std::move(base)) {}
       
       // Returns the height of the grid
       size_t height() const {
@@ -931,6 +933,9 @@ namespace aoc {
         };
       }
       
+      Base& base() {return m_grid;}
+      Base const& base() const {return m_grid;}
+
     private:
       std::vector<std::string> m_grid;
     };
@@ -1181,9 +1186,17 @@ namespace aoc {
   }
 
   namespace test {
+  
+    std::istringstream to_example_in(aoc::raw::Lines const&  example_lines) {
+      std::ostringstream oss{};
+      aoc::raw::write_to(oss, example_lines);
+      std::istringstream example_in{oss.str()};
+      return example_in;
+    }
+
     template <class T>
     using Expecteds = std::vector<T>;
-  
+
     template <class T>
     std::ostream& operator<<(std::ostream& os,Expecteds<T> const& log) {
       for (auto const& entry : log) {
