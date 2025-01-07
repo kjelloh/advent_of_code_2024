@@ -76,12 +76,10 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 namespace test {
 
-  using Expected = std::pair<aoc::raw::Line,aoc::raw::Lines>;
-  std::ostream& operator<<(std::ostream& os,Expected const& expected) {
+  using ExpectedDesignTowels = std::pair<aoc::raw::Line,aoc::raw::Lines>;
+  std::ostream& operator<<(std::ostream& os,ExpectedDesignTowels const& expected) {
     os << "expected:" << std::quoted(expected.first);
     if (expected.second.size()>0) {
       os << " from:";
@@ -96,28 +94,28 @@ namespace test {
     return os;
   }
   // Adapt to expected for day puzzle
-  struct LogEntry {
+  struct Expected {
     Model example{};
-    std::vector<Expected> expecteds{};
-    bool operator==(LogEntry const& other) const {
+    std::vector<ExpectedDesignTowels> expected_design_towels{};
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
-    std::cout << NL << "LogEntry:";
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
+    std::cout << NL << "Expected:";
     std::cout << NL << T << entry.example;
-    for (auto const& expected : entry.expecteds){
+    for (auto const& expected : entry.expected_design_towels){
       std::cout << NL << T << expected;
       
     }
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  Expected to_expected(const std::string& line) {
+  ExpectedDesignTowels to_expected_design_towels(const std::string& line) {
     std::string design;
     std::vector<std::string> towels;
     
@@ -152,76 +150,75 @@ namespace test {
     return {design, towels};
   }
 
-  LogEntries parse(auto& doc_in) {
-    std::cout << NL << T << "test::parse";
-    LogEntries result{};
-    using namespace aoc::parsing;
-    if (doc_in) {
-      auto sections = Splitter{doc_in}.same_indent_sections();
-      LogEntry entry{};
-      std::string repaired{};
-      for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-        std::cout << NL << "---------- section " << sx << " ----------";
-        for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-          std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-          switch (sx) {
-              /*
-               ---------- section 13 ----------
-                   line[0]:28 "r, wr, b, g, bwu, rb, gb, br"
-               ---------- section 14 ----------
-                   line[0]:5 "brwrr"
-                   line[1]:4 "bggr"
-                   line[2]:4 "gbbr"
-                   line[3]:6 "rrbgbr"
-                   line[4]:4 "ubwu"
-                   line[5]:6 "bwurrg"
-                   line[6]:4 "brgr"
-                   line[7]:6 "bbrgwb"
-               */
-            case 13: {
-                for (auto const& untrimmed : line.splits(',')) {
-                  entry.example.towels.push_back(untrimmed.trim());
-                }
-            } break;
-            case 14: {
-                entry.example.designs.push_back(line);
-            } break;
-            /*
-             ---------- section 18 ----------
-                 line[0]:67 "     * brwrr can be made with a br towel, then a wr towel, and then"
-             ---------- section 19 ----------
-                 line[0]:26 "       finally an r towel."
-             ---------- section 20 ----------
-                 line[0]:74 "     * bggr can be made with a b towel, two g towels, and then an r towel."
-                 line[1]:60 "     * gbbr can be made with a gb towel and then a br towel."
-                 line[2]:48 "     * rrbgbr can be made with r, rb, g, and br."
-                 line[3]:26 "     * ubwu is impossible."
-                 line[4]:48 "     * bwurrg can be made with bwu, r, r, and g."
-                 line[5]:42 "     * brgr can be made with br, g, and r."
-                 line[6]:28 "     * bbrgwb is impossible."
 
+  Expecteds to_expecteds(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
+    std::cout << NL << T << "to_expecteds";
+    Expecteds result{};
+    using namespace aoc::parsing;
+    Expected entry{};
+    std::string repaired{};
+    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+      std::cout << NL << "---------- section " << sx << " ----------";
+      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+        switch (sx) {
+            /*
+             ---------- section 13 ----------
+                 line[0]:28 "r, wr, b, g, bwu, rb, gb, br"
+             ---------- section 14 ----------
+                 line[0]:5 "brwrr"
+                 line[1]:4 "bggr"
+                 line[2]:4 "gbbr"
+                 line[3]:6 "rrbgbr"
+                 line[4]:4 "ubwu"
+                 line[5]:6 "bwurrg"
+                 line[6]:4 "brgr"
+                 line[7]:6 "bbrgwb"
              */
-            case 18: {
-              repaired = line;
-            } break;
-            case 19: {
-              repaired += line;
-            } break;
-            case 20: {
-              if (repaired.size()>0) {
-                auto expected = to_expected(repaired);
-                entry.expecteds.push_back(expected);
-                repaired.clear();
+          case 13: {
+              for (auto const& untrimmed : line.splits(',')) {
+                entry.example.towels.push_back(untrimmed.trim());
               }
-              auto expected = to_expected(line);
-              entry.expecteds.push_back(expected);
-            } break;
-            case 21: {} break;
-          }
+          } break;
+          case 14: {
+              entry.example.designs.push_back(line);
+          } break;
+          /*
+           ---------- section 18 ----------
+               line[0]:67 "     * brwrr can be made with a br towel, then a wr towel, and then"
+           ---------- section 19 ----------
+               line[0]:26 "       finally an r towel."
+           ---------- section 20 ----------
+               line[0]:74 "     * bggr can be made with a b towel, two g towels, and then an r towel."
+               line[1]:60 "     * gbbr can be made with a gb towel and then a br towel."
+               line[2]:48 "     * rrbgbr can be made with r, rb, g, and br."
+               line[3]:26 "     * ubwu is impossible."
+               line[4]:48 "     * bwurrg can be made with bwu, r, r, and g."
+               line[5]:42 "     * brgr can be made with br, g, and r."
+               line[6]:28 "     * bbrgwb is impossible."
+
+           */
+          case 18: {
+            repaired = line;
+          } break;
+          case 19: {
+            repaired += line;
+          } break;
+          case 20: {
+            if (repaired.size()>0) {
+              auto expected = to_expected_design_towels(repaired);
+              entry.expected_design_towels.push_back(expected);
+              repaired.clear();
+            }
+            auto expected = to_expected_design_towels(line);
+            entry.expected_design_towels.push_back(expected);
+          } break;
+          case 21: {} break;
         }
       }
-      result.push_back(entry);
     }
+    result.push_back(entry);
+
     return result;
   }
 
@@ -285,20 +282,21 @@ namespace test {
     while (!stack.empty()) {
 //      std::cout << NL << stack.size() << std::flush;
       auto [current, path] = stack.top(); // a path to current
+      using aoc::raw::operator<<;
+      std::cout << NL << current << " " << path;
       stack.pop();
       if (current == end) {
         std::cout << NL << NL << "END!";
         allPaths.push_back(path);
         continue;
       }
-
-      if (seen.contains(path)) continue; // already done once
       seen.insert(path); // process each path only once
-      
+      if (not graph.contains(current)) break;
       for (const auto& [neighbor, weight] : graph.at(current)) {
         using aoc::raw::operator<<;
         std::vector<Vertex> newPath = path;
         newPath.push_back(neighbor);
+        if (seen.contains(newPath)) continue;
         stack.push({neighbor, newPath});
 //            std::cout << NL << T << current << " --> " << neighbor << " " << weight;
       }
@@ -308,7 +306,7 @@ namespace test {
     return allPaths;
   }
 
-  std::optional<Result> test0(Towels const&  towels,Expected const& expected) {
+  std::optional<Result> test0(Towels const&  towels,ExpectedDesignTowels const& expected) {
     Integer count{};
     std::cout << NL << NL << "test0:" << expected;
     using aoc::raw::operator<<;
@@ -328,27 +326,68 @@ namespace test {
     return std::nullopt;
   }
 
-  std::optional<Result> test1(auto& doc_in,Args args) {
+  std::optional<Result> test1(Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
     Integer acc{};
-    if (doc_in) {
-      auto entries = test::parse(doc_in);
-      if (entries.size()==1) {
-        auto const& entry = entries.back();
-        auto const& towels = entry.example.towels;
-        for (auto const& expected : entry.expecteds) {
-          if (auto answer = test0(towels,expected)) {
-            acc += 1;
-          }
+    auto doc = aoc::doc::parse_doc(args);
+    auto entries = test::to_expecteds(doc,0,args);
+    if (entries.size()==1) {
+      auto const& entry = entries.back();
+      auto const& towels = entry.example.towels;
+      for (auto const& expected : entry.expected_design_towels) {
+        if (auto answer = test0(towels,expected)) {
+          acc += 1;
         }
       }
-      else {
-        std::cerr << NL << "Sorry, expected only one entry to test from parsing doc.txt";
-      }
+    }
+    else {
+      std::cerr << NL << "Sorry, expected only one entry to test from parsing doc.txt";
     }
     result = std::to_string(acc);
     return result;
+  }
+
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[13]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[14]));
+    return result;
+  }
+
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    std::ostringstream response{};
+    std::cout << NL << NL << "test";
+    if (in) {
+      auto model = parse(in);
+      auto doc = aoc::doc::parse_doc(args);
+      auto examples = to_examples(doc);
+      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
+        if (args.options.contains("-to_example")) {
+          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
+          if (aoc::raw::write_to_file(example_file, example_lines)) {
+            response << "Created " << example_file;
+          }
+          else {
+            response << "Sorry, failed to create file " << example_file;
+          }
+        }
+        else {
+          std::ostringstream oss{};
+          aoc::raw::write_to(oss, example_lines);
+          std::istringstream example_in{oss.str()};
+          auto example_model = ::parse(example_in);
+          std::cout << NL << NL << "example_model:" << example_model;
+          auto log = test::to_expecteds(doc, ix,args);
+          /* Call tests here */
+          return test1(args);
+        }
+      }
+    }
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
   }
 
 }
@@ -419,50 +458,78 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
 int main(int argc, char *argv[]) {
-  Args args{};
+  Args user_args{};
+  
+  // Override by any user input
   for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+
+    std::vector<std::string> parts = {"test", "1", "2"};
+    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{""},"test",""}
+      ,{{""},"test","example.txt"}
+      ,{{""},"1","example.txt"}
+      ,{{""},"1","puzzle.txt"}
+      ,{{""},"2","example.txt"}
+      ,{{""},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
+      Args args;
+      args.options = options;
+      args.arg["part"] = part;
+      if (file.size()>0) args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {11,10,21,20};
-  for (auto state : states) {
-    switch (state) {
-      case 111: {
-        auto doc_file = aoc::to_working_dir_path("doc.txt");
-        std::ifstream doc_in{doc_file};
-        if (doc_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(doc_in,args)});
-        else std::cerr << "\nSORRY, no doc file " << doc_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (std::filesystem::is_regular_file(file) and in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -475,14 +542,18 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
+
+   Xcode Debug -O2
+
+   >day_19 -all
 
    ANSWERS
-   duration:1ms answer[Part 1 Example] 6
-   duration:235ms answer[Part 1     ] 276
-   duration:0ms answer[Part 2 Example] 16
-   duration:483ms answer[Part 2     ] 681226908011510
+   duration:0ms answer[test example.txt] 6
+   duration:10ms answer[part1 example.txt] 6
+   duration:0ms answer[part1 puzzle.txt] 276
+   duration:223ms answer[part2 example.txt] 16
+   duration:0ms answer[part2 puzzle.txt] 681226908011510
    
-  */
+   */
   return 0;
 }
