@@ -113,8 +113,8 @@ Integer to_result(Grid const& grid) {
 
 
 std::ostream& operator<<(std::ostream& os,Simulation const& sim) {
-  std::cout << " pos:" << sim.pos;
-  std::cout << NL << sim.grid;
+  os << " pos:" << sim.pos;
+  os << NL << sim.grid;
   return os;
 }
 
@@ -238,8 +238,8 @@ namespace test {
   using State = std::pair<Simulation,Expected>;
 
   std::ostream& operator<<(std::ostream& os,State const& state) {
-    std::cout << NL << T << "Evaluated" << T << "Expected";
-    std::cout << NL << std::make_pair(state.first.grid, state.second.grid);
+    os << NL << T << "Evaluated" << T << "Expected";
+    os << NL << std::make_pair(state.first.grid, state.second.grid);
     return os;
   }
 
@@ -267,7 +267,7 @@ namespace test {
 
   bool test1(Model const& model,Expecteds const& expecteds) {
     bool result{true};
-    std::cout << NL << "TEST1";
+    std::cout << NL << "test1";
     auto starts = model.grid.find_all('@');
     if (starts.size()==1) {
       auto start = starts[0];
@@ -297,20 +297,14 @@ namespace test {
 
   bool test2(Model const& model) {
     bool result{true};
-    std::cout << NL << "TEST1";
-    auto starts = model.grid.find_all('@');
-    if (starts.size()==1) {
-      auto start = starts[0];
-      Simulation curr{start,model.grid};
-      for (int i=0;i<model.moves.size();++i) {
-        Move move = model.moves[i];
-        curr = to_next(curr,move);
-      }
-      std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
+    std::cout << NL << "test2";
+    auto start = model.grid.find('@');
+    Simulation curr{start,model.grid};
+    for (int i=0;i<model.moves.size();++i) {
+      Move move = model.moves[i];
+      curr = to_next(curr,move);
     }
-    else {
-      std::cerr << NL << "failed to find unique start position";
-    }
+    std::cout << NL << NL << "ANSWER:" << to_result(curr.grid);
     return true;
   }
 
@@ -339,9 +333,11 @@ namespace test {
           std::cout << NL << NL << "example_model:" << example_model;
           auto expecteds = test::to_expecteds(doc, ix,args);
           /* Call tests here */
-          if (args.arg["part"] == "test0") return std::string(test0()?"PASSED":"Failed");
-          if (args.arg["part"] == "test1") return test1(model, expecteds)?"PASSED":"Failed";
-          if (args.arg["part"] == "test2") return test2(model)?"PASSED":"Failed";
+          if (args.arg["file"] == "example0.txt") {
+            if (args.arg["part"] == "test0") response << std::string(test0()?"PASSED (file ignored)":"Failed");
+            if (args.arg["part"] == "test1") response << std::string(test1(model, expecteds)?" PASSED":" Failed");
+            if (args.arg["part"] == "test2") response << std::string(test2(model)?"PASSED (file ignored)":"Failed");
+          }
         }
       }
     }
@@ -370,6 +366,7 @@ namespace part1 {
          test::test2(model);
       }
       if (model.grid.width() >= 8) {
+        bool do_animate = args.options.contains("-animate");
         // Full puzzle for example and full puzzle
         auto starts = model.grid.find_all('@');
         if (starts.size()==1) {
@@ -379,6 +376,10 @@ namespace part1 {
           for (int i=0;i<model.moves.size();++i) {
             Move move = model.moves[i];
             curr = to_next(curr,move);
+            if (do_animate) {
+              std::cout << NL << "after move : " << move << NL << curr.grid << " " << (model.moves.size()-i) << std::flush;
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
           }
           result = std::to_string(to_result(curr.grid));
           std::cout << NL << NL << "After:" << NL << curr;
@@ -632,12 +633,13 @@ namespace part2 {
       }
       else std::cout << NL << T << "FAILED";
 
-      if (result) return "PASSED (file ignored)";
+      if (result) return "PASSED";
       else return "Failed";
     }
   
     std::optional<Result> test3(aoc::parsing::Sections const& doc_sections,Args args) {
       bool result{false};
+      auto do_animate = args.options.contains("-animate");
       auto doc = ::test::parse_doc(args);
       auto groups = doc[75].back().groups(R"(\D+(\d+).*)");
       auto expected_gps_sum = std::stoi(groups[0]);
@@ -649,12 +651,12 @@ namespace part2 {
       auto objects = to_objects(model.grid);
       for (auto move : model.moves) {
         objects = to_next(objects, move);
-        if (true) {
+        if (do_animate) {
           auto inspect_grid = to_grid(objects);
           std::cout << NL << "after move: " << move << NL << inspect_grid;
 //          std::cout << " : Press <Enter> to continue...";
 //          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
       }
       auto end_grid = to_grid(objects);
@@ -673,7 +675,7 @@ namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
-    if (args.options.size()>0) {
+    if (args.options.size()>0 and not args.options.contains("-animate")) {
       auto doc_sections = ::test::parse_doc(args);
       for (auto option : args.options) {
         if (option == "-test0") return test::test0(doc_sections);
@@ -684,18 +686,24 @@ namespace part2 {
       }
     }
     else if (in) {
+      auto do_animate = args.options.contains("-animate");
+//      auto do_animate = true;
       auto model = parse(in);
       model.grid = part2::to_expanded_grid(model.grid);
-      std::cout << NL << model;
+      std::cout << NL << model.grid;
       auto objects = to_objects(model.grid);
       for (auto [mx,move] : aoc::views::enumerate(model.moves)) {
         objects = to_next(objects, move);
-        if (true) {
+        if (do_animate) {
           auto inspect_grid = to_grid(objects);
           std::cout << NL << "after move: " << move << NL << inspect_grid << " " << model.moves.size()-mx << std::flush;
 //          std::cout << " : Press <Enter> to continue...";
 //          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        else {
+          static int loop_count{};
+          if (loop_count++ % 444 == 0) std::cout << NL << model.moves.size()-mx << std::flush;
         }
       }
       auto end_grid = to_grid(objects);
@@ -737,14 +745,24 @@ int main(int argc, char *argv[]) {
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
 
-    std::vector<std::string> parts = {"test", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
+    std::vector<std::string> parts = {"test0","test1","test2","1","2test0","2test1","2test2","2test3","2"};
+    std::vector<std::string> files = {"example0.txt","example1.txt","puzzle.txt"};
     
     for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
-      Args args;
-      args.arg["part"] = part;
-      args.arg["file"] = file;
+      Args args{};
+      if (part.starts_with("test") and file == "puzzle.txt") continue;
+      if (part.starts_with("2test")) {
+        if (file.starts_with("example1")) continue;
+        if (file.starts_with("puzzle")) continue;
+        auto option = std::string("-") + part.substr(1);
+        args.arg["part"] = part[0];
+        args.arg.erase("file");
+        args.options.insert(option);
+      }
+      else {
+        args.arg["part"] = part;
+        args.arg["file"] = file;
+      }
       requests.push_back(args);
     }
   }
@@ -753,6 +771,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
   for (auto request : requests) {
+    std::print("\nUsing options {} args {} ",request.options,request.arg);
     auto part = request.arg["part"];
     auto file = aoc::to_working_dir_path(request.arg["file"]);
     std::cout << NL << "Using part:" << part << " file:" << file;
@@ -784,13 +803,25 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_xx -all
+   >day_16 -all
 
    ANSWERS
-   duration:3ms answer[Part 1 Example] 2028
-   duration:2ms answer[Part 1 Example 2] 10092
-   duration:15ms answer[Part 1     ] 1471826
-   ...
+   duration:8ms answer[test0 example0.txt] PASSED (file ignored)PASSED (file ignored)
+   duration:6ms answer[test0 example1.txt] NO OPERATION
+   duration:6ms answer[test1 example0.txt]  PASSED PASSED
+   duration:4ms answer[test1 example1.txt] NO OPERATION
+   duration:3ms answer[test2 example0.txt] PASSED (file ignored)PASSED (file ignored)
+   duration:3ms answer[test2 example1.txt] NO OPERATION
+   duration:3ms answer[part1 example0.txt] 2028
+   duration:0ms answer[part1 example1.txt] 10092
+   duration:7ms answer[part1 puzzle.txt] 1471826
+   duration:2ms answer[{"-test0"} part2 ] PASSED (file ignored)
+   duration:2ms answer[{"-test1"} part2 ] PASSED (file ignored)
+   duration:5ms answer[{"-test2"} part2 ] PASSED
+   duration:60ms answer[{"-test3"} part2 ] PASSED (file ignored)
+   duration:0ms answer[{} part2 example0.txt] 1751
+   duration:52ms answer[{} part2 example1.txt] 9021
+   duration:20431ms answer[{} part2 puzzle.txt] 1457703
    
    */
   return 0;
