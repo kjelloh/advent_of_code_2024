@@ -67,3 +67,26 @@ In case case, one fix is no NOT use brace-initialisation by apply the contructor
 ```cpp
 std::string indent(remaining_blinks,' ');
 ```
+## day 15
+* The code:
+```cpp
+    std::set<Object> pushed{};
+    for (auto const& [pos,object] : objects) {
+      if (does_overlap(object.aabb, moved)) pushed.insert(object);
+    }
+```
+caused compiler error:
+```
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.2.sdk/usr/include/c++/v1/__functional/operations.h:358:16 Invalid operands to binary expression ('const part2::Object' and 'const part2::Object')
+```
+A very common tale tail but I forgot that this is due to my struct Object lacking an operator<! std::set requires objetcs to be inserted to be compearable with less-than.
+## day_24
+* I got a refernce to a discarded object without seeing it happen in:
+```cpp
+auto current = q.front();
+```
+Because q.front() is a reference to the element on the stack, thus current will also be a reference!
+I can't safelly use auto here but must explcitly state the type I want to mitigate the reference to pass through.
+```cpp
+State current = q.front(); // ensure a copy is made
+```
