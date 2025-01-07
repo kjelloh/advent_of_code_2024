@@ -55,14 +55,6 @@ Model parse(auto& in) {
   return result;
 }
 
-struct Args {
-  std::map<std::string,std::string> arg{};
-  std::set<std::string> options{};
-  operator bool() const {
-    return (arg.size()>0) or (options.size()>0);
-  }
-};
-
 namespace test {
 
   // Adapt to expected for day puzzle
@@ -79,22 +71,6 @@ namespace test {
 
   using Expecteds = aoc::test::Expecteds<Expected>;
 
-  aoc::parsing::Sections parse_doc(Args const& args) {
-    std::cout << NL << T << "parse puzzle doc text";
-    aoc::parsing::Sections result{};
-    using namespace aoc::parsing;
-    std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
-    auto sections = Splitter{doc_in}.same_indent_sections();
-    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-      std::cout << NL << "---------- section " << sx << " ----------";
-      result.push_back(section);
-      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      }
-    }
-    return result;
-  }
-
   std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
     std::vector<aoc::raw::Lines> result{};
     //result.push_back(aoc::parsing::to_raw(sections[??]));
@@ -106,13 +82,12 @@ namespace test {
     return result;
   }
 
-
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::ostringstream response{};
     std::cout << NL << NL << "test";
     if (in) {
       auto model = parse(in);
-      auto doc = parse_doc(args);
+      auto doc = aoc::doc::parse_doc(args);
       auto examples = to_examples(doc);
       for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
         if (args.options.contains("-to_example")) {
@@ -166,11 +141,13 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
 std::vector<Args> to_requests(Args const& args) {
   std::vector<Args> result{};
   result.push_back(args); // No fancy for now
   return result;
 }
+
 int main(int argc, char *argv[]) {
   Args user_args{};
   
@@ -198,11 +175,20 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> parts = {"test", "1", "2"};
     std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{""},"test",""}
+      ,{{""},"test","example.txt"}
+      ,{{""},"1","example.txt"}
+      ,{{""},"1","puzzle.txt"}
+      ,{{""},"2","example.txt"}
+      ,{{""},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
       Args args;
+      args.options = options;
       args.arg["part"] = part;
-      args.arg["file"] = file;
+      if (file.size()>0) args.arg["file"] = file;
       requests.push_back(args);
     }
   }

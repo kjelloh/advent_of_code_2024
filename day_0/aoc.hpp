@@ -1325,4 +1325,6 @@ namespace aoc {
 
 } // namespace aoc
 
+using aoc::Args;
+
 #endif /* aoc_hpp */
