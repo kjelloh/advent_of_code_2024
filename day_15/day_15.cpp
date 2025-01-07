@@ -488,7 +488,7 @@ namespace part2 {
   }
 
   std::vector<Object> to_connected(Objects const& objects, Object const& first, Direction const& dir) {
-    std::cout << NL << "to_connected:" << first.aabb.upper_left << " " << first.caption;
+//    std::cout << NL << "to_connected:" << first.aabb.upper_left << " " << first.caption;
     std::vector<Object> result{};
     std::set<Position> visited; // Keep track of visited objects
     std::queue<Object> queue;   // Queue for BFS
@@ -503,8 +503,8 @@ namespace part2 {
           queue.push(object);
           visited.insert(pos);
           result.push_back(object);
-          std::cout << NL << T << "Connected: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
-          << " " << object.caption;
+//          std::cout << NL << T << "Connected: " << object.aabb.upper_left.row << ", " << object.aabb.upper_left.col
+//          << " " << object.caption;
         }
       }
     }
@@ -685,8 +685,23 @@ namespace part2 {
     }
     else if (in) {
       auto model = parse(in);
-      Model expanded{to_expanded_grid(model.grid),model.moves};
-      std::cout << NL << expanded;
+      model.grid = part2::to_expanded_grid(model.grid);
+      std::cout << NL << model;
+      auto objects = to_objects(model.grid);
+      for (auto [mx,move] : aoc::views::enumerate(model.moves)) {
+        objects = to_next(objects, move);
+        if (true) {
+          auto inspect_grid = to_grid(objects);
+          std::cout << NL << "after move: " << move << NL << inspect_grid << " " << model.moves.size()-mx << std::flush;
+//          std::cout << " : Press <Enter> to continue...";
+//          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+      }
+      auto end_grid = to_grid(objects);
+      auto sum = to_result(end_grid);
+      std::cout << NL << "gps coordinates sum : " << sum;
+      result = std::to_string(sum);
     }
     return result;
   }
