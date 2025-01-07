@@ -56,22 +56,22 @@ using aoc::grid::Path;
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
-    bool operator==(LogEntry const& other) const {
+  struct Expected {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntries parse(auto& doc_in) {
+  Expecteds parse(auto& doc_in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
+    Expecteds result{};
     using namespace aoc::parsing;
     auto sections = Splitter{doc_in}.same_indent_sections();
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
@@ -156,7 +156,7 @@ namespace test {
     if (in) {
       auto model = ::parse(in);
       if (doc_in) {
-        auto log = test::parse(doc_in);
+        auto expecteds = test::parse(doc_in);
       }
       std::cout << NL << model;
       auto [track,cheats] = to_cheats(model);
@@ -374,12 +374,12 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
    For my input:
-
+   
    ANSWERS
-   duration:2ms answer[Part 1 Example] 44
-   duration:595ms answer[Part 1     ] 1497
+   duration:3ms answer[Part 1 Example] 44
+   duration:593ms answer[Part 1     ] 1497
    duration:1ms answer[Part 2 Example] 285
-   duration:5373ms answer[Part 2     ] 1030809
+   duration:5468ms answer[Part 2     ] 1030809
    
   */
   return 0;
