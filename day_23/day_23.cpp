@@ -54,22 +54,22 @@ Model parse(auto& in) {
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
-    bool operator==(LogEntry const& other) const {
+  struct Expected {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntries parse_doc() {
+  Expecteds parse_doc() {
     std::cout << NL << T << "parse puzzle doc text";
-    LogEntries result{};
+    Expecteds result{};
     using namespace aoc::parsing;
     std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
     auto sections = Splitter{doc_in}.same_indent_sections();
@@ -397,14 +397,14 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_22 -all
-
-   ANSWERS
-   duration:1ms answer[part1 example.txt] 7
-   duration:44ms answer[part1 puzzle.txt] 1485
-   duration:0ms answer[part2 example.txt] co,de,ka,ta
-   duration:88ms answer[part2 puzzle.txt] cc,dz,ea,hj,if,it,kf,qo,sk,ug,ut,uv,wh
+   >day_23 -all
    
+   ANSWERS
+   duration:0ms answer[part1 example.txt] 7
+   duration:43ms answer[part1 puzzle.txt] 1485
+   duration:0ms answer[part2 example.txt] co,de,ka,ta
+   duration:90ms answer[part2 puzzle.txt] cc,dz,ea,hj,if,it,kf,qo,sk,ug,ut,uv,wh
+
    */
   return 0;
 }
