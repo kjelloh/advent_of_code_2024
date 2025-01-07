@@ -23,6 +23,7 @@
 #include <coroutine>
 #include <format>
 #include <print>
+#include <numeric> // E.g., std::accumulate
 
 namespace aoc {
 
@@ -234,10 +235,6 @@ namespace aoc {
     concept Streamable = requires(std::ostream& os, T const& t) {
         { os << t } -> std::same_as<std::ostream&>;
     };
-
-    // A concept for integral types for operator<<(std::vector<Int>) below
-    template <typename T>
-    concept Integral = std::is_integral_v<T>;
   
     struct Indent {
       int i{};
@@ -261,9 +258,9 @@ namespace aoc {
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
 
     template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
-  
+    requires Streamable<T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s);
+
     namespace detail {
       template <typename T>
       struct Member {
@@ -377,7 +374,7 @@ namespace aoc {
     using Lines = std::vector<Splitter>;
     using Section = Lines;
     using Sections = std::vector<Section>;
-  
+    
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -480,6 +477,17 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+  
+    Line to_line(Lines const& lines) {
+      std::string acc{};
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        if (lx>0) acc += " ";
+        acc += line.trim()
+          .str();
+      }
+      return Line{acc};
+    }
+
     aoc::raw::Line to_raw(Line const& line) {return line.str();}
     aoc::raw::Lines to_raw(Lines const& lines) {
       aoc::raw::Lines result{};
@@ -833,11 +841,13 @@ namespace aoc {
     class Grid {
     public:
       using Seen = std::set<Position>;
+      using Base = std::vector<std::string>;
+
       Grid& push_back(raw::Line const& row) {
         m_grid.push_back(row);
         return *this;
       }
-      Grid(std::vector<std::string> grid = {}) : m_grid(std::move(grid)) {}
+      Grid(Base base = {}) : m_grid(std::move(base)) {}
       
       // Returns the height of the grid
       size_t height() const {
@@ -931,6 +941,9 @@ namespace aoc {
         };
       }
       
+      Base& base() {return m_grid;}
+      Base const& base() const {return m_grid;}
+
     private:
       std::vector<std::string> m_grid;
     };
@@ -1181,11 +1194,19 @@ namespace aoc {
   }
 
   namespace test {
-    template <class T>
-    using LogEntries = std::vector<T>;
   
+    std::istringstream to_example_in(aoc::raw::Lines const&  example_lines) {
+      std::ostringstream oss{};
+      aoc::raw::write_to(oss, example_lines);
+      std::istringstream example_in{oss.str()};
+      return example_in;
+    }
+
     template <class T>
-    std::ostream& operator<<(std::ostream& os,LogEntries<T> const& log) {
+    using Expecteds = std::vector<T>;
+
+    template <class T>
+    std::ostream& operator<<(std::ostream& os,Expecteds<T> const& log) {
       for (auto const& entry : log) {
         os << raw::NL << entry;
       }
@@ -1315,5 +1336,7 @@ namespace aoc {
   }
 
 } // namespace aoc
+
+using aoc::Args;
 
 #endif /* aoc_hpp */

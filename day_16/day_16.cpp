@@ -586,15 +586,20 @@ int main(int argc, char *argv[]) {
   
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
-
-    std::vector<std::string> parts = {"test", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"test","example.txt"}
+      ,{{},"1","example.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
       Args args;
+      if (options.size()>0) args.options = options;
       args.arg["part"] = part;
-      args.arg["file"] = file;
+      if (file.size()>0) args.arg["file"] = file;
       requests.push_back(args);
     }
   }
@@ -635,13 +640,13 @@ int main(int argc, char *argv[]) {
    Xcode Debug -O2
 
    >day_16 -all
-      
+         
    ANSWERS
-   duration:11ms answer[test example.txt]  PASSED PASSED
+   duration:10ms answer[test example.txt]  PASSED PASSED
    duration:1ms answer[part1 example.txt] 7036
-   duration:108ms answer[part1 puzzle.txt] 95476
+   duration:109ms answer[part1 puzzle.txt] 95476
    duration:7ms answer[part2 example.txt] 45
-   duration:3575ms answer[part2 puzzle.txt] 511
+   duration:3576ms answer[part2 puzzle.txt] 511
 
    */
   return 0;
