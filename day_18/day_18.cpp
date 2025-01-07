@@ -51,8 +51,6 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 struct Node {
     Position pos;
     Integer cost;
@@ -88,7 +86,7 @@ Path to_best_path(Position const& start, Position const& end,Grid const& grid) {
     }
     visited.insert(current.pos);
     
-    for (auto const& next : default_neighbors(current.pos)) {
+    for (auto const& next : aoc::grid::to_ortho_neighbours(current.pos)) {
       if (not grid.on_map(next)) continue;
       if (visited.contains(next)) continue;
       if (grid.at(next) == '#') continue;
@@ -133,12 +131,12 @@ Grid to_unwalked(Model const& model,int byte_count) {
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
+  struct Expected {
     int byte_count{-1};
     Grid unwalked{};
     Grid walked{};
     int best_step_count{-1};
-    bool operator==(LogEntry const& other) const {
+    bool operator==(Expected const& other) const {
       bool result{true};
 //      result = result and (unwalked == other.unwalked);
 //      result = result and (walked == other.walked);
@@ -147,8 +145,8 @@ namespace test {
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
-    std::cout << NL << "log:";
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
+    std::cout << NL << "expected:";
     std::cout << NL << "unwalked:" << entry.unwalked;
     std::cout << NL << "byte_count:" << entry.byte_count;
     std::cout << NL << "walked:" << entry.walked;
@@ -156,93 +154,130 @@ namespace test {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntry parse(auto& in) {
-    std::cout << NL << T << "test::parse";
-    LogEntry result{};
-    using namespace aoc::parsing;
-    auto sections = Splitter{in}.sections();
-    int byte_count{-1};
-    Grid unwalked_grid{{}};
-    Grid walked_grid{{}};
-    int corrupted_locations{-1};
-    int best_step_count{-1};
-    for (int i=0;i<sections.size();++i) {
-      std::cout << NL << "sections[" << i << "]" << std::flush;
-      for (auto const& line : sections[i]) {
-        std::cout << NL << line.str() << std::flush;
-        switch (i) {
-          case 0: {
-            std::regex pattern{R"(the first (\d+) bytes)"};
-            std::smatch match{};
-            if (std::regex_search(line.str(),match,pattern)) {
-              byte_count = std::stoi(match[1]);
-              std::cout << NL << T << "--> byte_count:" << byte_count;
-            }
-          } break;
-          case 1: {
-            unwalked_grid.push_back(line.str());
-          } break;
-          case 2: {
-            std::regex cl_pattern1{R"(After just (\d+) bytes)"};
-            std::regex sc_pattern{R"(would take (\d+) steps)"};
-            std::smatch match{};
-            if (std::regex_search(line.str(),match,cl_pattern1)) {
-              corrupted_locations = std::stoi(match[1]);
-              std::cout << NL << T << "--> corrupted_locations:" << corrupted_locations;
-            }
-            if (std::regex_search(line.str(),match,sc_pattern)) {
-              best_step_count = std::stoi(match[1]);
-              std::cout << NL << T << "--> best_step_count:" << best_step_count;
-            }
-          } break;
-          case 3: {
-            walked_grid.push_back(line.str());
-          } break;
-          default: {std::cerr << NL << "Sorry, parsed unexpected sections count " << sections.size();} break;
-        }
-      }
-    }
-    result.byte_count = byte_count;
-    result.unwalked = unwalked_grid;
-    result.walked = walked_grid;
-    result.best_step_count = best_step_count;
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[11]));
     return result;
   }
 
-  std::optional<Result> test0(Args args) {
-    std::cout << NL << NL << "test0";
-    return std::nullopt;
+  Expecteds to_expecteds(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
+    Expecteds result{};
+    
+    switch (config_ix) {
+      case 0: {
+        Expected expected{};
+        expected.byte_count = -1;
+        expected.best_step_count = -1;
+        {
+          //---------- section 15 ----------
+          //    line[0]:71 "   In the above example, if you were to draw the memory space after the"
+          //    line[1]:72 "   first 12 bytes have fallen (using . for safe and # for corrupted), it"
+          //    line[2]:24 "   would look like this:"
+          std::string entry = aoc::parsing::to_line(sections[15]).str();
+          std::cout << NL << T << std::quoted(entry);
+          std::regex pattern{R"(the first (\d+) bytes)"};
+          std::smatch match{};
+          if (std::regex_search(entry,match,pattern)) {
+            expected.byte_count = std::stoi(match[1]);
+            std::cout << " --> byte_count:" << expected.byte_count;
+          }
+        }
+        {
+          expected.unwalked.base() = aoc::parsing::to_raw(sections[16]);
+        }
+        {
+          //---------- section 17 ----------
+          //    line[0]:72 "   You can take steps up, down, left, or right. After just 12 bytes have"
+          //    line[1]:71 "   corrupted locations in your memory space, the shortest path from the"
+          //    line[2]:72 "   top left corner to the exit would take 22 steps. Here (marked with O)"
+          //    line[3]:20 "   is one such path:"
+          std::string entry = aoc::parsing::to_line(sections[17
+                                                             ]).str();
+          std::cout << NL << T << std::quoted(entry);
+          std::regex sc_pattern{R"(would take (\d+) steps)"};
+          std::smatch match{};
+          if (std::regex_search(entry,match,sc_pattern)) {
+            expected.best_step_count = std::stoi(match[1]);
+            std::cout << " --> best_step_count:" << expected.best_step_count;
+          }
+        }
+        {
+          expected.walked.base() = aoc::parsing::to_raw(sections[18]);
+        }
+        result.push_back(expected);
+      } break;
+      default: std::cout << NL << "Sorry, config_ix " << config_ix << " not recognized - Ignored";
+    }
+    
+    
+    return result;
   }
 
-  std::optional<Result> test1(auto& in, auto& log_in,Args args) {
+
+  std::optional<Result> test1(Model const& model,Expecteds const& expecteds,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "test1";
-    if (in) {
-      auto model = ::parse(in);
-      if (log_in) {
-        auto log = test::parse(log_in);
-        std::cout << NL << log;
-        auto const& unwalked = log.unwalked;
-        auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
-        std::cout << NL << "best_path:" << best_path;
-        auto best_step_count = best_path.size()-1;
-        std::cout << NL << "best_step_count:" << best_step_count;
-        auto computed = to_unwalked(model,log.byte_count);
-        computed = aoc::grid::to_filled(computed, best_path);
-        std::cout << NL << "computed:" << computed;
-        if (best_step_count == log.best_step_count) {
-          result = std::to_string(best_path.size()-1);
-        }
-        else {
-          std::cout << NL << "FAILED";
-        }
+    if (expecteds.size()==1) {
+      auto& expected = expecteds[0];
+      std::cout << NL << expected;
+      auto const& unwalked = expected.unwalked;
+      auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
+      std::cout << NL << "best_path:" << best_path;
+      auto best_step_count = best_path.size()-1;
+      std::cout << NL << "best_step_count:" << best_step_count;
+      auto computed = to_unwalked(model,expected.byte_count);
+      computed = aoc::grid::to_filled(computed, best_path);
+      std::cout << NL << "computed:" << computed;
+      if (best_step_count == expected.best_step_count) {
+        result = "PASSED";
       }
+      else {
+        result = "FAILED";
+      }
+    }
+    else {
+      std::cout << NL << "Sorry, Expected exactly one 'expected'";
     }
     return result;
   }
-}
+
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    std::ostringstream response{};
+    std::cout << NL << NL << "test";
+    if (in) {
+      auto model = parse(in);
+      auto doc = aoc::doc::parse_doc(args);
+      auto examples = to_examples(doc);
+      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
+        if (args.options.contains("-to_example")) {
+          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
+          if (aoc::raw::write_to_file(example_file, example_lines)) {
+            response << "Created " << example_file;
+          }
+          else {
+            response << "Sorry, failed to create file " << example_file;
+          }
+        }
+        else {
+          std::ostringstream oss{};
+          aoc::raw::write_to(oss, example_lines);
+          std::istringstream example_in{oss.str()};
+          auto example_model = ::parse(example_in);
+          std::cout << NL << NL << "example_model:" << example_model;
+          auto expecteds = test::to_expecteds(doc, ix,args);
+          /* Call tests here */
+          return test1(model,expecteds,args);
+        }
+      }
+    }
+    if (response.str().size()>0) return response.str();
+    else return std::nullopt;
+  }
+
+} // namespace test
 
 namespace common {
   struct Solution {
@@ -251,12 +286,12 @@ namespace common {
     Path best_path;
     Integer best_step_count;
   };
-  std::optional<Solution> solve_for(Model const& model,Args const& args) {
+  std::optional<Solution> solve_for(Model const& model,Args args) {
     std::optional<Solution> result{};
     std::cout << NL << NL << "common::solve_for";
     int byte_count{12};
     if (model.size()>25) byte_count = 1024;
-    if (args.size()>0) byte_count = std::stoi(args[0]);
+    if (args.options.size()==1) byte_count = std::stoi(args.options.begin()->substr(1));
     auto unwalked = to_unwalked(model,byte_count);
     auto best_path = to_best_path(unwalked.top_left(),unwalked.bottom_right(), unwalked);
     std::cout << NL << "best_path:" << best_path;
@@ -319,55 +354,74 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
 int main(int argc, char *argv[]) {
-  Args args{};
+  Args user_args{};
+  
+  // Override by any user input
   for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
+  }
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+    
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"test","example.txt"}
+      ,{{},"1","example.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
+      Args args;
+      if (options.size()>0) args.options = options;
+      args.arg["part"] = part;
+      if (file.size()>0) args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {111,11,10,21,20};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        answers.push_back({"test0",test::test0(args)});
-      } break;
-      case 111: {
-        auto log_file = aoc::to_working_dir_path("example.log");
-        std::ifstream log_in{log_file};
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in and log_in) answers.push_back({"Part 1 Test Example vs Log",test::test1(in,log_in,args)});
-        else std::cerr << "\nSORRY, no file " << file << " or log_file " << log_file;
-      } break;
-      case 11: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 10: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 21: {
-        auto file = aoc::to_working_dir_path("example.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      case 20: {
-        auto file = aoc::to_working_dir_path("puzzle.txt");
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
     exec_times.push_back(std::chrono::system_clock::now());
   }
   
@@ -380,15 +434,18 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-   For my input:
 
-   ANSWERS
-   duration:3ms answer[Part 1 Test Example vs Log] 22
-   duration:1ms answer[Part 1 Example] 22
-   duration:74ms answer[Part 1     ] 252
-   duration:0ms answer[Part 2 Example] 6,1
-   duration:21593ms answer[Part 2     ] 5,60
+   Xcode Debug -O2
+
+   >day_18 -all
    
-  */
+   ANSWERS
+   duration:4ms answer[test example.txt] PASSED
+   duration:0ms answer[part1 example.txt] 22
+   duration:71ms answer[part1 puzzle.txt] 252
+   duration:0ms answer[part2 example.txt] 6,1
+   duration:21390ms answer[part2 puzzle.txt] 5,60
+
+   */
   return 0;
 }
