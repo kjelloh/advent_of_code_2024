@@ -152,18 +152,18 @@ namespace test {
   }
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
-    bool operator==(LogEntry const& other) const {
+  struct Expected {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
   aoc::parsing::Sections parse_doc(Args const& args) {
     std::cout << NL << T << "parse puzzle doc text";
