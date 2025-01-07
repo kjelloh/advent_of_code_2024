@@ -81,25 +81,25 @@ using aoc::grid::Position;
 namespace test {
 
   // Adapted to expected for day puzzle
-  struct LogEntry {
+  struct Expected {
     aoc::raw::Line code;
     aoc::raw::Line expected_presses;
-    bool operator==(LogEntry const& other) const {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     std::cout << entry.code << " -- ? --> " << entry.expected_presses;
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntries parse(auto& doc_in) {
+  Expecteds parse(auto& doc_in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
+    Expecteds result{};
     using namespace aoc::parsing;
     auto sections = Splitter{doc_in}.same_indent_sections();
     int target_sx{-1};
@@ -112,7 +112,7 @@ namespace test {
         }
         if (sx == target_sx) {
           auto const& [left,right] = line.split(':');
-          LogEntry entry{left,right.trim()};
+          Expected entry{left,right.trim()};
           result.push_back(entry);
         }
       }
@@ -263,9 +263,9 @@ namespace test {
       auto model = ::parse(in);
       std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
       if (doc_in) {
-        auto log = test::parse(doc_in);
+        auto expecteds = test::parse(doc_in);
         using aoc::test::operator<<;
-        std::cout << NL << log;
+        std::cout << NL << expecteds;
         aoc::grid::Grid keypad({
            "789"
           ,"456"
@@ -281,7 +281,7 @@ namespace test {
         // that is the shortest one!
         bool all_did_pass{true};
         Integer acc{};
-        for (LogEntry const& entry : log) {
+        for (Expected const& entry : expecteds) {
           auto code = entry.code;
           auto to_press_1 = to_remote_press_options(keypad,code);
           auto to_press_2 = to_remote_press_options(remote, to_press_1);
@@ -372,7 +372,7 @@ namespace part2 {
       for (auto const& neighbour : aoc::grid::to_ortho_neighbours(curr.back())) {
         if (not grid.on_map(neighbour)) continue;
         if (auto iter = std::ranges::find(curr,neighbour);iter!=curr.end()) continue; // No back-track
-        if (*grid.at(neighbour) == ' ') continue;
+        if (grid.at(neighbour) == ' ') continue;
         using aoc::raw::operator+;
         auto next = curr + neighbour;
         if (next.size()>manhattan_distance+1) continue; // filter out 'detoures' > manhattan distance steps
@@ -971,14 +971,14 @@ int main(int argc, char *argv[]) {
    Xcode Debug -O2
 
    >day_21 -all
-   
+      
    ANSWERS
-   duration:2ms answer[test0 example.txt] 029A -> {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"} (file ignored) OK
-   duration:6925ms answer[test1 example.txt] Five code example (file ignored) -> Complexity 126384 OK
-   duration:6175ms answer[part1 example.txt] 126384
-   duration:81229ms answer[part1 puzzle.txt] 179444
-   duration:8ms answer[part2 example.txt] 126384
-   duration:47ms answer[part2 puzzle.txt] 223285811665866
+   duration:3ms answer[test0 example.txt] 029A -> {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"} (file ignored) OK
+   duration:6921ms answer[test1 example.txt] Five code example (file ignored) -> Complexity 126384 OK
+   duration:5897ms answer[part1 example.txt] 126384
+   duration:82107ms answer[part1 puzzle.txt] 179444
+   duration:7ms answer[part2 example.txt] 126384
+   duration:44ms answer[part2 puzzle.txt] 223285811665866
    
    */
   return 0;
