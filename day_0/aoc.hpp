@@ -23,6 +23,7 @@
 #include <coroutine>
 #include <format>
 #include <print>
+#include <numeric> // E.g., std::accumulate
 
 namespace aoc {
 
@@ -373,7 +374,7 @@ namespace aoc {
     using Lines = std::vector<Splitter>;
     using Section = Lines;
     using Sections = std::vector<Section>;
-  
+    
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -476,6 +477,17 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+  
+    Line to_line(Lines const& lines) {
+      std::string acc{};
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        if (lx>0) acc += " ";
+        acc += line.trim()
+          .str();
+      }
+      return Line{acc};
+    }
+
     aoc::raw::Line to_raw(Line const& line) {return line.str();}
     aoc::raw::Lines to_raw(Lines const& lines) {
       aoc::raw::Lines result{};
