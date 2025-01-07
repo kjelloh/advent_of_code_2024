@@ -23,6 +23,7 @@
 #include <optional>
 #include <regex>
 #include <filesystem>
+#include <thread>
 
 using aoc::raw::NL;
 using aoc::raw::T;
@@ -507,6 +508,7 @@ namespace part2 {
         }
       }
     }
+    std::reverse(result.begin(), result.end()); // Ensure ordering back-to-front in dir order
     return result;
   }
 
@@ -647,6 +649,13 @@ namespace part2 {
       auto objects = to_objects(model.grid);
       for (auto move : model.moves) {
         objects = to_next(objects, move);
+        if (true) {
+          auto inspect_grid = to_grid(objects);
+          std::cout << NL << "after move: " << move << NL << inspect_grid;
+//          std::cout << " : Press <Enter> to continue...";
+//          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
       }
       auto end_grid = to_grid(objects);
       auto expected_grid = Grid{aoc::parsing::to_raw(doc[74])};
