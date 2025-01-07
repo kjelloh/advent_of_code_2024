@@ -48,25 +48,25 @@ using Args = std::vector<std::string>;
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
+  struct Expected {
     aoc::raw::Lines lines{};
-    bool operator==(LogEntry const& other) const {
+    bool operator==(Expected const& other) const {
       bool result{true};
       return result;
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     using aoc::raw::operator<<;
     os << entry.lines;
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntries parse(auto& doc_in) {
+  Expecteds parse(auto& doc_in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
+    Expecteds result{};
     using namespace aoc::parsing;
     auto sections = Splitter{doc_in}.same_indent_sections();
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
@@ -157,9 +157,9 @@ namespace test {
     if (in) {
       auto model = ::parse(in);
       if (doc_in) {
-        auto log = test::parse(doc_in);
-        std::cout << NL << log[31];
-        std::cout << NL << log[32];
+        auto sections = test::parse(doc_in);
+        std::cout << NL << sections[31];
+        std::cout << NL << sections[32];
       }
       for (auto seed : model) {
         for (int j=0;j<2000;++j) seed = to_evolved(seed);
@@ -289,10 +289,10 @@ namespace test {
     if (in) {
       auto model = ::parse(in);
       if (doc_in) {
-        auto log = test::parse(doc_in);
-        if (log.size()>36) {
-          std::cout << NL << log[39];
-          std::cout << NL << log[40];
+        auto sections = test::parse(doc_in);
+        if (sections.size()>36) {
+          std::cout << NL << sections[39];
+          std::cout << NL << sections[40];
         }
         else {
           std::cout << NL << "Doc is to short. Are you sure you have solved part 1?";
@@ -525,12 +525,14 @@ int main(int argc, char *argv[]) {
   std::cout << "\n";
   /*
    For my input:
-
+   
+   day_22 -all
+   
    ANSWERS
-   duration:1ms answer[Part 1 Example] 37327623
-   duration:126ms answer[Part 1     ] 16894083306
-   duration:25ms answer[Part 2 Example] 23
-   duration:32761ms answer[Part 2     ] 1925
+   duration:2ms answer[Part 1 Example] 37327623
+   duration:123ms answer[Part 1     ] 16894083306
+   duration:24ms answer[Part 2 Example] 23
+   duration:32741ms answer[Part 2     ] 1925
    
   */
   return 0;
