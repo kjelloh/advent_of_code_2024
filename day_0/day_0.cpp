@@ -73,11 +73,14 @@ namespace test {
 
   std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
     std::vector<aoc::raw::Lines> result{};
-    //result.push_back(aoc::parsing::to_raw(sections[??]));
+    result.push_back({});
+//    result.back().append_range(aoc::parsing::to_raw(sections[??]));
+//    result.back().push_back("");
+//    result.back().append_range(aoc::parsing::to_raw(sections[??]));
     return result;
   }
 
-  std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
+  Expecteds to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
     Expecteds result{};
     return result;
   }
