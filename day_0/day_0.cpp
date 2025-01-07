@@ -174,22 +174,18 @@ int main(int argc, char *argv[]) {
   
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
-
-    std::vector<std::string> parts = {"test", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
     
     std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{""},"test",""}
-      ,{{""},"test","example.txt"}
-      ,{{""},"1","example.txt"}
-      ,{{""},"1","puzzle.txt"}
-      ,{{""},"2","example.txt"}
-      ,{{""},"2","puzzle.txt"}
+       {{},"test","example.txt"}
+      ,{{},"1","example.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example.txt"}
+      ,{{},"2","puzzle.txt"}
     };
     
     for (const auto& [options,part, file] : states) {
       Args args;
-      args.options = options;
+      if (options.size()>0) args.options = options;
       args.arg["part"] = part;
       if (file.size()>0) args.arg["file"] = file;
       requests.push_back(args);
@@ -231,8 +227,8 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_xx -all
-
+   >day_ -all
+   
    ANSWERS
    ...
    
