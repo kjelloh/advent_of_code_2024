@@ -716,11 +716,13 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
 std::vector<Args> to_requests(Args const& args) {
   std::vector<Args> result{};
   result.push_back(args); // No fancy for now
   return result;
 }
+
 int main(int argc, char *argv[]) {
   Args user_args{};
   
@@ -744,25 +746,24 @@ int main(int argc, char *argv[]) {
   
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
-
-    std::vector<std::string> parts = {"test0","test1","test2","1","2test0","2test1","2test2","2test3","2"};
-    std::vector<std::string> files = {"example0.txt","example1.txt","puzzle.txt"};
     
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      Args args{};
-      if (part.starts_with("test") and file == "puzzle.txt") continue;
-      if (part.starts_with("2test")) {
-        if (file.starts_with("example1")) continue;
-        if (file.starts_with("puzzle")) continue;
-        auto option = std::string("-") + part.substr(1);
-        args.arg["part"] = part[0];
-        args.arg.erase("file");
-        args.options.insert(option);
-      }
-      else {
-        args.arg["part"] = part;
-        args.arg["file"] = file;
-      }
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"test0","example0.txt"}
+      ,{{},"test1","example0.txt"}
+      ,{{},"test2","example0.txt"}
+      ,{{},"1","example0.txt"}
+      ,{{},"1","example1.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example0.txt"}
+      ,{{},"2","example1.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
+      Args args;
+      if (options.size()>0) args.options = options;
+      args.arg["part"] = part;
+      if (file.size()>0) args.arg["file"] = file;
       requests.push_back(args);
     }
   }
@@ -771,7 +772,6 @@ int main(int argc, char *argv[]) {
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
   for (auto request : requests) {
-    std::print("\nUsing options {} args {} ",request.options,request.arg);
     auto part = request.arg["part"];
     auto file = aoc::to_working_dir_path(request.arg["file"]);
     std::cout << NL << "Using part:" << part << " file:" << file;
@@ -781,7 +781,7 @@ int main(int argc, char *argv[]) {
         answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
       }
       else if (part=="2") {
-        answers.push_back({std::format("{} part{} {}",request.options, part,file.filename().string()),part2::solve_for(in,request)});
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
       }
       else if (part.starts_with("test")) {
         answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
@@ -806,22 +806,15 @@ int main(int argc, char *argv[]) {
    >day_16 -all
 
    ANSWERS
-   duration:8ms answer[test0 example0.txt] PASSED (file ignored)PASSED (file ignored)
-   duration:6ms answer[test0 example1.txt] NO OPERATION
+   duration:7ms answer[test0 example0.txt] PASSED (file ignored)PASSED (file ignored)
    duration:6ms answer[test1 example0.txt]  PASSED PASSED
-   duration:4ms answer[test1 example1.txt] NO OPERATION
-   duration:3ms answer[test2 example0.txt] PASSED (file ignored)PASSED (file ignored)
-   duration:3ms answer[test2 example1.txt] NO OPERATION
-   duration:3ms answer[part1 example0.txt] 2028
-   duration:0ms answer[part1 example1.txt] 10092
-   duration:7ms answer[part1 puzzle.txt] 1471826
-   duration:2ms answer[{"-test0"} part2 ] PASSED (file ignored)
-   duration:2ms answer[{"-test1"} part2 ] PASSED (file ignored)
-   duration:5ms answer[{"-test2"} part2 ] PASSED
-   duration:60ms answer[{"-test3"} part2 ] PASSED (file ignored)
-   duration:0ms answer[{} part2 example0.txt] 1751
-   duration:52ms answer[{} part2 example1.txt] 9021
-   duration:20431ms answer[{} part2 puzzle.txt] 1457703
+   duration:4ms answer[test2 example0.txt] PASSED (file ignored)PASSED (file ignored)
+   duration:4ms answer[part1 example0.txt] 2028
+   duration:1ms answer[part1 example1.txt] 10092
+   duration:8ms answer[part1 puzzle.txt] 1471826
+   duration:1ms answer[part2 example0.txt] 1751
+   duration:63ms answer[part2 example1.txt] 9021
+   duration:19479ms answer[part2 puzzle.txt] 1457703
    
    */
   return 0;
