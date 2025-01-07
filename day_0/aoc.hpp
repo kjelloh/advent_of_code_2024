@@ -234,10 +234,6 @@ namespace aoc {
     concept Streamable = requires(std::ostream& os, T const& t) {
         { os << t } -> std::same_as<std::ostream&>;
     };
-
-    // A concept for integral types for operator<<(std::vector<Int>) below
-    template <typename T>
-    concept Integral = std::is_integral_v<T>;
   
     struct Indent {
       int i{};
@@ -261,9 +257,9 @@ namespace aoc {
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
 
     template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
-  
+    requires Streamable<T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s);
+
     namespace detail {
       template <typename T>
       struct Member {
