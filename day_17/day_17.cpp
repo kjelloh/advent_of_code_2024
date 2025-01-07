@@ -454,22 +454,14 @@ Model parse(auto& in) {
   return result;
 }
 
-struct Args {
-  std::map<std::string,std::string> arg{};
-  std::set<std::string> options{};
-  operator bool() const {
-    return (arg.size()>0) or (options.size()>0);
-  }
-};
-
 namespace test {
 
   // Adapt to expected for day puzzle
-  struct LogEntry {
+  struct Expected {
     Computer before;
     std::optional<Computer> after{};
     std::optional<Result> output{};
-    bool operator==(LogEntry const& other) const {
+    bool operator==(Expected const& other) const {
       bool result{true};
       result = result and (after and other.after)?*after == *other.after:true;
       result = result and (output and other.output)?(*output==*other.output):true;
@@ -477,7 +469,7 @@ namespace test {
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     os << " log entry:";
     os << NL << T << " before:" << entry.before;
     os << NL << T << " after:";
@@ -489,11 +481,11 @@ namespace test {
     return os;
   }
 
-  using LogEntries = aoc::test::LogEntries<LogEntry>;
+  using Expecteds = aoc::test::Expecteds<Expected>;
 
-  LogEntries parse0(auto& in) {
+  Expecteds parse0(auto& in) {
     std::cout << NL << T << "test::parse";
-    LogEntries result{};
+    Expecteds result{};
     using namespace aoc::parsing;
     auto input = Splitter{in};
     auto lines = input.lines();
@@ -569,7 +561,7 @@ namespace test {
       }
       Computer before{reg_before,memory};
       Computer after{reg_after,memory};
-      LogEntry entry{before};
+      Expected entry{before};
       if (reg_after.size()>0) entry.after = Computer{reg_after,memory};
       if (output.size()>0) entry.output = output;
       result.push_back(entry);
@@ -579,13 +571,13 @@ namespace test {
     return result;
   }
 
-  LogEntry parse1(auto& in,auto& log_in) {
+  Expected parse1(auto& in,auto& log_in) {
     std::cout << NL << T << "test::parse";
     using namespace aoc::parsing;
     auto model = ::parse(in);
     Computer computer{model.registers,model.memory};
     auto log_input = Splitter{log_in}.trim();
-    LogEntry entry{computer,{},to_raw(log_input)};
+    Expected entry{computer,{},to_raw(log_input)};
     return entry;
   }
 
@@ -610,7 +602,7 @@ namespace test {
         std::cout << NL << "processing:" << logged;
         Computer pc{logged.before};
         auto output = pc.run();
-        LogEntry computed{logged.before,pc,output};
+        Expected computed{logged.before,pc,output};
         std::cout << NL << "--------------------";
         std::cout << computed;
         if ((logged.after and computed.after) and  (*logged.after != *computed.after)) {
@@ -658,15 +650,36 @@ namespace part2 {
   // Recursive function to solve best a that makes f(a_next) = ouput[index]
   Integer solve_for(std::vector<int> const& output, int index, Integer a_current, auto const& f) {
 
-    if (index < 0) return a_current;
+    if (index < 0) return a_current; // end loop of program counting down
     
     std::print("\n\n{} {},{},{}",std::string(index*2,' '),index,a_current,output[index]);
+    
+    // From inspecting the code we can assume that a is divided by 8 (bin right shifted 3) between each out.
+    // E.g., the last processing steps as logged by part 1 by cli 'day_17 1 puzzle.txt'
+
+    //10:out : out B % 8 = 111 % 8 = 111 ---> 7
+    
+    //12:adv : A = A >> 3 = 10110 >> 11 = 10 // divide A by 8 (A is A*8 + 0..7 in previous loop)
+    
+    //14:jnz : jnz A 0 A = 2 != 0, ip = 0
+    //0:bst : B = A % 8 = 10 % 8 = 010        // ...
+    //2:bxl : B = B xor 5 = 10 xor 101 = 111  // mambo..
+    //4:cdv : C = A >> B = 10 >> 7 = 0        // jamo...
+    //6:bxl : B = B xor 6 = 111 xor 110 = 1   // ...
+    //8:bxc : B = B xor C = 1 xor 0 = 1
+    //10:out : out B % 8 = 1 % 8 = 001 ---> 1
+    
+    //12:adv : A = A >> 3 = 10 >> 11 = 0      // Final divide by 8 (A is less that 8, i.e. 0..7)
+    //14:jnz : jnz A 0
+    
+    // And program terminates on a < 7 (bin 111)
+    // Thus we can iterate backwards by trying a = 0..7 as a starter
+    // ,and for each match try to increase to a_prev = a_curr*8 + R, R=0..7 again.
     
     Integer best_a = std::numeric_limits<Integer>::max();
     for (Integer i = 0; i < 8; ++i) {
       Integer a_next = a_current * 8 + i;
       if (f(a_next) == output[index]) {
-
         // Recurse only for accepted candidates
         best_a = std::min(best_a, solve_for(output, index - 1, a_next, f));
       }
@@ -679,8 +692,7 @@ namespace part2 {
   // Wrapper function to initiate the recursion
   Integer find_lowest_a(const std::vector<int>& output, auto const& f) {
     if (output.empty()) return std::numeric_limits<Integer>::max();
-    
-    auto start_index = static_cast<int>(output.size() - 1);
+    auto start_index = static_cast<int>(output.size() - 1); // program loop count
     return solve_for(output,start_index,0,f);
   }
 
@@ -691,16 +703,18 @@ namespace part2 {
       auto model = parse(in);
       print_program(Program{model.memory});
       Computer pc{model.registers,model.memory};
+      
+      // f runs one iteration of the program with provided a value, and returns the a register at end
       auto f = [&program = model.memory](Integer a) -> int {
         Registers registers{};
         registers['A'] = a;
         CPU cpu{registers,0,program};
         while (true) {
           auto output = ++cpu;
-          if (output.size()>0) return (output.back() - '0'
-                                       );
+          if (output.size()>0) return (output.back() - '0');
         }
       };
+      
       auto a = find_lowest_a(model.memory,f);
       if (a < std::numeric_limits<Integer>::max()) {
         result = std::to_string(a);
@@ -711,11 +725,13 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
+
 std::vector<Args> to_requests(Args const& args) {
   std::vector<Args> result{};
   result.push_back(args); // No fancy for now
   return result;
 }
+
 int main(int argc, char *argv[]) {
   Args user_args{};
   
@@ -739,27 +755,26 @@ int main(int argc, char *argv[]) {
   
   if (not user_args or user_args.options.contains("-all")) {
     requests.clear();
-
-    std::vector<std::string> parts = {"1", "2"};
-    std::vector<std::string> files = {"example.txt", "example2.txt"
-      , "puzzle.txt"};
     
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"test0","example.txt"}
+      ,{{},"1","example.txt"}
+      ,{{},"1","example2.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example.txt"}
+      ,{{},"2","example2.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
       Args args;
+      if (options.size()>0) args.options = options;
       args.arg["part"] = part;
-      args.arg["file"] = file;
+      if (file.size()>0) args.arg["file"] = file;
       requests.push_back(args);
     }
   }
 
-  std::cout << NL << "Arguments:";
-  for (auto const& request : requests) {
-    auto const& [arg,options] = request;
-    using aoc::raw::operator<<;
-    std::cout << NL << "  {key,value} : " << arg;
-    std::cout << NL << "  options     : " << options;
-  }
-  
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
@@ -792,17 +807,21 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-
+   
    Xcode Debug -O2
-   ./day_07 -all
 
-   ANSWERS
-   duration:1ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
+   ./day_17 -all
+   
+   duration:6ms answer[test0 example.txt] passed
+   duration:0ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
    duration:0ms answer[part1 example2.txt] 5,7,3,0
    duration:1ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
-   duration:4ms answer[part2 example.txt] 29328
-   duration:7ms answer[part2 example2.txt] 117440
-   duration:216ms answer[part2 puzzle.txt] 107416732707226
+   duration:2ms answer[part2 example.txt] 29328
+   duration:9ms answer[part2 example2.txt] 117440
+   duration:233ms answer[part2 puzzle.txt] 107416732707226
+   
+      
    */
+
   return 0;
 }
