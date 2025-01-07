@@ -19,8 +19,35 @@
 #include <set>
 #include <deque>
 #include <iterator>
+#include <tuple>
+#include <coroutine>
+#include <format>
+#include <print>
 
 namespace aoc {
+
+  // For tool chain without std::print(thing) without format string
+  template <typename T>
+  void print(T t) {
+    std::print("{}",t);
+  }
+
+  void test_print() {
+    int i{};
+    aoc::print(i);
+    std::pair<char,char> step{};
+    std::print("{}",step);
+    aoc::print(step);
+  }
+
+
+  struct Args {
+    std::map<std::string,std::string> arg{};
+    std::set<std::string> options{};
+    operator bool() const {
+      return (arg.size()>0) or (options.size()>0);
+    }
+  };
 
   namespace views {
     template <typename Iterator>
@@ -79,8 +106,117 @@ namespace aoc {
     }
   } // namespace views
 
+  namespace coroutine {
+
+    // Until C++ library of comiler supports std::generator
+    template<typename T>
+    class Generator {
+    public:
+      struct promise_type {
+        T current_value;
+        
+        Generator get_return_object() {
+          return Generator{std::coroutine_handle<promise_type>::from_promise(*this)};
+        }
+        
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_always final_suspend() noexcept { return {}; }
+        std::suspend_always yield_value(T value) {
+          current_value = value;
+          return {};
+        }
+        
+        void return_void() {}
+        void unhandled_exception() { std::terminate(); }
+      };
+      
+      using handle_type = std::coroutine_handle<promise_type>;
+      
+      explicit Generator(handle_type coroutine) : coroutine_(coroutine) {}
+      Generator(const Generator&) = delete;
+      Generator(Generator&& other) noexcept : coroutine_(other.coroutine_) {
+        other.coroutine_ = nullptr;
+      }
+      ~Generator() {
+        if (coroutine_) {
+          coroutine_.destroy();
+        }
+      }
+      
+      struct Iterator {
+        handle_type coroutine_;
+        
+        Iterator(handle_type coroutine) : coroutine_(coroutine) {
+          if (coroutine_) coroutine_.resume();
+        }
+        
+        Iterator& operator++() {
+          coroutine_.resume();
+          if (coroutine_.done()) coroutine_ = nullptr;
+          return *this;
+        }
+        
+        const T& operator*() const { return coroutine_.promise().current_value; }
+        const T* operator->() const { return &coroutine_.promise().current_value; }
+        
+        bool operator==(const Iterator& other) const { return coroutine_ == other.coroutine_; }
+        bool operator!=(const Iterator& other) const { return !(*this == other); }
+      };
+      
+      Iterator begin() {
+        return coroutine_ ? Iterator{coroutine_} : end();
+      }
+      
+      Iterator end() {
+        return Iterator{nullptr};
+      }
+      
+    private:
+      handle_type coroutine_;
+    };;
+
+
+  } // namespace coroutine
+
+  template <typename T>
+  using generatator = coroutine::Generator<T>;
+
 
   namespace raw {
+  
+    template <typename T>
+    std::vector<T> operator+(std::vector<T> v,T const& t) {
+      v.push_back(t);
+      return v;
+    }
+
+    std::string operator+(std::string lhs,char rhs) {
+      lhs.push_back(rhs);
+      return lhs;
+    }
+
+    // advance for enums,integral types and iterators
+    template <typename T>
+    constexpr T advance(T value, int steps = 1) {
+      if constexpr (std::is_enum_v<T>) {
+        using underlying = std::underlying_type_t<T>;
+        return static_cast<T>(static_cast<underlying>(value) + steps);
+      } else if constexpr (std::is_integral_v<T>) {
+        return value + steps;
+      } else if constexpr (std::is_base_of_v<std::input_iterator_tag,
+                           typename std::iterator_traits<T>::iterator_category>) {
+        return std::next(value, steps);
+      } else {
+        static_assert(false, "Unsupported type for advance");
+      }
+    }
+
+    // ++ for enums, integers and iterators (See aoc::raw::advance)
+    template <typename T>
+    constexpr T operator++(T& value) {
+      value = aoc::raw::advance(value,1);
+      return value;
+    }
   
     template <typename T>
     int sign(T value) {
@@ -93,12 +229,6 @@ namespace aoc {
     using Line = std::string;
     using Lines = std::vector<Line>;
     using Sections = std::vector<Lines>;
-    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
-      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << std::quoted(line);
-      }
-      return os;
-    }
   
     template <typename T>
     concept Streamable = requires(std::ostream& os, T const& t) {
@@ -108,47 +238,52 @@ namespace aoc {
     // A concept for integral types for operator<<(std::vector<Int>) below
     template <typename T>
     concept Integral = std::is_integral_v<T>;
-
-    // << std::vector<Integral>
-    template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::vector<T>& ints) {
-      os << "[";
-      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
-        if (ix>0) os << ',';
-        os << n;
-      }
-      os << "]";
+  
+    struct Indent {
+      int i{};
+      Indent& operator+=(int step) {i+=step;return *this;}
+    };
+  
+    std::ostream& operator<<(std::ostream& os,Indent indent) {
+      while (indent.i-- > 0) os << ' ';
       return os;
     }
-  
+
+    std::ostream& operator<<(std::ostream& os,Lines const& lines) {
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        os << raw::NL << "line[" << lx << "]:" << line.size() << " "  << line;
+      }
+      return os;
+    }
+    
     template <typename U,typename V>
     requires Streamable<U> && Streamable<V>
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
 
+    template <typename T>
+    requires Integral<T>
+    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
+  
+    namespace detail {
+      template <typename T>
+      struct Member {
+        const T& value;
+        explicit Member(const T& val) : value(val) {}
+      };
 
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member);
+    }
+  
     // << std::vector
     template <typename T>
     std::ostream& operator<<(std::ostream& os, const std::vector<T>& v) {
       os << "[";
       for (auto const& [ix,e] : aoc::views::enumerate(v)) {
         if (ix>0) os << ',';
-        os << e;
+        os << detail::Member(e);
       }
       os << "]";
-      return os;
-    }
-
-    // << std::set<Integral>
-    template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints) {
-      os << "{";
-      for (auto const& [ix,n] : aoc::views::enumerate(ints)) {
-        if (ix>0) os << ',';
-        os << n;
-      }
-      os << "}";
       return os;
     }
   
@@ -158,7 +293,7 @@ namespace aoc {
     std::ostream& operator<<(std::ostream& os, std::set<T> const& s) {
         os << "{ ";
         for (auto const& elem : s) {
-            os << elem << " ";
+            os << detail::Member(elem) << " ";
         }
         os << "}";
         return os;
@@ -168,10 +303,22 @@ namespace aoc {
     template <typename U,typename V>
     requires Streamable<U> && Streamable<V>
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp) {
-      os << "{ " << pp.first << "," << pp.second << "}";
+      os << "{ " << detail::Member(pp.first) << "," << detail::Member(pp.second) << "}";
       return os;
     }
-  
+
+    template<typename U,typename V>
+    requires Streamable<U> && Streamable<V>
+    std::ostream& operator<<(std::ostream& os,std::map<U,V> const& map) {
+      os << "[";
+      for (auto const& [ix,e] : aoc::views::enumerate(map)) {
+        if (ix>0) os << ',';
+        os << detail::Member(e);
+      }
+      os << "]";
+      return os;
+    }
+
     // Base case: printing an empty tuple
     std::ostream& operator<<(std::ostream& os, const std::tuple<>&) {
       return os;
@@ -180,13 +327,31 @@ namespace aoc {
     // Recursive case: printing the first element, then recursing on the rest
     template <typename T, typename... Types>
     std::ostream& operator<<(std::ostream& os, const std::tuple<T, Types...>& t) {
-      os << std::get<0>(t);  // Print the first element
+      os << detail::Member(std::get<0>(t));  // Print the first element
       if constexpr (sizeof...(Types) > 0) {  // If there are more elements
         os << ", ";  // Print a comma and a space
         operator<<(os, std::tuple<Types...>(std::get<Types>(t)...)); // Recurse on the rest of the tuple
       }
       return os;
     }
+  
+    namespace detail {
+
+      // Decide on how to format T
+      template <typename T>
+      std::ostream& operator<<(std::ostream& os, const Member<T>& member) {
+        if constexpr (std::is_same_v<T, std::string>) {
+          os << std::quoted(member.value); // Quote strings
+        } else if constexpr (std::is_same_v<T, char>) {
+          os << '\'' << member.value << '\''; // Single-quote chars
+        } else {
+          using aoc::raw::operator<<;
+          os << member.value; // Default behavior for other types
+        }
+        return os;
+      }
+    }
+
   
     bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
       if (out) {
@@ -198,11 +363,14 @@ namespace aoc {
       }
       return false;
     }
+  
     bool write_to_file(std::filesystem::path file,aoc::raw::Lines const& lines) {
       std::ofstream out{file};
       return write_to(out, lines);
     }
+  
   } // namespace raw
+
   namespace parsing {
     class Splitter; // Forward
     using Line = Splitter;
@@ -306,6 +474,7 @@ namespace aoc {
       }
 
       std::string const& str() const {return m_s;}
+      std::string& str() {return m_s;}
       operator std::string() const {return m_s;}
       auto size() const {return m_s.size();}
     private:
@@ -653,14 +822,24 @@ namespace aoc {
     Direction const LEFT{0,-1};
     Direction const RIGHT{0,1};
 
+    auto to_manhattan_distance(Position const& p) {
+      return (std::abs(p.row)+std::abs(p.col));
+    }
+    
+    auto to_manhattan_distance(Position const& p1, Position const& p2) {
+      return to_manhattan_distance(p2-p1);
+    }
+
     class Grid {
     public:
       using Seen = std::set<Position>;
+      using Base = std::vector<std::string>;
+
       Grid& push_back(raw::Line const& row) {
         m_grid.push_back(row);
         return *this;
       }
-      Grid(std::vector<std::string> grid = {}) : m_grid(std::move(grid)) {}
+      Grid(Base base = {}) : m_grid(std::move(base)) {}
       
       // Returns the height of the grid
       size_t height() const {
@@ -680,11 +859,11 @@ namespace aoc {
       }
       
       // Retrieves the character at a given position, if valid
-      std::optional<char> at(Position const& pos) const {
+      char at(Position const& pos) const {
         if (on_map(pos)) {
           return m_grid[pos.row][pos.col];
         }
-        return std::nullopt;
+        return '?';
       }
       char& at(Position const& pos) {
         if (on_map(pos)) {
@@ -694,8 +873,7 @@ namespace aoc {
       }
       
       char operator[](Position const pos) const {
-        if (auto och = at(pos)) return *och;
-        throw std::runtime_error(std::format("Sorry, grid pos({},{}) is not on map width:{}, height:{}",pos.row,pos.col,width(),height()));
+        return at(pos);
       }
       
       std::optional<std::string> at_row(int r) const {
@@ -713,12 +891,13 @@ namespace aoc {
       void for_each(auto f) const {
         for (int row=0;row<height();++row) {
           for (int col=0;col<width();++col) {
-            f(*this,Position{row,col});
+            Position pos{row,col};
+            f(pos,at(pos));
           }
         }
       }
       
-      Position find(char ch) {
+      Position find(char ch) const {
         Position result{-1,-1};
         for (int row=0;row<height();++row) {
           for (int col=0;col<width();++col) {
@@ -728,26 +907,22 @@ namespace aoc {
         return result;
       }
       
-      Positions find_all(char ch) const {
+      Positions find_all(char ch_x) const {
         Positions result{};
-        auto push_back_matched = [ch,&result](Grid const& grid,Position const& pos) {
-          if (grid.at(pos) == ch) result.push_back(pos);
+        auto push_back_matched = [ch_x,&result](Position const& pos,char ch) {
+          if (ch == ch_x) result.push_back(pos);
         };
         for_each(push_back_matched);
         return result;
       }
-      
+
+      // For compability with sparse grid mapping pos -> ch only for occupied posititions
       bool contains(Position const& pos) const {
-        return at(pos).has_value();
+        return on_map(pos);
       }
       
       bool operator==(Grid const& other) const {
-        bool result{true};
-        auto all_equal = [this,other,&result](Grid const& grid,Position const& pos){
-          result = result and (this->at(pos) == other.at(pos));
-        };
-        this->for_each(all_equal);
-        return result;
+        return m_grid == other.m_grid;
       }
       
       Position top_left() const {return {0,0};}
@@ -758,6 +933,9 @@ namespace aoc {
         };
       }
       
+      Base& base() {return m_grid;}
+      Base const& base() const {return m_grid;}
+
     private:
       std::vector<std::string> m_grid;
     };
@@ -835,6 +1013,22 @@ namespace aoc {
       }
       return result;
     }
+  
+    std::string to_dir_steps(Path const& path) {
+      std::string result{};
+      for (int i=0;i<path.size()-1;++i) {
+        auto from = path[i];
+        auto to = path[i+1];
+        switch (to_direction_index(from, to)) {
+          case 0: result.push_back('>'); break;
+          case 1: result.push_back('v'); break;
+          case 2: result.push_back('<'); break;
+          case 3: result.push_back('^'); break;
+          default: result.push_back('?'); break;
+        }
+      }
+      return result;
+    }
 
     Grid& to_dir_traced(Grid& grid,Path const& path) {
       for (int i=1;i<path.size()-1;++i) {
@@ -865,7 +1059,7 @@ namespace aoc {
       Seen visited{};
       if (grid.on_map(start)) {
         q.push_back(start);
-        char ch = *grid.at(start);
+        char ch = grid.at(start);
         visited.insert(start);
         while (not q.empty()) {
           auto curr = q.front();q.pop_front();
@@ -992,11 +1186,19 @@ namespace aoc {
   }
 
   namespace test {
-    template <class T>
-    using LogEntries = std::vector<T>;
   
+    std::istringstream to_example_in(aoc::raw::Lines const&  example_lines) {
+      std::ostringstream oss{};
+      aoc::raw::write_to(oss, example_lines);
+      std::istringstream example_in{oss.str()};
+      return example_in;
+    }
+
     template <class T>
-    std::ostream& operator<<(std::ostream& os,LogEntries<T> const& log) {
+    using Expecteds = std::vector<T>;
+
+    template <class T>
+    std::ostream& operator<<(std::ostream& os,Expecteds<T> const& log) {
       for (auto const& entry : log) {
         os << raw::NL << entry;
       }
@@ -1056,6 +1258,74 @@ namespace aoc {
       return os;
     }
   } // namespace test
+
+  namespace algo {
+    template <typename T1, typename T2>
+    std::vector<std::pair<T1, T2>> cartesian_product(const std::vector<T1>& vec1, const std::vector<T2>& vec2) {
+        std::vector<std::pair<T1, T2>> result;
+        for (const auto& a : vec1) {
+            for (const auto& b : vec2) {
+                result.emplace_back(a, b);
+            }
+        }
+        return result;
+    }
+  }
+
+  // for processing text documenting the puzzle
+  namespace doc {
+  
+    using namespace aoc::raw;
+    using namespace aoc::parsing;
+  
+    aoc::parsing::Sections parse_doc(Args const& args) {
+      std::cout << NL << T << "parse puzzle doc text";
+      aoc::parsing::Sections result{};
+      using namespace aoc::parsing;
+      std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
+      auto sections = Splitter{doc_in}.same_indent_sections();
+      for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+        std::cout << NL << "---------- section " << sx << " ----------";
+        result.push_back(section);
+        for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+          std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+        }
+      }
+      return result;
+    }
+
+    using aoc::grid::Position;
+    using aoc::grid::Path;
+    using aoc::grid::Grid;
+  
+    // Traces a path marked on the grid defguned by predicate is_path_mark
+    // Used to read examples of expected paths on grid as presented on AoC day web page (the doc)
+    Path to_marked_path(Position start,Grid const& grid,auto is_path_mark) {
+      Path result{};
+      std::deque<Position> q{};
+      aoc::grid::Seen visited{};
+      if (grid.on_map(start)) {
+        q.push_back(start);
+        char ch = grid.at(start);
+        visited.insert(start);
+        result.push_back(start);
+        while (not q.empty()) {
+          auto curr = q.front();q.pop_front();
+          for (auto const& next : aoc::grid::to_ortho_neighbours(curr)) {
+            if (not grid.on_map(next)) continue;
+            if (visited.contains(next)) continue;
+            if (not is_path_mark(grid.at(next))) continue;
+            q.push_back(next);
+            visited.insert(next);
+            result.push_back(next);
+          }
+        }
+      }
+      return result;
+    }
+
+
+  }
 
 } // namespace aoc
 
