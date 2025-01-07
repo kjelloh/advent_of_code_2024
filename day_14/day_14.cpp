@@ -93,8 +93,6 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 Robot to_stepped(Robot const& robot,auto width,auto height,int const STEPS) {
   Robot result{robot};
   auto [p,v] = robot;
@@ -325,58 +323,70 @@ namespace part2 {
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
 
-  std::filesystem::path working_dir{"../.."};
-  if (auto dir = get_working_dir()) {
-    working_dir = *dir;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
+int main(int argc, char *argv[]) {
+  Args user_args{};
+  
+  // Override by any user input
+  for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
   }
-  else {
-    std::cout << NL << "No working directory path configured";
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+    
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"1","example.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
+      Args args;
+      if (options.size()>0) args.options = options;
+      args.arg["part"] = part;
+      if (file.size()>0) args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
-  std::cout << NL << "Using working_dir " << working_dir;
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11};
-  std::vector<int> states = {11,10,20};
-  for (auto state : states) {
-    switch (state) {
-      case 11: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
+    exec_times.push_back(std::chrono::system_clock::now());
   }
   
   std::cout << "\n\nANSWERS";
@@ -388,11 +398,15 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-  For my input:
 
-   duration:1ms answer[Part 1 Example] 12
-   duration:34ms answer[Part 1     ] 222208000
-   duration:625ms answer[Part 2     ] 7623
+   Xcode Debug -O2
+
+   >day_ -all
+      
+   ANSWERS
+   duration:2ms answer[part1 example.txt] 12
+   duration:32ms answer[part1 puzzle.txt] 222208000
+   duration:639ms answer[part2 puzzle.txt] 7623
    
    */
   return 0;
