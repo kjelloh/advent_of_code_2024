@@ -47,7 +47,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Answer = aoc::Dispatcher::Answer;
+using Answer = aoc::application::Answer;
 using aoc::xy::Vector;
 struct MachineConfig {
   /*
@@ -318,8 +318,9 @@ std::vector<Args> to_requests(Args const& args) {
 }
 
 int main(int argc, char *argv[]) {
-  aoc::Dispatcher app(to_requests,part1::solve_for,part2::solve_for);
-  return app.run(argc, argv);
+  aoc::application app(to_requests,part1::solve_for,part2::solve_for);
+  app.run(argc, argv);
+  app.print_result();
   /*
 
    Xcode Debug -O2

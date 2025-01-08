@@ -1336,7 +1336,7 @@ namespace aoc {
 
   }
 
-  class Dispatcher {
+  class application {
   public:
     using ToRequestsFunction = std::function<std::vector<Args>(Args const& args)>;
     using Answer = std::string;
@@ -1348,13 +1348,14 @@ namespace aoc {
     Answers m_answers{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> m_exec_times{};
   public:
-    Dispatcher(
+    application(
                ToRequestsFunction&& to_requests
                ,SolveForFunction part_1_solver
                ,SolveForFunction part_2_solver)
       :  m_to_requests(std::move(to_requests))
         ,m_solve_for{{"1",part_1_solver},{"2",part_2_solver}} {}
-    int run(int argc, char const* const argv[]) {
+    
+    void run(int argc, char const* const argv[]) {
       using aoc::raw::NL;
       
       Args user_args{};
@@ -1395,7 +1396,6 @@ namespace aoc {
           requests.push_back(args);
         }
       }
-
       m_exec_times.push_back(std::chrono::system_clock::now());
       for (auto request : requests) {
         auto part = request.arg["part"];
@@ -1410,17 +1410,20 @@ namespace aoc {
         else std::cerr << "\nSORRY, no file " << file;
         m_exec_times.push_back(std::chrono::system_clock::now());
       }
-      
+    }
+    
+    void print_result() {
       std::cout << "\n\nANSWERS";
       for (auto const& [i,answer] : aoc::views::enumerate(m_answers)) {
-        std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(m_exec_times[i+1] - m_exec_times[i]).count() << "ms";
+        std::cout
+          << "\nduration:"
+          << std::chrono::duration_cast<std::chrono::milliseconds>(m_exec_times[i+1] - m_exec_times[i]).count()
+          << "ms";
         std::cout << " answer[" << answer.first << "] ";
         if (answer.second) std::cout << *answer.second;
         else std::cout << "NO OPERATION";
       }
       std::cout << "\n";
-      return 0;
-
     }
     
   private:
