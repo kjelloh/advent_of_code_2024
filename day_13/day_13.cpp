@@ -311,14 +311,13 @@ namespace part2 {
   }
 }
 
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  aoc::application app(to_requests,part1::solve_for,part2::solve_for);
+  
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
   app.run(argc, argv);
   app.print_result();
   /*
@@ -328,12 +327,12 @@ int main(int argc, char *argv[]) {
    >day_13 -all
    
    For my input:
-         
+            
    ANSWERS
-   duration:90ms answer[part1 example.txt] 480
-   duration:2950ms answer[part1 puzzle.txt] 39290
-   duration:0ms answer[part2 example.txt] 875318608908
-   duration:18ms answer[part2 puzzle.txt] 73458657399094
+   duration:84ms answer[part 1 in:example.txt] 480
+   duration:3036ms answer[part 1 in:puzzle.txt] 39290
+   duration:0ms answer[part 2 in:example.txt] 875318608908
+   duration:18ms answer[part 2 in:puzzle.txt] 73458657399094
 
    */
 

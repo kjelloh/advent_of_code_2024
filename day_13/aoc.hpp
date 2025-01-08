@@ -1338,29 +1338,31 @@ namespace aoc {
 
   class application {
   public:
-    using ToRequestsFunction = std::function<std::vector<Args>(Args const& args)>;
     using Answer = std::string;
     using SolveForFunction = std::function<std::optional<Answer>(std::istream& in,Args const& args)>;
     using Answers = std::vector<std::pair<std::string,std::optional<Answer>>>;
   private:
-    ToRequestsFunction m_to_requests;
-    std::map<std::string,SolveForFunction> m_solve_for{};
+    std::map<std::pair<std::string,std::string>,SolveForFunction> m_solve_for{};
     Answers m_answers{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> m_exec_times{};
+    std::vector<Args> to_requests(Args const& args) {
+      std::vector<Args> result{};
+      result.push_back(args); // No fancy for now
+      return result;
+    }
   public:
-    application(
-               ToRequestsFunction&& to_requests
-               ,SolveForFunction part_1_solver
-               ,SolveForFunction part_2_solver)
-      :  m_to_requests(std::move(to_requests))
-        ,m_solve_for{{"1",part_1_solver},{"2",part_2_solver}} {}
+    application() {}
     
+    void add_solve_for(std::string part,SolveForFunction&& solve_for,std::optional<std::string> in_file_name = std::nullopt) {
+      m_solve_for.insert({{part,in_file_name?*in_file_name:""},solve_for});
+    }
+
     void run(int argc, char const* const argv[]) {
       using aoc::raw::NL;
       
       Args user_args{};
       
-      // Override by any user input
+      // {argc,argv} -> Args
       for (int i=1;i<argc;++i) {
         user_args.arg["file"] = "example.txt";
         std::string token{argv[i]};
@@ -1376,7 +1378,7 @@ namespace aoc {
         }
       }
       
-      auto requests = m_to_requests(user_args);
+      auto requests = this->to_requests(user_args);
       
       if (not user_args or user_args.options.contains("-all")) {
         requests.clear();
@@ -1399,15 +1401,42 @@ namespace aoc {
       m_exec_times.push_back(std::chrono::system_clock::now());
       for (auto request : requests) {
         auto part = request.arg["part"];
-        auto file = aoc::to_working_dir_path(request.arg["file"]);
-        std::cout << NL << "Using part:" << part << " file:" << file;
-        std::ifstream in{file};
-        if (in) {
-          if (m_solve_for.contains(part)) {
-            m_answers.push_back({std::format("part{} {}",part,file.filename().string()),m_solve_for[part](in,request)});
+        auto file_name = request.arg["file"];
+        if (m_solve_for.contains({part,file_name})) {
+          auto file_path = aoc::to_working_dir_path(file_name);
+          if (file_name.size()>0) {
+            if (std::filesystem::is_regular_file(file_path)) {
+              std::ifstream in{file_path};
+              if (in) {
+                m_answers.push_back(
+                  std::make_pair(
+                    std::format("part {} in:{}",part,file_name)
+                  ,m_solve_for[{part,file_name}](in,user_args)));
+              }
+              else {
+                std::cout << NL << std::format("Sorry, Failed to open file {}",file_path.string());
+              }
+            }
+            else {
+              std::cout << NL << std::format("Sorry, Not a regular file {}",file_path.string());
+            }
+          }
+          else {
+            // No file
+            std::istringstream iss{"File "" ascociated with this solve_for by aoc::application::add_solve_for"};
+            m_answers.push_back(
+              std::make_pair(
+               std::format(R"(part:"{}" in:"")",part)
+              ,m_solve_for[{part,file_name}](iss,user_args)));
           }
         }
-        else std::cerr << "\nSORRY, no file " << file;
+        else {
+          std::cerr << NL << std::format(R"(Sorry, no solve_for registered for part:"{}" file:"{}")",part,file_name);
+          m_answers.push_back(
+            std::make_pair(
+              std::format(R"(part:"{}" file:"{}")",part,file_name)
+            ,std::format("NULL solve_for")));
+        }
         m_exec_times.push_back(std::chrono::system_clock::now());
       }
     }
