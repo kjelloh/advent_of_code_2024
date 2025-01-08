@@ -1351,7 +1351,7 @@ namespace aoc {
   private:
     std::optional<aoc::parsing::Sections> m_doc{};
     std::optional<ToExamplesFunction> m_to_examples{};
-    std::map<std::string,TestFunction> m_test_function{};
+    std::vector<std::pair<std::string,std::string>> solve_for_keyes{};
     std::map<std::pair<std::string,std::string>,SolveForFunction> m_solve_for{};
     Answers m_answers{};
     std::vector<std::chrono::time_point<std::chrono::system_clock>> m_exec_times{};
@@ -1360,6 +1360,15 @@ namespace aoc {
       result.push_back(args); // No interpretation for now
       return result;
     }
+    struct TestFunctionWrapper {
+      std::optional<aoc::parsing::Sections> const& m_doc;
+      TestFunction m_test_function;
+      std::optional<Answer> operator()(std::istream& in,Args const& args) const {
+        auto result = m_test_function(m_doc,args);
+        if (result) return std::string("PASSED");
+        else return std::string("FAILED");
+      }
+    };
   public:
     application() {
       if (auto doc = aoc::doc::parse_doc()) {
@@ -1375,11 +1384,13 @@ namespace aoc {
     }
     
     void add_test(std::string caption,TestFunction&& test_function) {
-      m_test_function[caption] = std::move(test_function);
+      this->add_solve_for(caption,TestFunctionWrapper{m_doc,std::move(test_function)});
     }
     
     void add_solve_for(std::string part,SolveForFunction&& solve_for,std::optional<std::string> in_file_name = std::nullopt) {
-      m_solve_for.insert({{part,in_file_name?*in_file_name:""},solve_for});
+      auto index = solve_for_keyes.size();
+      solve_for_keyes.push_back({part,in_file_name?*in_file_name:""});
+      m_solve_for[solve_for_keyes[index]] = solve_for;
     }
 
     void run(int argc, char const* const argv[]) {
@@ -1431,19 +1442,12 @@ namespace aoc {
       
       if (user_args.is_empty() or user_args.options.contains("-all")) {
         requests.clear();
-        
-        std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-           {{},"1","example.txt"}
-          ,{{},"1","puzzle.txt"}
-          ,{{},"2","example.txt"}
-          ,{{},"2","puzzle.txt"}
-        };
-        
-        for (const auto& [options,part, file] : states) {
+        for (auto const& key : solve_for_keyes) {
+          auto const& [part,file_name] = key;
           Args args;
-          if (options.size()>0) args.options = options;
+          args.options = user_args.options;
           args.arg["part"] = part;
-          if (file.size()>0) args.arg["file"] = file;
+          args.arg["file"] = file_name;
           requests.push_back(args);
         }
       }
@@ -1473,23 +1477,20 @@ namespace aoc {
           }
           else {
             // No file
-            std::istringstream iss{"File "" ascociated with this solve_for by aoc::application::add_solve_for"};
+            std::istringstream iss{"No file ascociated with this solve_for (see aoc::application::add_solve_for call)"};
             m_answers.push_back(
               std::make_pair(
-               std::format(R"(part:"{}" in:"")",part)
+               std::format(R"(part:"{}")",part)
               ,m_solve_for[{part,file_name}](iss,user_args)));
           }
         }
-        else if (m_test_function.contains(part)) {
-          auto result = m_test_function[part](m_doc,user_args);
+        else if (part.starts_with("test") and m_solve_for.contains({part,""})) {
+          // a test function
+          std::istringstream iss{"File "" ascociated with this solve_for by aoc::application::add_solve_for"};
           m_answers.push_back(
             std::make_pair(
-              std::format(R"({})",part)
-            ,std::format("{}",result)));
-          if (not result) {
-            std::cout << NL << NL << std::format("==> BREAK on failed {}",part);
-            done = true;
-          }
+              std::format("{}",part)
+            ,m_solve_for[{part,""}](iss,user_args)));
         }
         else {
           std::cerr << NL << std::format(R"(Sorry, no solve_for or test registered for part:"{}" file:"{}")",part,file_name);
