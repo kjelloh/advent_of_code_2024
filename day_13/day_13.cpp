@@ -47,7 +47,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = std::string;
+using Answer = aoc::Dispatcher::Answer;
 using aoc::xy::Vector;
 struct MachineConfig {
   /*
@@ -251,16 +251,9 @@ Integer find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool 
   }
 }
 
-namespace test {
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    return std::string("No tests defined");
-  }
-
-}
-
 namespace part1 {
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::optional<Result> result{};
+  std::optional<Answer> solve_for(std::istream& in,Args const& args) {
+    std::optional<Answer> result{};
     std::cout << NL << NL << "part1";
     if (in) {
       Integer acc{};
@@ -283,9 +276,9 @@ namespace part1 {
 }
 
 namespace part2 {
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+  std::optional<Answer> solve_for(std::istream& in,Args const& args) {
     Integer K{10000000000000LL};
-    std::optional<Result> result{};
+    std::optional<Answer> result{};
     std::cout << NL << NL << "part2";
     if (in) {
       Integer acc{};
@@ -318,8 +311,6 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
 std::vector<Args> to_requests(Args const& args) {
   std::vector<Args> result{};
   result.push_back(args); // No fancy for now
@@ -327,76 +318,8 @@ std::vector<Args> to_requests(Args const& args) {
 }
 
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-    
-    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{},"1","example.txt"}
-      ,{{},"1","puzzle.txt"}
-      ,{{},"2","example.txt"}
-      ,{{},"2","puzzle.txt"}
-    };
-    
-    for (const auto& [options,part, file] : states) {
-      Args args;
-      if (options.size()>0) args.options = options;
-      args.arg["part"] = part;
-      if (file.size()>0) args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::Dispatcher app(to_requests,part1::solve_for,part2::solve_for);
+  return app.run(argc, argv);
   /*
 
    Xcode Debug -O2
@@ -412,5 +335,5 @@ int main(int argc, char *argv[]) {
    duration:18ms answer[part2 puzzle.txt] 73458657399094
 
    */
-  return 0;
+
 }

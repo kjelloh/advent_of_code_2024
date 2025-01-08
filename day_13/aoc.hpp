@@ -24,6 +24,7 @@
 #include <format>
 #include <print>
 #include <numeric> // E.g., std::accumulate
+#include <span>
 
 namespace aoc {
 
@@ -1116,15 +1117,15 @@ namespace aoc {
        Lets see if we can reuse this code :)
      
      */
-    template<typename Key, typename Result, typename State>
-    Result find_count(
+    template<typename Key, typename Integer, typename State>
+    Integer find_count(
         int remaining_steps,
         Key initial_key,
         std::function<std::vector<Key>(Key)> const& transform_fn,
         std::function<State(int, Key)> const& state_fn,
-        std::map<State, Result>& seen) {
+        std::map<State, Integer>& seen) {
         if (remaining_steps == 0) {
-            return Result(1); // Base case: count the initial state itself
+            return Integer(1); // Base case: count the initial state itself
         }
 
         State memo_state = state_fn(remaining_steps, initial_key);
@@ -1132,7 +1133,7 @@ namespace aoc {
             return seen[memo_state];
         }
 
-        Result result = Result(0);
+        Integer result = Integer(0);
         for (auto const& next_key : transform_fn(initial_key)) {
             result += find_count(remaining_steps - 1, next_key, transform_fn, state_fn, seen);
         }
@@ -1142,14 +1143,14 @@ namespace aoc {
     }
 
     // Overload for initial invocation
-    template<typename Key, typename Result, typename State>
-    Result find_count(
+    template<typename Key, typename Integer, typename State>
+    Integer find_count(
         int remaining_steps,
         std::vector<Key> const& initial_keys,
         std::function<std::vector<Key>(Key)> const& transform_fn,
         std::function<State(int, Key)> const& state_fn) {
-        Result result{};
-        std::map<State, Result> seen;
+        Integer result{};
+        std::map<State, Integer> seen;
 
         for (auto const& key : initial_keys) {
             result += find_count(remaining_steps, key, transform_fn, state_fn, seen);
@@ -1334,6 +1335,98 @@ namespace aoc {
 
 
   }
+
+  class Dispatcher {
+  public:
+    using ToRequestsFunction = std::function<std::vector<Args>(Args const& args)>;
+    using Answer = std::string;
+    using SolveForFunction = std::function<std::optional<Answer>(std::istream& in,Args const& args)>;
+    using Answers = std::vector<std::pair<std::string,std::optional<Answer>>>;
+  private:
+    ToRequestsFunction m_to_requests;
+    std::map<std::string,SolveForFunction> m_solve_for{};
+    Answers m_answers{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> m_exec_times{};
+  public:
+    Dispatcher(
+               ToRequestsFunction&& to_requests
+               ,SolveForFunction part_1_solver
+               ,SolveForFunction part_2_solver)
+      :  m_to_requests(std::move(to_requests))
+        ,m_solve_for{{"1",part_1_solver},{"2",part_2_solver}} {}
+    int run(int argc, char const* const argv[]) {
+      using aoc::raw::NL;
+      
+      Args user_args{};
+      
+      // Override by any user input
+      for (int i=1;i<argc;++i) {
+        user_args.arg["file"] = "example.txt";
+        std::string token{argv[i]};
+        if (token.starts_with("-")) user_args.options.insert(token);
+        else {
+          // assume options before <part> and <file>
+          auto non_option_index = i - user_args.options.size(); // <part> <file>
+          switch (non_option_index) {
+            case 1: user_args.arg["part"] = token; break;
+            case 2: user_args.arg["file"] = token; break;
+            default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+          }
+        }
+      }
+      
+      auto requests = m_to_requests(user_args);
+      
+      if (not user_args or user_args.options.contains("-all")) {
+        requests.clear();
+        
+        std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+           {{},"1","example.txt"}
+          ,{{},"1","puzzle.txt"}
+          ,{{},"2","example.txt"}
+          ,{{},"2","puzzle.txt"}
+        };
+        
+        for (const auto& [options,part, file] : states) {
+          Args args;
+          if (options.size()>0) args.options = options;
+          args.arg["part"] = part;
+          if (file.size()>0) args.arg["file"] = file;
+          requests.push_back(args);
+        }
+      }
+
+      m_exec_times.push_back(std::chrono::system_clock::now());
+      for (auto request : requests) {
+        auto part = request.arg["part"];
+        auto file = aoc::to_working_dir_path(request.arg["file"]);
+        std::cout << NL << "Using part:" << part << " file:" << file;
+        std::ifstream in{file};
+        if (in) {
+          if (m_solve_for.contains(part)) {
+            m_answers.push_back({std::format("part{} {}",part,file.filename().string()),m_solve_for[part](in,request)});
+          }
+        }
+        else std::cerr << "\nSORRY, no file " << file;
+        m_exec_times.push_back(std::chrono::system_clock::now());
+      }
+      
+      std::cout << "\n\nANSWERS";
+      for (auto const& [i,answer] : aoc::views::enumerate(m_answers)) {
+        std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(m_exec_times[i+1] - m_exec_times[i]).count() << "ms";
+        std::cout << " answer[" << answer.first << "] ";
+        if (answer.second) std::cout << *answer.second;
+        else std::cout << "NO OPERATION";
+      }
+      std::cout << "\n";
+      return 0;
+
+    }
+    
+  private:
+    
+  };
+
 
 } // namespace aoc
 
