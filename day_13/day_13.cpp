@@ -47,7 +47,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using aoc::xy::Vector;
 struct MachineConfig {
   /*
@@ -127,11 +127,9 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 struct State {
   Integer x, y;
-  Result cost;
+  Integer cost;
   int a_push_count{};
   int b_push_count{};
   bool operator>(const State& other) const {
@@ -143,8 +141,8 @@ std::ostream& operator<<(std::ostream& os,State state) {
   return os;
 }
 
-using Seen = std::map<Result,std::vector<State>>;
-Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,Seen& seen) {
+using Seen = std::map<Integer,std::vector<State>>;
+Integer find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,Seen& seen) {
 //    std::cout << NL << "find_min_cost:" << config;
     int const COST_A = 3;
     int const COST_B = 1;
@@ -210,7 +208,7 @@ Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,Seen& 
     return -1; // failed
 }
 
-Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool is_part_2) {
+Integer find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool is_part_2) {
   Seen seen{};
   if (is_part_2) {
     // Shoot, this is actually an algebraic problem?
@@ -253,12 +251,19 @@ Result find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool i
   }
 }
 
+namespace test {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+    return std::string("No tests defined");
+  }
+
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
-      Result acc{};
+      Integer acc{};
       auto model = parse(in);
       std::cout << NL << "model:" << model;
       for (auto const& mc : model) {
@@ -271,7 +276,7 @@ namespace part1 {
           std::cout << " --> FAILED ";
         }
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -283,7 +288,7 @@ namespace part2 {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
     if (in) {
-      Result acc{};
+      Integer acc{};
       auto model = parse(in);
       for (auto const& mc : model) {
         // Assume there is a cycle in the search space.
@@ -307,65 +312,81 @@ namespace part2 {
           std::cout << " --> FAILED ";
         }
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
 }
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
 
-  std::filesystem::path working_dir{"../.."};
-  if (auto dir = get_working_dir()) {
-    working_dir = *dir;
+std::vector<Args> to_requests(Args const& args) {
+  std::vector<Args> result{};
+  result.push_back(args); // No fancy for now
+  return result;
+}
+
+int main(int argc, char *argv[]) {
+  Args user_args{};
+  
+  // Override by any user input
+  for (int i=1;i<argc;++i) {
+    user_args.arg["file"] = "example.txt";
+    std::string token{argv[i]};
+    if (token.starts_with("-")) user_args.options.insert(token);
+    else {
+      // assume options before <part> and <file>
+      auto non_option_index = i - user_args.options.size(); // <part> <file>
+      switch (non_option_index) {
+        case 1: user_args.arg["part"] = token; break;
+        case 2: user_args.arg["file"] = token; break;
+        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+      }
+    }
   }
-  else {
-    std::cout << NL << "No working directory path configured";
+  
+  auto requests = to_requests(user_args);
+  
+  if (not user_args or user_args.options.contains("-all")) {
+    requests.clear();
+    
+    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
+       {{},"1","example.txt"}
+      ,{{},"1","puzzle.txt"}
+      ,{{},"2","example.txt"}
+      ,{{},"2","puzzle.txt"}
+    };
+    
+    for (const auto& [options,part, file] : states) {
+      Args args;
+      if (options.size()>0) args.options = options;
+      args.arg["part"] = part;
+      if (file.size()>0) args.arg["file"] = file;
+      requests.push_back(args);
+    }
   }
-  std::cout << NL << "Using working_dir " << working_dir;
 
   Answers answers{};
   std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
   exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11};
-  std::vector<int> states = {11,10,21,20};
-  for (auto state : states) {
-    switch (state) {
-      case 11: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
+  for (auto request : requests) {
+    auto part = request.arg["part"];
+    auto file = aoc::to_working_dir_path(request.arg["file"]);
+    std::cout << NL << "Using part:" << part << " file:" << file;
+    std::ifstream in{file};
+    if (in) {
+      if (part=="1") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
+      }
+      else if (part=="2") {
+        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
+      }
+      else if (part.starts_with("test")) {
+        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
+      }
     }
+    else std::cerr << "\nSORRY, no file " << file;
+    exec_times.push_back(std::chrono::system_clock::now());
   }
   
   std::cout << "\n\nANSWERS";
@@ -377,14 +398,19 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "\n";
   /*
-  For my input:
-      
-   ANSWERS
-   duration:91ms answer[Part 1 Example] 480
-   duration:3035ms answer[Part 1     ] 39290
-   duration:0ms answer[Part 2 Example] 875318608908
-   duration:18ms answer[Part 2     ] 73458657399094
+
+   Xcode Debug -O2
+
+   >day_13 -all
    
-  */
+   For my input:
+         
+   ANSWERS
+   duration:90ms answer[part1 example.txt] 480
+   duration:2950ms answer[part1 puzzle.txt] 39290
+   duration:0ms answer[part2 example.txt] 875318608908
+   duration:18ms answer[part2 puzzle.txt] 73458657399094
+
+   */
   return 0;
 }
