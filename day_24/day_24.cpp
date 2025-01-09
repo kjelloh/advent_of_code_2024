@@ -33,6 +33,17 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = aoc::raw::Line;
 
 using WireValues = std::map<std::string,std::optional<bool>>;
+
+template <typename T>
+struct std::formatter<std::optional<T>> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(std::optional<T> const& ot, FmtContext& ctx) const {
+    if (ot) std::format_to(ctx.out(),"{}",*ot);
+    else std::format_to(ctx.out(),"nullopt");
+    return ctx.out();
+  }
+};
+
 struct Gate {
   std::string input1;
   std::string input2;
@@ -40,16 +51,42 @@ struct Gate {
   std::string op; // "AND", "OR", "XOR"
   auto operator<=>(const Gate&) const = default;
 };
+
+template <>
+struct std::formatter<Gate> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(Gate const& gate, FmtContext& ctx) const {
+    std::format_to(ctx.out(),"(setq {} ({} {} {}))",gate.output,gate.op,gate.input1,gate.input2);
+    return ctx.out();
+  }
+};
+
 std::ostream& operator<<(std::ostream& os,Gate const& gate) {
-  os << '(' << "setq " << gate.output <<  " (" << gate.op << " " << gate.input1 << " " << gate.input2 << "))"; // lisp :)
+  os << std::format("{}",gate);
   return os;
 }
+
 using Gates = std::vector<Gate>;
 
 struct Model {
   WireValues wire_values{};
   Gates gates{};
 };
+
+template <>
+struct std::formatter<Model> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(Model const& model, FmtContext& ctx) const {
+    std::format_to(ctx.out(),"\n{}\n{}",model.wire_values,model.gates);
+    return ctx.out();
+  }
+};
+
+std::ostream& operator<<(std::ostream& os,Model const& model) {
+  os << NL << "Model:";
+  os << NL << std::format("{}",model);
+  return os;
+}
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -163,7 +200,6 @@ namespace test {
     return os;
   }
 
-  using Expecteds = aoc::test::Expecteds<Expected>;
 
   aoc::parsing::Sections parse_doc(Args const& args) {
     std::cout << NL << T << "parse puzzle doc text";
@@ -181,8 +217,52 @@ namespace test {
     return result;
   }
 
-  aoc::raw::Lines to_example(aoc::parsing::Sections const& sections) {
-    return {};
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[17]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[18]));
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[25]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[26]));
+
+    return result;
+  }
+
+  bool test0(std::optional<aoc::parsing::Sections> const& sections,Args args) {
+    // This function is called by aoc::application if registered with add_test(test::test0)
+    // Extract test data from provided sections from the day web page text.
+    // See zsh-script pull_text.zsh for support to fetch advent of code day web page text to doc.txt
+    std::cout << NL << "test0";
+    if (sections) {
+      std::cout << NL << T << "sections ok";
+      auto examples = to_examples(*sections);
+      if (examples.size()>0) {
+        std::cout << NL << T << "examples ok";
+        auto example_in = aoc::test::to_example_in(examples[0]);
+        auto example_model = parse(example_in);
+        std::cout << NL << std::format("\n{}",example_model);
+        
+        auto const INIT_VALUES = example_model.wire_values;
+        auto const& [vals,gates] = to_evaluated(INIT_VALUES,example_model);
+        auto z_digits = to_bin_digit_string('z',vals);
+        std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
+        auto z = to_int(z_digits);
+        std::cout << " --> decimal:" << z;
+        return z==4;
+      }
+      else {
+        std::cout << NL << T << "NO examples";
+      }
+    }
+    else {
+      std::cout << NL << T << "NO sections";
+    }
+    return false;
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -191,26 +271,12 @@ namespace test {
     if (in) {
       auto model = parse(in);
       auto const INIT_VALUES = model.wire_values;
-      auto doc = parse_doc(args);
-      auto example_lines = to_example(doc);
-      if (args.options.contains("-to_example")) {
-        auto example_file = aoc::to_working_dir_path("example.txt");
-        if (aoc::raw::write_to_file(example_file, example_lines)) {
-          response << "Created " << example_file;
-        }
-        else {
-          response << "Sorry, failed to create file " << example_file;
-        }
-        return response.str();
-      }
-      else {
-        auto const& [vals,gates] = to_evaluated(INIT_VALUES,model);
-        auto z_digits = to_bin_digit_string('z',vals);
-        std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
-        auto z = to_int(z_digits);
-        std::cout << " --> decimal:" << z;
-        response << z;
-      }
+      auto const& [vals,gates] = to_evaluated(INIT_VALUES,model);
+      auto z_digits = to_bin_digit_string('z',vals);
+      std::cout << NL << "zs:" << z_digits.size() << " " << z_digits;
+      auto z = to_int(z_digits);
+      std::cout << " --> decimal:" << z;
+      response << z;
     }
     if (response.str().size()>0) return response.str();
     else return std::nullopt;
@@ -238,6 +304,27 @@ namespace part1 {
 }
 
 namespace part2 {
+
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[17]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[18]));
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[25]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[26]));
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[44]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[45]));
+    return result;
+  }
+
 
   // sum,carry
   std::pair<std::string, std::string> to_bitwise_added(const std::string& x, const std::string& y) {
@@ -287,27 +374,6 @@ namespace part2 {
     bool carry_out = (x & y) | (y & c_in) | (c_in & x); // Carry-out logic
         
     return {sum, carry_out};
-  }
-
-  void rename_wire(std::string const& old_name,std::string const& new_name,Model& model) {
-    if (old_name==new_name) return;
-
-    
-    std::cout << NL << "rename: " << old_name << " --> " << new_name;
-    
-    std::for_each(model.gates.begin(), model.gates.end(), [&old_name,&new_name](Gate& target){
-      if (target.input1 == old_name) target.input1 = new_name;
-      if (target.input2 == old_name) target.input2 = new_name;
-      if (target.output == old_name) target.output = new_name;
-    });
-    // A bit cumbersome to rename a key in an std::map
-    // Also costly - so lets see if we can do this without getting too long solve time?
-    auto iter = model.wire_values.find(old_name);
-    if (iter != model.wire_values.end()) {
-      auto value = iter->second;
-      model.wire_values.erase(iter);
-      model.wire_values[new_name] = value;
-    }
   }
 
   //           z = x ^ y ^ carry_in
@@ -943,101 +1009,36 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  user_args.arg["file"] = "example.txt";
-  for (int i=1;i<argc;++i) {
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: user_args.arg[std::to_string(non_option_index)] = token;
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-
-    std::vector<std::string> parts = {"1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
-    
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part=="2" and file=="example.txt") continue;
-      Args args;
-      args.arg["part"] = part;
-      args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-  
-  std::cout << NL << "Arguments:";
-  for (auto const& request : requests) {
-    auto const& [arg,options] = request;
-    using aoc::raw::operator<<;
-    std::cout << NL << "  {key,value} : " << arg;
-    std::cout << NL << "  options     : " << options;
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part=="test") {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_test("test0", test::test0);
+  app.add_solve_for("test",test::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"example1.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
 
    Xcode Debug -O2
 
-   >day_22 -all
-
+   >day_24 -all
+   
+   For my input:
+            
    NOTE: User must inspect and enter swaps to fix each faulty z-bit found by program
-   NOTE: My Manual input swaps [{ "qjj","gjc"},{ "z17","wmp"},{ "z26","gvm"},{ "z39","qsb"}]
+   NOTE: My Manual input swaps [{ "w"},{ "z17","wmp"},{ "z26","gvm"},{ "z39","qsb"}]
    NOTE: Execution time includes user interaction.
    
    ANSWERS
-   duration:0ms answer[part1 example.txt] 4
-   duration:24ms answer[part1 puzzle.txt] 49520947122770
-   duration:52854ms answer[part2 puzzle.txt] gjc,gvm,qjj,qsb,wmp,z17,z26,z39
-
+   duration:0ms answer[part:"test0"] PASSED
+   duration:0ms answer[part test in:example.txt] 4
+   duration:0ms answer[part 1 in:example.txt] 4
+   duration:1ms answer[part 1 in:example1.txt] 2024
+   duration:19ms answer[part 1 in:puzzle.txt] 49520947122770
+   duration:91254ms answer[part 2 in:puzzle.txt] gjc,gvm,qjj,qsb,wmp,z17,z26,z39
    */
-  return 0;
+
 }

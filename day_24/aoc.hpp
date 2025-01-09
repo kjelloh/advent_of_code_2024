@@ -23,6 +23,9 @@
 #include <coroutine>
 #include <format>
 #include <print>
+#include <numeric> // E.g., std::accumulate
+#include <span>
+#include <expected>
 
 namespace aoc {
 
@@ -44,8 +47,8 @@ namespace aoc {
   struct Args {
     std::map<std::string,std::string> arg{};
     std::set<std::string> options{};
-    operator bool() const {
-      return (arg.size()>0) or (options.size()>0);
+    bool is_empty() const {
+      return (arg.size()==0) and (options.size()==0);
     }
   };
 
@@ -234,10 +237,6 @@ namespace aoc {
     concept Streamable = requires(std::ostream& os, T const& t) {
         { os << t } -> std::same_as<std::ostream&>;
     };
-
-    // A concept for integral types for operator<<(std::vector<Int>) below
-    template <typename T>
-    concept Integral = std::is_integral_v<T>;
   
     struct Indent {
       int i{};
@@ -261,9 +260,9 @@ namespace aoc {
     std::ostream& operator<<(std::ostream& os, std::pair<U,V> const& pp);
 
     template <typename T>
-    requires Integral<T>
-    std::ostream& operator<<(std::ostream& os, const std::set<T>& ints);
-  
+    requires Streamable<T>
+    std::ostream& operator<<(std::ostream& os, std::set<T> const& s);
+
     namespace detail {
       template <typename T>
       struct Member {
@@ -355,9 +354,8 @@ namespace aoc {
   
     bool write_to(std::ostream& out,aoc::raw::Lines const& lines) {
       if (out) {
-        for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
-          if (lx>0) out << NL;
-          out << line;
+        for (auto const& line : lines) {
+          out << line << NL;
         }
         return true;
       }
@@ -377,7 +375,7 @@ namespace aoc {
     using Lines = std::vector<Splitter>;
     using Section = Lines;
     using Sections = std::vector<Section>;
-  
+    
     class Splitter {
     public:
       Splitter(std::string const& s) : m_s{s} {}
@@ -480,6 +478,17 @@ namespace aoc {
     private:
       std::string m_s{};
     };
+  
+    Line to_line(Lines const& lines) {
+      std::string acc{};
+      for (auto const& [lx,line] : aoc::views::enumerate(lines)) {
+        if (lx>0) acc += " ";
+        acc += line.trim()
+          .str();
+      }
+      return Line{acc};
+    }
+
     aoc::raw::Line to_raw(Line const& line) {return line.str();}
     aoc::raw::Lines to_raw(Lines const& lines) {
       aoc::raw::Lines result{};
@@ -1108,15 +1117,15 @@ namespace aoc {
        Lets see if we can reuse this code :)
      
      */
-    template<typename Key, typename Result, typename State>
-    Result find_count(
+    template<typename Key, typename Integer, typename State>
+    Integer find_count(
         int remaining_steps,
         Key initial_key,
         std::function<std::vector<Key>(Key)> const& transform_fn,
         std::function<State(int, Key)> const& state_fn,
-        std::map<State, Result>& seen) {
+        std::map<State, Integer>& seen) {
         if (remaining_steps == 0) {
-            return Result(1); // Base case: count the initial state itself
+            return Integer(1); // Base case: count the initial state itself
         }
 
         State memo_state = state_fn(remaining_steps, initial_key);
@@ -1124,7 +1133,7 @@ namespace aoc {
             return seen[memo_state];
         }
 
-        Result result = Result(0);
+        Integer result = Integer(0);
         for (auto const& next_key : transform_fn(initial_key)) {
             result += find_count(remaining_steps - 1, next_key, transform_fn, state_fn, seen);
         }
@@ -1134,14 +1143,14 @@ namespace aoc {
     }
 
     // Overload for initial invocation
-    template<typename Key, typename Result, typename State>
-    Result find_count(
+    template<typename Key, typename Integer, typename State>
+    Integer find_count(
         int remaining_steps,
         std::vector<Key> const& initial_keys,
         std::function<std::vector<Key>(Key)> const& transform_fn,
         std::function<State(int, Key)> const& state_fn) {
-        Result result{};
-        std::map<State, Result> seen;
+        Integer result{};
+        std::map<State, Integer> seen;
 
         for (auto const& key : initial_keys) {
             result += find_count(remaining_steps, key, transform_fn, state_fn, seen);
@@ -1278,20 +1287,27 @@ namespace aoc {
     using namespace aoc::raw;
     using namespace aoc::parsing;
   
-    aoc::parsing::Sections parse_doc(Args const& args) {
+    std::expected<aoc::parsing::Sections,std::string> parse_doc() {
       std::cout << NL << T << "parse puzzle doc text";
       aoc::parsing::Sections result{};
       using namespace aoc::parsing;
-      std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
-      auto sections = Splitter{doc_in}.same_indent_sections();
-      for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-        std::cout << NL << "---------- section " << sx << " ----------";
-        result.push_back(section);
-        for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-          std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+      auto file_path = aoc::to_working_dir_path("doc.txt");
+      std::ifstream doc_in{file_path};
+      if (doc_in) {
+        auto sections = Splitter{doc_in}.same_indent_sections();
+        for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
+          std::cout << NL << "---------- section " << sx << " ----------";
+          result.push_back(section);
+          for (auto const& [lx,line] : aoc::views::enumerate(section)) {
+            std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
+          }
         }
       }
-      return result;
+      else {
+        return std::unexpected(std::format("Sorry, Failed to open file {}",file_path.string()));
+      }
+      if (result.size()>0) return result;
+      else return std::unexpected(std::format("Sorry, Empty file {}",file_path.string()));
     }
 
     using aoc::grid::Position;
@@ -1323,10 +1339,194 @@ namespace aoc {
       }
       return result;
     }
-
-
   }
 
+  class application {
+  public:
+    using ToExamplesFunction = std::function<std::vector<aoc::raw::Lines>(aoc::parsing::Sections const& sections)>;
+    using TestFunction = std::function<bool(std::optional<aoc::parsing::Sections> const& sections,Args args)>;
+    using Answer = std::string;
+    using SolveForFunction = std::function<std::optional<Answer>(std::istream& in,Args const& args)>;
+    using Answers = std::vector<std::pair<std::string,std::optional<Answer>>>;
+  private:
+    std::optional<aoc::parsing::Sections> m_doc{};
+    std::optional<ToExamplesFunction> m_to_examples{};
+    std::vector<std::pair<std::string,std::string>> solve_for_keyes{};
+    std::map<std::pair<std::string,std::string>,SolveForFunction> m_solve_for{};
+    Answers m_answers{};
+    std::vector<std::chrono::time_point<std::chrono::system_clock>> m_exec_times{};
+    std::vector<Args> to_requests(Args const& args) {
+      std::vector<Args> result{};
+      result.push_back(args); // No interpretation for now
+      return result;
+    }
+    struct TestFunctionWrapper {
+      std::optional<aoc::parsing::Sections> const& m_doc;
+      TestFunction m_test_function;
+      std::optional<Answer> operator()(std::istream& in,Args const& args) const {
+        auto result = m_test_function(m_doc,args);
+        if (result) return std::string("PASSED");
+        else return std::string("FAILED");
+      }
+    };
+  public:
+    application() {
+      if (auto doc = aoc::doc::parse_doc()) {
+        m_doc = *doc;
+      }
+      else {
+        std::print("\naoc::application() - doc parse failed with error:{}",doc.error());
+      }
+    }
+    
+    void add_to_examples(ToExamplesFunction&& to_examples) {
+      m_to_examples = std::move(to_examples);
+    }
+    
+    void add_test(std::string caption,TestFunction&& test_function) {
+      this->add_solve_for(caption,TestFunctionWrapper{m_doc,std::move(test_function)});
+    }
+    
+    void add_solve_for(std::string part,SolveForFunction&& solve_for,std::optional<std::string> in_file_name = std::nullopt) {
+      auto index = solve_for_keyes.size();
+      solve_for_keyes.push_back({part,in_file_name?*in_file_name:""});
+      m_solve_for[solve_for_keyes[index]] = solve_for;
+    }
+
+    void run(int argc, char const* const argv[]) {
+      using aoc::raw::NL;
+      
+      Args user_args{};
+      
+      // {argc,argv} -> Args
+      for (int i=1;i<argc;++i) {
+        user_args.arg["file"] = "example.txt";
+        std::string token{argv[i]};
+        if (token.starts_with("-")) user_args.options.insert(token);
+        else {
+          // assume options before <part> and <file>
+          auto non_option_index = i - user_args.options.size(); // <part> <file>
+          switch (non_option_index) {
+            case 1: user_args.arg["part"] = token; break;
+            case 2: user_args.arg["file"] = token; break;
+            default: std::cerr << NL << "Unknown argument " << std::quoted(token);
+          }
+        }
+      }
+      
+      auto requests = this->to_requests(user_args);
+            
+      if (user_args.options.contains("-to_examples")) {
+        if (m_to_examples) {
+          if (m_doc) {
+            auto examples = (*m_to_examples)(*m_doc);
+            for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
+              std::string d{};
+              if (ix>0) d= std::to_string(ix);
+              auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",d));
+              if (aoc::raw::write_to_file(example_file, example_lines)) {
+                std::cout << NL << "Created " << example_file;
+              }
+              else {
+                std::cout << NL << "Sorry, failed to create file " << example_file;
+              }
+            }
+          }
+          else {
+            std::print("\nSorry, Option -to_examples failed. Have you run pull_text.zsh to create doc.txt for this day?");
+          }
+        }
+        else {
+          std::print("\nSorry, no to_examples function registered with oac::application::add_to_examples");
+        }
+        return;
+      }
+      
+      if (user_args.is_empty() or user_args.options.contains("-all")) {
+        requests.clear();
+        for (auto const& key : solve_for_keyes) {
+          auto const& [part,file_name] = key;
+          Args args;
+          args.options = user_args.options;
+          args.arg["part"] = part;
+          args.arg["file"] = file_name;
+          requests.push_back(args);
+        }
+      }
+      m_exec_times.push_back(std::chrono::system_clock::now());
+      bool done{false};
+      for (auto request : requests) {
+        auto part = request.arg["part"];
+        auto file_name = request.arg["file"];
+        if (m_solve_for.contains({part,file_name})) {
+          auto file_path = aoc::to_working_dir_path(file_name);
+          if (file_name.size()>0) {
+            if (std::filesystem::is_regular_file(file_path)) {
+              std::ifstream in{file_path};
+              if (in) {
+                m_answers.push_back(
+                  std::make_pair(
+                    std::format("part {} in:{}",part,file_name)
+                  ,m_solve_for[{part,file_name}](in,user_args)));
+              }
+              else {
+                std::cout << NL << std::format("Sorry, Failed to open file {}",file_path.string());
+              }
+            }
+            else {
+              std::cout << NL << std::format("Sorry, Not a regular file {}",file_path.string());
+            }
+          }
+          else {
+            // No file
+            std::istringstream iss{"No file ascociated with this solve_for (see aoc::application::add_solve_for call)"};
+            m_answers.push_back(
+              std::make_pair(
+               std::format(R"(part:"{}")",part)
+              ,m_solve_for[{part,file_name}](iss,user_args)));
+          }
+        }
+        else if (part.starts_with("test") and m_solve_for.contains({part,""})) {
+          // a test function
+          std::istringstream iss{"Dummy std::istringstream ascociated with this solve_for by aoc::application::add_test"};
+          m_answers.push_back(
+            std::make_pair(
+              std::format("{}",part)
+            ,m_solve_for[{part,""}](iss,user_args)));
+        }
+        else {
+          std::cerr << NL << std::format(R"(Sorry, no solve_for or test registered for part:"{}" file:"{}")",part,file_name);
+          m_answers.push_back(
+            std::make_pair(
+              std::format(R"(part:"{}" file:"{}")",part,file_name)
+            ,std::format("NULL solve_for")));
+        }
+        m_exec_times.push_back(std::chrono::system_clock::now());
+        if (done) break;
+      }
+    }
+    
+    void print_result() {
+      std::cout << "\n\nANSWERS";
+      for (auto const& [i,answer] : aoc::views::enumerate(m_answers)) {
+        std::cout
+          << "\nduration:"
+          << std::chrono::duration_cast<std::chrono::milliseconds>(m_exec_times[i+1] - m_exec_times[i]).count()
+          << "ms";
+        std::cout << " answer[" << answer.first << "] ";
+        if (answer.second) std::cout << *answer.second;
+        else std::cout << "NO OPERATION";
+      }
+      std::cout << "\n";
+    }
+    
+  private:
+    
+  };
+
+
 } // namespace aoc
+
+using aoc::Args;
 
 #endif /* aoc_hpp */
