@@ -1421,7 +1421,9 @@ namespace aoc {
           if (m_doc) {
             auto examples = (*m_to_examples)(*m_doc);
             for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
-              auto example_file = aoc::to_working_dir_path(std::format("example_{}.txt",ix));
+              std::string d{};
+              if (ix>0) d= std::to_string(ix);
+              auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",d));
               if (aoc::raw::write_to_file(example_file, example_lines)) {
                 std::cout << NL << "Created " << example_file;
               }
