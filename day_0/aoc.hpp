@@ -1486,7 +1486,7 @@ namespace aoc {
         }
         else if (part.starts_with("test") and m_solve_for.contains({part,""})) {
           // a test function
-          std::istringstream iss{"File "" ascociated with this solve_for by aoc::application::add_solve_for"};
+          std::istringstream iss{"Dummy std::istringstream ascociated with this solve_for by aoc::application::add_test"};
           m_answers.push_back(
             std::make_pair(
               std::format("{}",part)

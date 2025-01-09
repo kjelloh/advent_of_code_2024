@@ -35,10 +35,18 @@ struct Model {
   aoc::raw::Lines entries;
 };
 
+template <>
+struct std::formatter<Model> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(Model const& model, FmtContext& ctx) const {
+    std::format_to(ctx.out(),"\n{}",model.entries);
+    return ctx.out();
+  }
+};
+
 std::ostream& operator<<(std::ostream& os,Model const& model) {
   os << NL << "Model:";
-  using aoc::raw::operator<<;
-  os << NL << model.entries;
+  os << NL << std::format("{}",model.entries);
   return os;
 }
 
@@ -134,16 +142,13 @@ int main(int argc, char *argv[]) {
 
    Xcode Debug -O2
 
-   >day_13 -all
+   >day_0 -all
    
    For my input:
             
    ANSWERS
-   duration:84ms answer[part 1 in:example.txt] 480
-   duration:3036ms answer[part 1 in:puzzle.txt] 39290
-   duration:0ms answer[part 2 in:example.txt] 875318608908
-   duration:18ms answer[part 2 in:puzzle.txt] 73458657399094
-
+   ...
+   
    */
 
 }
