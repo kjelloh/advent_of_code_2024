@@ -488,6 +488,28 @@ namespace aoc {
       }
       return Line{acc};
     }
+  
+    template <typename Integer = int>
+    std::vector<Integer> to_ints(Line const& line) {
+      std::vector<Integer> result{};
+      std::regex pattern{R"((\d+))"};
+      auto const& str = line.str();
+      auto begin = std::sregex_iterator(str.begin(),str.end(),pattern);
+      auto end = std::sregex_iterator{};
+      for (auto iter = begin;iter != end;++iter) {
+        auto match = *iter;
+        result.push_back(std::stoi(match.str()));
+      }
+      return result;
+    }
+
+  
+    template <typename Integer = int>
+    std::vector<Integer> to_ints(Section const& section) {
+      std::vector<Integer> result{};
+      auto line = to_line(section);
+      return to_ints<Integer>(line);
+    }
 
     aoc::raw::Line to_raw(Line const& line) {return line.str();}
     aoc::raw::Lines to_raw(Lines const& lines) {
