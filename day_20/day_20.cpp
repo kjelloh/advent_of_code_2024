@@ -53,46 +53,6 @@ using aoc::grid::Path;
 
 namespace test {
 
-  // Adapt to expected for day puzzle
-  struct Expected {
-    bool operator==(Expected const& other) const {
-      bool result{true};
-      return result;
-    }
-  };
-
-  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
-    return os;
-  }
-
-  using Expecteds = aoc::test::Expecteds<Expected>;
-
-
-  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
-    std::vector<aoc::raw::Lines> result{};
-    //result.push_back(aoc::parsing::to_raw(sections[??]));
-    return result;
-  }
-
-  std::vector<Expected> to_expecteds(aoc::parsing::Sections const& doc_sections,auto config_ix,Args const& args) {
-    Expecteds result{};
-    return result;
-  }
-
-  Expecteds parse(auto& doc_in) {
-    std::cout << NL << T << "test::parse";
-    Expecteds result{};
-    using namespace aoc::parsing;
-    auto sections = Splitter{doc_in}.same_indent_sections();
-    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-      std::cout << NL << "---------- section " << sx << " ----------";
-      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      }
-    }
-    return result;
-  }
-
   std::size_t to_saving(Path track,PositionPair cheat) {
     std::size_t best{track.size()};
 
@@ -296,94 +256,28 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-
-    std::vector<std::string> parts = {"test", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
-    
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
-      Args args;
-      args.arg["part"] = part;
-      args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_solve_for("test",test::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
 
    Xcode Debug -O2
 
    >day_20 -all
-   
+      
    ANSWERS
-   duration:1ms answer[test example.txt] 44
-   duration:1ms answer[part1 example.txt] 44
-   duration:574ms answer[part1 puzzle.txt] 1497
-   duration:1ms answer[part2 example.txt] 285
-   duration:5679ms answer[part2 puzzle.txt] 1030809
-   
+   duration:2ms answer[part test in:example.txt] 44
+   duration:1ms answer[part 1 in:example.txt] 44
+   duration:599ms answer[part 1 in:puzzle.txt] 1497
+   duration:1ms answer[part 2 in:example.txt] 285
+   duration:5398ms answer[part 2 in:puzzle.txt] 1030809
+
    */
-  return 0;
+
 }
