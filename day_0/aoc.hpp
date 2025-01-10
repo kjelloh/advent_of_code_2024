@@ -1489,7 +1489,7 @@ namespace aoc {
                 m_answers.push_back(
                   std::make_pair(
                     std::format("part {} in:{}",part,file_name)
-                  ,m_solve_for[{part,file_name}](in,user_args)));
+                  ,m_solve_for[{part,file_name}](in,request)));
               }
               else {
                 std::cout << NL << std::format("Sorry, Failed to open file {}",file_path.string());
@@ -1505,7 +1505,7 @@ namespace aoc {
             m_answers.push_back(
               std::make_pair(
                std::format(R"(part:"{}")",part)
-              ,m_solve_for[{part,file_name}](iss,user_args)));
+              ,m_solve_for[{part,file_name}](iss,request)));
           }
         }
         else if (part.starts_with("test") and m_solve_for.contains({part,""})) {
@@ -1514,7 +1514,7 @@ namespace aoc {
           m_answers.push_back(
             std::make_pair(
               std::format("{}",part)
-            ,m_solve_for[{part,""}](iss,user_args)));
+            ,m_solve_for[{part,""}](iss,request)));
         }
         else {
           std::cerr << NL << std::format(R"(Sorry, no solve_for or test registered for part:"{}" file:"{}")",part,file_name);
