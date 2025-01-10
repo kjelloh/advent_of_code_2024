@@ -41,13 +41,15 @@ struct Model {
   Towels towels{};
   Designs designs{};
 };
-std::ostream& operator<<(std::ostream& os,Model const& model) {
-  os << NL << "model:";
-  using aoc::raw::operator<<;
-  os << NL << T << "towels:" << model.towels;
-  os << NL << T << "designs:" << model.designs;
-  return os;
-}
+
+template <>
+struct std::formatter<Model> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(Model const& model, FmtContext& ctx) const {
+    std::format_to(ctx.out(),"model:\n\ttowels:{}\n\tdesigns:{}",model.towels,model.designs);
+    return ctx.out();
+  }
+};
 
 using aoc::raw::operator<<;
 
@@ -70,15 +72,13 @@ Model parse(auto& in) {
       else std::cerr << NL << "DESIGN INSUFFICIENCY: Section " << sx << " not expected nor processed";
     }
   }
-//  std::cout << NL << "result:";
-//  std::cout << NL << T << result.towels;
-//  std::cout << NL << T << result.designs;
   return result;
 }
 
 namespace test {
 
   using ExpectedDesignTowels = std::pair<aoc::raw::Line,aoc::raw::Lines>;
+
   std::ostream& operator<<(std::ostream& os,ExpectedDesignTowels const& expected) {
     os << "expected:" << std::quoted(expected.first);
     if (expected.second.size()>0) {
@@ -93,22 +93,17 @@ namespace test {
     }
     return os;
   }
-  // Adapt to expected for day puzzle
+
   struct Expected {
-    Model example{};
-    std::vector<ExpectedDesignTowels> expected_design_towels{};
-    bool operator==(Expected const& other) const {
-      bool result{true};
-      return result;
-    }
+    Towels available_towels{};
+    std::vector<ExpectedDesignTowels> expected_design_towels_v{};
   };
 
   std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     std::cout << NL << "Expected:";
-    std::cout << NL << T << entry.example;
-    for (auto const& expected : entry.expected_design_towels){
-      std::cout << NL << T << expected;
-      
+    std::cout << NL << T << "available towels:" << std::format("{}",entry.available_towels);
+    for (auto const& expected_design_towels : entry.expected_design_towels_v){
+      std::cout << NL << T << expected_design_towels;
     }
     return os;
   }
@@ -150,75 +145,12 @@ namespace test {
     return {design, towels};
   }
 
-
-  Expecteds to_expecteds(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
-    std::cout << NL << T << "to_expecteds";
-    Expecteds result{};
-    using namespace aoc::parsing;
-    Expected entry{};
-    std::string repaired{};
-    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-      std::cout << NL << "---------- section " << sx << " ----------";
-      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-        switch (sx) {
-            /*
-             ---------- section 13 ----------
-                 line[0]:28 "r, wr, b, g, bwu, rb, gb, br"
-             ---------- section 14 ----------
-                 line[0]:5 "brwrr"
-                 line[1]:4 "bggr"
-                 line[2]:4 "gbbr"
-                 line[3]:6 "rrbgbr"
-                 line[4]:4 "ubwu"
-                 line[5]:6 "bwurrg"
-                 line[6]:4 "brgr"
-                 line[7]:6 "bbrgwb"
-             */
-          case 13: {
-              for (auto const& untrimmed : line.splits(',')) {
-                entry.example.towels.push_back(untrimmed.trim());
-              }
-          } break;
-          case 14: {
-              entry.example.designs.push_back(line);
-          } break;
-          /*
-           ---------- section 18 ----------
-               line[0]:67 "     * brwrr can be made with a br towel, then a wr towel, and then"
-           ---------- section 19 ----------
-               line[0]:26 "       finally an r towel."
-           ---------- section 20 ----------
-               line[0]:74 "     * bggr can be made with a b towel, two g towels, and then an r towel."
-               line[1]:60 "     * gbbr can be made with a gb towel and then a br towel."
-               line[2]:48 "     * rrbgbr can be made with r, rb, g, and br."
-               line[3]:26 "     * ubwu is impossible."
-               line[4]:48 "     * bwurrg can be made with bwu, r, r, and g."
-               line[5]:42 "     * brgr can be made with br, g, and r."
-               line[6]:28 "     * bbrgwb is impossible."
-
-           */
-          case 18: {
-            repaired = line;
-          } break;
-          case 19: {
-            repaired += line;
-          } break;
-          case 20: {
-            if (repaired.size()>0) {
-              auto expected = to_expected_design_towels(repaired);
-              entry.expected_design_towels.push_back(expected);
-              repaired.clear();
-            }
-            auto expected = to_expected_design_towels(line);
-            entry.expected_design_towels.push_back(expected);
-          } break;
-          case 21: {} break;
-        }
-      }
-    }
-    result.push_back(entry);
-
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[13]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[14]));
     return result;
   }
 
@@ -273,40 +205,135 @@ namespace test {
 
   using Path = std::vector<Vertex>;
   std::vector<Path> to_paths(const Graph& graph, Vertex start, Vertex end) {
-//    std::cout << NL << "to_paths(graph:" << graph.size() << ",..)" << std::flush;
     std::vector<Path> allPaths;
     std::stack<std::pair<Vertex, Path>> stack;
     std::set<Path> seen{};
     
     stack.push({start, {start}});
     while (!stack.empty()) {
-//      std::cout << NL << stack.size() << std::flush;
       auto [current, path] = stack.top(); // a path to current
-      using aoc::raw::operator<<;
-      std::cout << NL << current << " " << path;
       stack.pop();
       if (current == end) {
-        std::cout << NL << NL << "END!";
         allPaths.push_back(path);
         continue;
       }
       seen.insert(path); // process each path only once
       if (not graph.contains(current)) break;
       for (const auto& [neighbor, weight] : graph.at(current)) {
-        using aoc::raw::operator<<;
         std::vector<Vertex> newPath = path;
         newPath.push_back(neighbor);
         if (seen.contains(newPath)) continue;
         stack.push({neighbor, newPath});
-//            std::cout << NL << T << current << " --> " << neighbor << " " << weight;
       }
 
     }
-//    std::cout << NL << "to_paths END" << std::flush;
     return allPaths;
   }
 
-  std::optional<Result> test0(Towels const&  towels,ExpectedDesignTowels const& expected) {
+  bool test0(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+    // This function is called by aoc::application if registered with add_test(test::test0)
+    // Extract test data from provided sections from the day web page text.
+    // See zsh-script pull_text.zsh for support to fetch advent of code day web page text to doc.txt
+    std::cout << NL << "test0";
+    if (opt_sections) {
+      auto const& sections = *opt_sections;
+      std::cout << NL << T << "sections ok";
+      auto examples = to_examples(sections);
+      if (examples.size()>0) {
+        bool result{};
+        std::cout << NL << T << "examples ok";
+        auto example_in = aoc::test::to_example_in(examples[0]);
+        auto example_model = parse(example_in);
+        std::cout << NL << std::format("\n{}",example_model);
+        
+        auto line = aoc::parsing::to_line(sections[18]).str();
+        line += aoc::parsing::to_line(sections[19]).str();
+        auto expected = to_expected_design_towels(line);
+                
+        auto const& available_towels = example_model.towels;
+        std::cout << NL << T << "available towels:" << std::format("{}",available_towels);
+        using test::operator<<;
+        std::cout << NL << T << expected;
+        auto design = expected.first;
+        auto graph = to_graph(design, available_towels);
+        auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
+        std::cout << NL << "paths:" << paths.size();
+        if (paths.size()>0) {
+          std::print(" {}",paths);
+          return true;
+        }
+        else {
+          std::cout << " impossible";
+        }
+        result = false;;
+      }
+      else {
+        std::cout << NL << T << "NO examples";
+      }
+    }
+    else {
+      std::cout << NL << T << "NO sections";
+    }
+    return false;
+  }
+
+  bool test1(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+    std::cout << NL << "test0";
+    if (opt_sections) {
+      auto const& sections = *opt_sections;
+      std::cout << NL << T << "sections ok";
+      auto examples = to_examples(sections);
+      if (examples.size()>0) {
+        bool result{true};
+        std::cout << NL << T << "examples ok";
+        auto example_in = aoc::test::to_example_in(examples[0]);
+        auto example_model = parse(example_in);
+        std::cout << NL << std::format("\n{}",example_model);
+        
+        std::vector<ExpectedDesignTowels> expected_design_towels_v{};
+
+        auto line = aoc::parsing::to_line(sections[18]).str();
+        line += aoc::parsing::to_line(sections[19]).str();
+        expected_design_towels_v.push_back(to_expected_design_towels(line));
+        for (auto const& line : sections[20]) {
+          expected_design_towels_v.push_back(to_expected_design_towels(line));
+        }
+                
+        auto const& available_towels = example_model.towels;
+        Integer acc{};
+        std::cout << NL << "available towels:" << std::format("{}",available_towels);
+        for (auto const& expected_design_towels : expected_design_towels_v) {
+          std::cout << NL << NL << std::format("expected: {}",expected_design_towels);
+          auto design = expected_design_towels.first;
+          auto graph = to_graph(design, available_towels);
+          auto paths = to_paths(graph, 0, static_cast<Vertex>(design.size()-1));
+          std::cout << NL << NL << T;
+          if (paths.size()>0) {
+            result = result and (0 < expected_design_towels.second.size());
+            std::print(" {} matches {}? {}",paths,expected_design_towels.second,result);
+            ++acc; // possible
+          }
+          else {
+            result = result and (0 == expected_design_towels.second.size());
+            std::print(" {} matches {}? {}",paths,expected_design_towels.second,result);
+          }
+        }
+        std::print("\nacc:{}",acc);
+        result = result and (acc == 6);
+        return result;
+      }
+      else {
+        std::cout << NL << T << "NO examples";
+      }
+    }
+    else {
+      std::cout << NL << T << "NO sections";
+    }
+    return false;
+  }
+
+
+  std::optional<Result> test0_old(Towels const&  towels,ExpectedDesignTowels const& expected) {
     Integer count{};
     std::cout << NL << NL << "test0:" << expected;
     using aoc::raw::operator<<;
@@ -324,70 +351,6 @@ namespace test {
       std::cout << " impossible";
     }
     return std::nullopt;
-  }
-
-  std::optional<Result> test1(Args args) {
-    std::optional<Result> result{};
-    std::cout << NL << NL << "test1";
-    Integer acc{};
-    auto doc = aoc::doc::parse_doc(args);
-    auto entries = test::to_expecteds(doc,0,args);
-    if (entries.size()==1) {
-      auto const& entry = entries.back();
-      auto const& towels = entry.example.towels;
-      for (auto const& expected : entry.expected_design_towels) {
-        if (auto answer = test0(towels,expected)) {
-          acc += 1;
-        }
-      }
-    }
-    else {
-      std::cerr << NL << "Sorry, expected only one entry to test from parsing doc.txt";
-    }
-    result = std::to_string(acc);
-    return result;
-  }
-
-  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
-    std::vector<aoc::raw::Lines> result{};
-    result.push_back({});
-    result.back().append_range(aoc::parsing::to_raw(sections[13]));
-    result.back().push_back("");
-    result.back().append_range(aoc::parsing::to_raw(sections[14]));
-    return result;
-  }
-
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::ostringstream response{};
-    std::cout << NL << NL << "test";
-    if (in) {
-      auto model = parse(in);
-      auto doc = aoc::doc::parse_doc(args);
-      auto examples = to_examples(doc);
-      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
-        if (args.options.contains("-to_example")) {
-          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
-          if (aoc::raw::write_to_file(example_file, example_lines)) {
-            response << "Created " << example_file;
-          }
-          else {
-            response << "Sorry, failed to create file " << example_file;
-          }
-        }
-        else {
-          std::ostringstream oss{};
-          aoc::raw::write_to(oss, example_lines);
-          std::istringstream example_in{oss.str()};
-          auto example_model = ::parse(example_in);
-          std::cout << NL << NL << "example_model:" << example_model;
-          auto log = test::to_expecteds(doc, ix,args);
-          /* Call tests here */
-          return test1(args);
-        }
-      }
-    }
-    if (response.str().size()>0) return response.str();
-    else return std::nullopt;
   }
 
 }
@@ -457,103 +420,31 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-
-    std::vector<std::string> parts = {"test", "1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
-    
-    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{""},"test",""}
-      ,{{""},"test","example.txt"}
-      ,{{""},"1","example.txt"}
-      ,{{""},"1","puzzle.txt"}
-      ,{{""},"2","example.txt"}
-      ,{{""},"2","puzzle.txt"}
-    };
-    
-    for (const auto& [options,part, file] : states) {
-      Args args;
-      args.options = options;
-      args.arg["part"] = part;
-      if (file.size()>0) args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (std::filesystem::is_regular_file(file) and in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_test("test0",test::test0);
+  app.add_test("test1",test::test1);
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
 
    Xcode Debug -O2
 
    >day_19 -all
-
-   ANSWERS
-   duration:0ms answer[test example.txt] 6
-   duration:10ms answer[part1 example.txt] 6
-   duration:0ms answer[part1 puzzle.txt] 276
-   duration:223ms answer[part2 example.txt] 16
-   duration:0ms answer[part2 puzzle.txt] 681226908011510
    
+   ANSWERS
+   duration:1ms answer[part:"test0"] PASSED
+   duration:3ms answer[part:"test1"] PASSED
+   duration:0ms answer[part 1 in:example.txt] 6
+   duration:230ms answer[part 1 in:puzzle.txt] 276
+   duration:0ms answer[part 2 in:example.txt] 16
+   duration:490ms answer[part 2 in:puzzle.txt] 681226908011510
+
    */
-  return 0;
+
 }
