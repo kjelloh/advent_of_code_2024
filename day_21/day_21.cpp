@@ -80,6 +80,19 @@ using aoc::grid::Position;
 
 namespace test {
 
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    //---------- section 33 ----------
+    //    line[0]:4 "029A"
+    //    line[1]:4 "980A"
+    //    line[2]:4 "179A"
+    //    line[3]:4 "456A"
+    //    line[4]:4 "379A"
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[33]));
+    return result;
+  }
+
   // Adapted to expected for day puzzle
   struct Expected {
     aoc::raw::Line code;
@@ -97,11 +110,9 @@ namespace test {
 
   using Expecteds = aoc::test::Expecteds<Expected>;
 
-  Expecteds parse(auto& doc_in) {
-    std::cout << NL << T << "test::parse";
+
+  Expecteds to_expecteds(aoc::parsing::Sections const& sections) {
     Expecteds result{};
-    using namespace aoc::parsing;
-    auto sections = Splitter{doc_in}.same_indent_sections();
     int target_sx{-1};
     for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
       std::cout << NL << "---------- section " << sx << " ----------";
@@ -197,9 +208,8 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test0(Args args) {
-    std::ostringstream oss{};
-    std::cout << NL << NL << "test0";
+  bool test0(std::optional<aoc::parsing::Sections> const& opt_sections,Args const& args) {
+    bool result{true};
     //    For example, to make the robot type 029A on the numeric keypad, one sequence of inputs on the directional keypad you could use is:
     //
     //    < to move the arm from A (its initial position) to 0.
@@ -216,7 +226,7 @@ namespace test {
     
     std::string code{"029A"};
     auto computed = to_remote_press_options(keypad,code);
-    std::set<std::string> expected = {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"}; // CTAD :)
+    std::set<std::string> expected = {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"};
     std::print("\ncomputed:{} expected:{}",computed,expected);
     if (computed.size() == expected.size()) {
       if (std::all_of(computed.begin(), computed.end(), [&expected](std::string const& option) {
@@ -226,23 +236,22 @@ namespace test {
         }
         return true;
       })) {
-        std::print(oss,"{} -> {} (file ignored) OK",code,expected);
+        std::print("{} -> {} (file ignored) OK",code,expected);
       }
       else {
-        std::print(oss,"FAILED");
+        std::print("FAILED");
+        result = false;
       }
     }
     else {
       if (computed.size() < expected.size()) {
-        std::print(oss,"Computed too few");
+        std::print("Computed too few");
       }
       else {
-        std::print(oss,"Computed too many");
+        std::print("Computed too many");
       }
     }
-
-    if (oss.str().size()>0) return oss.str();
-    return std::nullopt;
+    return result;
   }
 
   int to_num_part(std::string const& code) {
@@ -255,63 +264,47 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test1(auto& in, Args args) {
-    std::optional<Result> result{};
-    aoc::raw::Lines answers{};
-    std::cout << NL << NL << "test1";
-    if (in) {
-      auto model = ::parse(in);
-      std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
-      if (doc_in) {
-        auto expecteds = test::parse(doc_in);
-        using aoc::test::operator<<;
-        std::cout << NL << expecteds;
-        aoc::grid::Grid keypad({
-           "789"
-          ,"456"
-          ,"123"
-          ," 0A"
-        });
-        aoc::grid::Grid remote({
-           " ^A"
-          ,"<v>"
-        });
-        
-        // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
-        // that is the shortest one!
-        bool all_did_pass{true};
-        Integer acc{};
-        for (Expected const& entry : expecteds) {
-          auto code = entry.code;
-          auto to_press_1 = to_remote_press_options(keypad,code);
-          auto to_press_2 = to_remote_press_options(remote, to_press_1);
-          auto to_press_3 = to_remote_press_options(remote, to_press_2);
-          std::print("\ncomputed:{}",to_press_3);
-          std::print("\nexpect:{}",entry.expected_presses);
-          auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
-          all_did_pass = all_did_pass and (iter != to_press_3.end());
-          if (not all_did_pass) break;
-          acc += to_num_part(code) * to_press_3.back().size();
-        }
-        if (not all_did_pass) {
-          return "FAILED";
-        }
-        if (acc == 126384) return std::format("Five code example (file ignored) -> Complexity 126384 OK");
-        else return "FAILED";
+  bool test1(std::optional<aoc::parsing::Sections> const& opt_sections,Args const& args) {
+    if (opt_sections) {
+      auto const& sections = *opt_sections;
+      auto expecteds = to_expecteds(sections);
+      using aoc::test::operator<<;
+      std::cout << NL << expecteds;
+      aoc::grid::Grid keypad({
+         "789"
+        ,"456"
+        ,"123"
+        ," 0A"
+      });
+      aoc::grid::Grid remote({
+         " ^A"
+        ,"<v>"
+      });
+      
+      // Shoot! We need to examine all possible moves from robot to see what path the next robot can take
+      // that is the shortest one!
+      Integer acc{};
+      bool result{true};
+      for (Expected const& entry : expecteds) {
+        auto code = entry.code;
+        auto to_press_1 = to_remote_press_options(keypad,code);
+        auto to_press_2 = to_remote_press_options(remote, to_press_1);
+        auto to_press_3 = to_remote_press_options(remote, to_press_2);
+        std::print("\ncomputed:{}",to_press_3);
+        std::print("\nexpect:{}",entry.expected_presses);
+        auto iter = std::find(to_press_3.begin(), to_press_3.end(), entry.expected_presses);
+        result = result and (iter != to_press_3.end());
+        if (not result) break;
+        acc += to_num_part(code) * to_press_3.back().size();
       }
+      if (result = result and (acc == 126384);result) {
+        std::print("\nFive code example -> Complexity 126384 OK");
+      }
+      if (not result) std::print("\nFAILED");
+      return result;
     }
-    return result;
-  }
-
-  std::optional<Result> solve_for(std::istream& in,Args args) {
-    std::optional<Result> result{};
-    std::cout << NL << NL << "test";
-    if (args.arg["part"] == "test0") return test0(args);
-    else if (args.arg["part"] == "test1") return test1(in,args);
-    else {
-      return std::format("Sorry, Unknown 'part' \"{}\"",args.arg["part"] );
-    }
-    return std::nullopt;
+    else std::print("\nNo sections (did you pull_text.zsh and does doc.txt exist with day web page text?)");
+    return false;
   }
 }
 
@@ -397,7 +390,7 @@ namespace part2 {
         auto const& [second_pos,second] = *std::next(key_map.begin(),j);
         Step step{first,second};
         result[step] = to_move_options(pad, first_pos, second_pos);
-        std::print("\nstep:{} options:{}",step,result[step]);
+        std::print("\nstep:{} options:{}",step,result[step]); std::cout << std::flush;
       }
     }
     return result;
@@ -872,10 +865,13 @@ namespace part2 {
       for (auto const& [step,moves] : to_move_options_map(remote)) move_options[step] = moves;
       
       int ROBOT_STACK_HEIGHT{25};
+      if (not args.arg.contains("file")) {
+        std::cout << NL << "No File?!";
+      }
       if (args.arg.at("file") == "example.txt") ROBOT_STACK_HEIGHT=2;
       
       if (false) {
-        // test single digit to see how it exapnds
+        // test single digit to see how it expands
         return std::to_string(to_shortest_possible_sequences_length("029A",move_options,2));
       }
       
@@ -889,97 +885,37 @@ namespace part2 {
       if (acc>0) result = std::to_string(acc);
 
     }
-    return result; // 2381545 too low
+    return result;
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-
-    std::vector<std::string> parts = {"test0","test1","1", "2"};
-    std::vector<std::string> files = {"example.txt", "puzzle.txt"};
-    
-    for (const auto& [part, file] : aoc::algo::cartesian_product(parts, files)) {
-      if (part.starts_with("test") and file.starts_with("puzzle")) continue;
-      Args args;
-      args.arg["part"] = part;
-      args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_test("test0",test::test0);
+  app.add_test("test1",test::test1);
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
 
    Xcode Debug -O2
-
+   
+   For my input:
+            
    >day_21 -all
-      
+         
    ANSWERS
-   duration:3ms answer[test0 example.txt] 029A -> {"<A^A>^^AvvvA", "<A^A^>^AvvvA", "<A^A^^>AvvvA"} (file ignored) OK
-   duration:6921ms answer[test1 example.txt] Five code example (file ignored) -> Complexity 126384 OK
-   duration:5897ms answer[part1 example.txt] 126384
-   duration:82107ms answer[part1 puzzle.txt] 179444
-   duration:7ms answer[part2 example.txt] 126384
-   duration:44ms answer[part2 puzzle.txt] 223285811665866
+   duration:2ms answer[part:"test0"] PASSED
+   duration:6961ms answer[part:"test1"] PASSED
+   duration:5951ms answer[part 1 in:example.txt] 126384
+   duration:80721ms answer[part 1 in:puzzle.txt] 179444
+   duration:6ms answer[part 2 in:example.txt] 126384
+   duration:46ms answer[part 2 in:puzzle.txt] 223285811665866
    
    */
-  return 0;
+
 }
