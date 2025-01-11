@@ -82,7 +82,7 @@ namespace test {
     return result;
   }
 
-  aoc::application::ExpectedTeBool test0(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+  aoc::application::ExpectedTeBool test(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
     // This function is called by aoc::application if registered with add_test(test::test0)
     // Extract test data from provided sections from the day web page text.
     // See zsh-script pull_text.zsh for support to fetch advent of code day web page text to doc.txt
@@ -141,7 +141,7 @@ namespace part2 {
 int main(int argc, char *argv[]) {
   aoc::application app{};
   app.add_to_examples(test::to_examples);
-  app.add_test("test0",test::test0);
+  app.add_test("test",test::test);
   app.add_solve_for("1",part1::solve_for,"example.txt");
   app.add_solve_for("1",part1::solve_for,"puzzle.txt");
   app.add_solve_for("2",part2::solve_for,"example.txt");
