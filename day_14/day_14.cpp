@@ -45,7 +45,7 @@ std::optional<std::filesystem::path> get_working_dir() {
 using namespace aoc::raw;
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 
 using aoc::xy::Vector;
 using aoc::xy::Vectors;
@@ -178,7 +178,7 @@ namespace part1 {
       auto transformed = to_stepped(model, width, height, STEPS);
       std::cout << NL << to_grid(transformed,width,height);
       
-      std::array<Result,4> acc{};
+      std::array<Integer,4> acc{};
       auto in_quadrant = [width,height](Robot const& robot,int ix){
         // assume odd width and height
         auto ghosted_col = width / 2; // 11 -> 6, 101 -> 51
@@ -208,7 +208,7 @@ namespace part1 {
         std::cout << NL << T << "acc[" << i << "]:" << acc[i-1];
       }
 
-      result = acc[0]*acc[1]*acc[2]*acc[3];
+      result = std::to_string(acc[0]*acc[1]*acc[2]*acc[3]);
         
     }
     return result;
@@ -288,7 +288,7 @@ namespace part2 {
   };
 
   bool no_overlaps(Robots const& robots) {
-    std::map<Vector,Result> seen{}; // Count overlaps
+    std::map<Vector,Integer> seen{}; // Count overlaps
     for (auto const& robot : robots) {
       if (++seen[robot.first] > 1) return false;
     }
@@ -302,19 +302,23 @@ namespace part2 {
       auto model = parse(in);
       auto [width,height] = to_bottom_right(model);
       std::cout << NL << to_grid(model, width, height);
-      // Each robot travels the same path over and over.
-      // Maybe it visist only a subset of all possble positions in its path?
       auto transformed = model;
+      Integer acc{0};
       for (int i=0;true;++i) {
-//        if (i % 1000 == 0) std::cout << NL << i;
         transformed = to_stepped(transformed, width, height, 1); // try i steps
+        // From web discussions and YT - Maybe the tree is shown when all robots are spread out?
+        // That is, no robot share the location with any other robot.
+        // It turns out that works. In hindsight it also makes sense.
+        // They start out (or end up) in the 'Tree position', and then over time
+        // they walk all over the place with several robots sharing locations.
         if (no_overlaps(transformed)) {
-          result = i+1;
+          acc = i+1;
           break;
         }
       }
-      if (result and *result > 0) {
-        std::cout << NL << NL << "SUCCESS after " << *result << " steps";
+      if (acc > 0) {
+        result = std::to_string(acc);
+        std::cout << NL << NL << "SUCCESS after " << acc << " steps";
         std::cout << NL << to_grid(transformed, width, height);
       }
     }
@@ -322,92 +326,25 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-    
-    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{},"1","example.txt"}
-      ,{{},"1","puzzle.txt"}
-      ,{{},"2","puzzle.txt"}
-    };
-    
-    for (const auto& [options,part, file] : states) {
-      Args args;
-      if (options.size()>0) args.options = options;
-      args.arg["part"] = part;
-      if (file.size()>0) args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
-
+            
    Xcode Debug -O2
 
    >day_ -all
-      
+         
    ANSWERS
-   duration:2ms answer[part1 example.txt] 12
-   duration:32ms answer[part1 puzzle.txt] 222208000
-   duration:639ms answer[part2 puzzle.txt] 7623
-   
+   duration:2ms answer[part 1 in:example.txt] 12
+   duration:33ms answer[part 1 in:puzzle.txt] 222208000
+   duration:646ms answer[part 2 in:puzzle.txt] 7623
+
    */
   return 0;
+
 }
