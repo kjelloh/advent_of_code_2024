@@ -456,6 +456,33 @@ Model parse(auto& in) {
 
 namespace test {
 
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+    //---------- section 37 ----------
+    //    line[0]:15 "Register A: 729"
+    //    line[1]:13 "Register B: 0"
+    //    line[2]:13 "Register C: 0"
+    //---------- section 38 ----------
+    //    line[0]:20 "Program: 0,1,5,4,3,0"
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[37]));
+    result.back().push_back("");
+    result.back().append_range(aoc::parsing::to_raw(sections[38]));
+    if (sections.size()>46) {
+    //---------- section 46 ----------
+    //    line[0]:16 "Register A: 2024"
+    //    line[1]:13 "Register B: 0"
+    //    line[2]:13 "Register C: 0"
+    //---------- section 47 ----------
+    //    line[0]:20 "Program: 0,3,5,4,3,0"
+      result.push_back({});
+      result.back().append_range(aoc::parsing::to_raw(sections[46]));
+      result.back().push_back("");
+      result.back().append_range(aoc::parsing::to_raw(sections[47]));
+    }
+    return result;
+  }
+
   // Adapt to expected for day puzzle
   struct Expected {
     Computer before;
@@ -470,35 +497,56 @@ namespace test {
   };
 
   std::ostream& operator<<(std::ostream& os,Expected const& entry) {
-    os << " log entry:";
+    os << " Expected:";
     os << NL << T << " before:" << entry.before;
     os << NL << T << " after:";
     if (entry.after) os << *entry.after;
     else os << "?";
     os << NL << T << " output:";
     if (entry.output) os << std::quoted(*entry.output);
-    else os << "?";
+    else os << "void";
     return os;
   }
 
   using Expecteds = aoc::test::Expecteds<Expected>;
 
-  Expecteds parse0(auto& in) {
-    std::cout << NL << T << "test::parse";
+  Expecteds to_expecteds(aoc::parsing::Sections const& sections) {
     Expecteds result{};
     using namespace aoc::parsing;
-    auto input = Splitter{in};
-    auto lines = input.lines();
+    aoc::raw::Lines lines{};
+    //---------- section 26 ----------
+    //    line[0]:72 "     * If register C contains 9, the program 2,6 would set register B to"
+    //---------- section 27 ----------
+    //    line[0]:9 "       1."
+    //---------- section 28 ----------
+    //    line[0]:70 "     * If register A contains 10, the program 5,0,5,1,5,4 would output"
+    //---------- section 29 ----------
+    //    line[0]:13 "       0,1,2."
+    //---------- section 30 ----------
+    //    line[0]:72 "     * If register A contains 2024, the program 0,1,5,4,3,0 would output"
+    //---------- section 31 ----------
+    //    line[0]:55 "       4,2,5,6,7,7,7,7,3,1,0 and leave 0 in register A."
+    //---------- section 32 ----------
+    //    line[0]:73 "     * If register B contains 29, the program 1,7 would set register B to"
+    //---------- section 33 ----------
+    //    line[0]:10 "       26."
+    //---------- section 34 ----------
+    //    line[0]:69 "     * If register B contains 2024 and register C contains 43690, the"
+    //---------- section 35 ----------
+    //    line[0]:49 "       program 4,0 would set register B to 44354."
+
+    // 1) Glue together the entries of the bullet list of examples
+    for (int i=26;i<=34;i+=2) {
+      lines.push_back(to_line(sections[i]));
+      lines.back() += " ";
+      lines.back() += to_line(sections[i+1]).trim();
+    }
+
+    // parse the entries of the bullte list for stated expecteds
     std::cout << NL << T << lines.size() << " lines";
     for (int i=0;i<lines.size();++i) {
       auto raw_line = to_raw(lines[i]);
       std::cout << NL << T << T << "line[" << i << "]:" << raw_line.size() << " " << std::quoted(raw_line);
-      //        If register C contains 9, the program 2,6 would set register B to 1.
-      //        If register A contains 10, the program 5,0,5,1,5,4 would output 0,1,2.
-      //        If register A contains 2024, the program 0,1,5,4,3,0 would output 4,2,5,6,7,7,7,7,3,1,0 and leave 0 in register A.
-      //        If register B contains 29, the program 1,7 would set register B to 26.
-      //        If register B contains 2024 and register C contains 43690, the program 4,0 would set register B to 44354
-
       Registers reg_before{};
       {
         std::regex pattern(R"(register ([A-Z]) contains (\d+))");
@@ -566,69 +614,49 @@ namespace test {
       if (output.size()>0) entry.output = output;
       result.push_back(entry);
     }
-//    using aoc::test::operator<<;
-//    std::cout << NL << "test::parse0:" << result.size() << result;
     return result;
   }
 
-  Expected parse1(auto& in,auto& log_in) {
-    std::cout << NL << T << "test::parse";
-    using namespace aoc::parsing;
-    auto model = ::parse(in);
-    Computer computer{model.registers,model.memory};
-    auto log_input = Splitter{log_in}.trim();
-    Expected entry{computer,{},to_raw(log_input)};
-    return entry;
+  aoc::application::ExpectedTeBool test0(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+    // If register C contains 9, the Memory 2,6 would set register B to 1.
+    Registers reg{{'C',9}};
+    Memory memory{2,6};
+    Computer pc{reg,memory};
+    std::cout << NL << pc.run();
+    std::cout << NL << pc.m_cpu;
+    return (pc.m_cpu.m_reg['B'] == 1);
   }
 
-
-  std::optional<Result> test0(Args args) {
-    std::optional<Result> result{};
-    std::cout << NL << NL << "test0";
-    std::ifstream log_in{aoc::to_working_dir_path("example0.log")};
-    if (false) {
-      // If register C contains 9, the Memory 2,6 would set register B to 1.
-      Registers reg{{'C',9}};
-      Memory memory{2,6};
-      Computer pc{reg,memory};
-      auto output = pc.run();
-    }
-    else if (log_in) {
-      auto log = test::parse0(log_in);
-      bool failed{};
-      int count{};
-      for (auto const& logged : log) {
-        std::cout << NL << "--------------------";
-        std::cout << NL << "processing:" << logged;
-        Computer pc{logged.before};
-        auto output = pc.run();
-        Expected computed{logged.before,pc,output};
-        std::cout << NL << "--------------------";
-        std::cout << computed;
-        if ((logged.after and computed.after) and  (*logged.after != *computed.after)) {
-          std::cout << NL << "logged.after DIFFERS from computed.after - FAILED";
-          failed = true;
-          break;
-        }
-        if ((logged.output and computed.output) and (*logged.output != *computed.output)) {
-          std::cout << NL << "logged.output DIFFERS from computed.output - FAILED";
-          failed = true;
-          break;
-        }
-        std::cout << NL << "logged == computed OK";
+  aoc::application::ExpectedTeBool test1(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+    if (not opt_sections) return std::unexpected("doc.txt required");
+    auto const& sections = *opt_sections;
+    std::cout << NL << T << "sections ok";
+    Expecteds log = to_expecteds(sections);
+    bool failed{};
+    int count{};
+    for (auto const& logged : log) {
+      std::cout << NL << "--------------------";
+      std::cout << NL << "processing:" << logged;
+      Computer pc{logged.before};
+      auto computed_output = pc.run();
+      Expected computed{logged.before,pc,computed_output};
+      std::cout << NL << "--------------------";
+      std::cout << NL << "computed:" << computed;
+      if ((logged.after and computed.after) and  (*logged.after != *computed.after)) {
+        std::cout << NL << "logged.after DIFFERS from computed.after - FAILED";
+        failed = true;
+        break;
       }
-      if (failed) result = "FAILED";
-      else result = "passed";
+      if ((logged.output and computed.output) and (*logged.output != *computed.output)) {
+        std::cout << NL << "logged.output DIFFERS from computed.output - FAILED";
+        failed = true;
+        break;
+      }
+      std::cout << NL << "logged == computed OK";
     }
-    return result;
+    return not failed;
   }
 
-  std::optional<Result> solve_for(auto& in,Args args) {
-    std::optional<Result> result;
-    auto part = args.arg["part"];
-    if (part == "test0") return test0(args);
-    return result;
-  }
 }
 
 namespace part1 {
@@ -648,7 +676,7 @@ namespace part1 {
 namespace part2 {
 
   // Recursive function to solve best a that makes f(a_next) = ouput[index]
-  Integer solve_for(std::vector<int> const& output, int index, Integer a_current, auto const& f) {
+  Integer dfs(std::vector<int> const& output, int index, Integer a_current, auto const& f) {
 
     if (index < 0) return a_current; // end loop of program counting down
     
@@ -681,19 +709,18 @@ namespace part2 {
       Integer a_next = a_current * 8 + i;
       if (f(a_next) == output[index]) {
         // Recurse only for accepted candidates
-        best_a = std::min(best_a, solve_for(output, index - 1, a_next, f));
+        best_a = std::min(best_a, dfs(output, index - 1, a_next, f));
       }
     }
     
-    return best_a; //  13427091588403 too low
-                   // 107416732707226
+    return best_a;
   }
 
   // Wrapper function to initiate the recursion
   Integer find_lowest_a(const std::vector<int>& output, auto const& f) {
     if (output.empty()) return std::numeric_limits<Integer>::max();
     auto start_index = static_cast<int>(output.size() - 1); // program loop count
-    return solve_for(output,start_index,0,f);
+    return dfs(output,start_index,0,f);
   }
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
@@ -724,104 +751,34 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-    
-    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{},"test0","example.txt"}
-      ,{{},"1","example.txt"}
-      ,{{},"1","example2.txt"}
-      ,{{},"1","puzzle.txt"}
-      ,{{},"2","example.txt"}
-      ,{{},"2","example2.txt"}
-      ,{{},"2","puzzle.txt"}
-    };
-    
-    for (const auto& [options,part, file] : states) {
-      Args args;
-      if (options.size()>0) args.options = options;
-      args.arg["part"] = part;
-      if (file.size()>0) args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_test("test0",test::test0);
+  app.add_test("test1",test::test1);
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example1.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
 
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
   /*
-   
+
    Xcode Debug -O2
 
    ./day_17 -all
    
-   duration:6ms answer[test0 example.txt] passed
-   duration:0ms answer[part1 example.txt] 4,6,3,5,6,3,5,2,1,0
-   duration:0ms answer[part1 example2.txt] 5,7,3,0
-   duration:1ms answer[part1 puzzle.txt] 2,1,3,0,5,2,3,7,1
-   duration:2ms answer[part2 example.txt] 29328
-   duration:9ms answer[part2 example2.txt] 117440
-   duration:233ms answer[part2 puzzle.txt] 107416732707226
+   ANSWERS
+   duration:0ms answer[part:"test0"] PASSED
+   duration:5ms answer[part:"test1"] PASSED
+   duration:1ms answer[part 1 in:example.txt] 4,6,3,5,6,3,5,2,1,0
+   duration:1ms answer[part 1 in:puzzle.txt] 2,1,3,0,5,2,3,7,1
+   duration:9ms answer[part 2 in:example1.txt] 117440
+   duration:233ms answer[part 2 in:puzzle.txt] 107416732707226
    
-      
    */
 
   return 0;
+
 }
