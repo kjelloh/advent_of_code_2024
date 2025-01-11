@@ -35,6 +35,18 @@ using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64
 using Result = std::string;
 using Model = Grid;
 
+template <>
+struct std::formatter<Model> : std::formatter<std::string> {
+  template<class FmtContext>
+  FmtContext::iterator format(Model const& model, FmtContext& ctx) const {
+    std::ostringstream oss{};
+    using aoc::grid::operator<<;
+    oss << model;
+    std::format_to(ctx.out(),"\n{}",oss.str());
+    return ctx.out();
+  }
+};
+
 Model parse(auto& in) {
   using namespace aoc::parsing;
   auto input = Splitter{in};
@@ -47,12 +59,12 @@ using aoc::Args;
 
 namespace test {
 
-  struct LogEntry {
+  struct Expected {
     Grid grid;
     Integer score{};
     std::optional<Integer> steps{};
     std::optional<Integer> turns{};
-    bool operator==(LogEntry const& other) const {
+    bool operator==(Expected const& other) const {
       bool result{true};
       result = result and (grid == other.grid);
       result = result and (score == other.score);
@@ -62,7 +74,7 @@ namespace test {
     }
   };
 
-  std::ostream& operator<<(std::ostream& os,LogEntry const& entry) {
+  std::ostream& operator<<(std::ostream& os,Expected const& entry) {
     os << " score:" << entry.score;
     os << " steps:";
     if (entry.steps) os << *entry.steps;
@@ -74,8 +86,8 @@ namespace test {
     os << NL << "Grid:" << NL << entry.grid;
     return os;
   }
-  using LogEntries = std::vector<LogEntry>;
-  std::ostream& operator<<(std::ostream& os,LogEntries const& log) {
+  using Expecteds = std::vector<Expected>;
+  std::ostream& operator<<(std::ostream& os,Expecteds const& log) {
     for (auto const& entry : log) {
       os << NL << entry;
     }
@@ -83,8 +95,8 @@ namespace test {
   }
 
   struct Outcome {
-    LogEntry expected;
-    LogEntry deduced;
+    Expected expected;
+    Expected deduced;
   };
 
   std::ostream& operator<<(std::ostream& os,Outcome const& outcome) {
@@ -132,32 +144,15 @@ namespace test {
     return os;
   }
 
-  aoc::parsing::Sections parse_doc(Args const& args) {
-    std::cout << NL << T << "parse puzzle doc text";
-    aoc::parsing::Sections result{};
-    using namespace aoc::parsing;
-    std::ifstream doc_in{aoc::to_working_dir_path("doc.txt")};
-    auto sections = Splitter{doc_in}.same_indent_sections();
-    for (auto const& [sx,section] : aoc::views::enumerate(sections)) {
-      std::cout << NL << "---------- section " << sx << " ----------";
-      result.push_back(section);
-      for (auto const& [lx,line] : aoc::views::enumerate(section)) {
-        std::cout << NL << T << T << "line[" << lx << "]:" << line.size() << " " << std::quoted(line.str());
-      }
-    }
-    return result;
-  }
-
   std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
     std::vector<aoc::raw::Lines> result{};
     result.push_back(aoc::parsing::to_raw(sections[11]));
     result.push_back(aoc::parsing::to_raw(sections[15]));
     return result;
   }
-
   
-  LogEntries to_log_entries(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
-    LogEntries result{};
+  Expecteds to_expecteds(aoc::parsing::Sections const& sections,auto config_ix,Args const& args) {
+    Expecteds result{};
         
     if (config_ix == 0) {
       // config_ix 0
@@ -296,83 +291,50 @@ namespace test {
     return result;
   }
 
-  std::optional<Result> test1(Model const& model,LogEntries const& log, Args args) {
-    std::ostringstream response{};
-    std::cout << NL << NL << "test1";
+  aoc::application::ExpectedTeBool test1(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
+    std::cout << NL << "test0";
+    if (not opt_sections) return std::unexpected("doc.txt required");
+    auto const& sections = *opt_sections;
+    std::cout << NL << T << "sections ok";
+    auto examples = to_examples(sections);
+    if (examples.size()==0) return std::unexpected("example from doc.txt required");
+    std::cout << NL << T << "examples ok";
+    auto example_in = aoc::test::to_example_in(examples[0]);
+    auto example_model = parse(example_in);
+    std::cout << NL << std::format("\n{}",example_model);
+
+    // return test result here
+    auto start = example_model.find('S');
+    auto end = example_model.find('E');
+    auto expecteds = to_expecteds(sections,0,args);
+    if (expecteds.size()==0) return std::unexpected("No expecteds");
+    auto const&  expected = expecteds[0];
     
-    auto start = model.find('S');
-    auto end = model.find('E');
+    auto deduced_path = aoc::doc::to_marked_path(start, expected.grid, [](char ch){
+      std::set<char> const PATH_MARK{'S','<','^','>','v','E'};
+      return PATH_MARK.contains(ch);
+    });
+    std::cout << NL << "Deduced path:" << deduced_path;
+    auto deduced_turns = to_turns(deduced_path);
+    std::cout << NL << "Deduced turns:" << deduced_turns;
+    auto deduced_score = to_score(deduced_path,deduced_turns);
+    std::cout << NL << "deduced score:" << deduced_score;
     
-    if (log.size() == 1) {
-      // Extract the exposed solution path from log
-      auto expected = log[0];
-      auto deduced_path = aoc::doc::to_marked_path(start, expected.grid, [](char ch){
-        std::set<char> const PATH_MARK{'S','<','^','>','v','E'};
-        return PATH_MARK.contains(ch);
-      });
-      std::cout << NL << "Deduced path:" << deduced_path;
-      auto deduced_turns = to_turns(deduced_path);
-      std::cout << NL << "Deduced turns:" << deduced_turns;
-      auto deduced_score = to_score(deduced_path,deduced_turns);
-      std::cout << NL << "deduced score:" << deduced_score;
-      
-      auto best_path = to_best_path(start, end, model);
-      std::cout << NL << "best_path:" << best_path;
-      auto best_turns = to_turns(best_path);
-      using test::operator<<;
-      std::cout << NL << "best_turns:" << best_turns;
-      auto best_score = to_score(best_path,best_turns);
-      std::cout << NL << "best_score:" << best_score;
+    auto best_path = to_best_path(start, end, example_model);
+    std::cout << NL << "best_path:" << best_path;
+    auto best_turns = to_turns(best_path);
+    using test::operator<<;
+    std::cout << NL << "best_turns:" << best_turns;
+    auto best_score = to_score(best_path,best_turns);
+    std::cout << NL << "best_score:" << best_score;
 
-      Grid grid = model;
-      aoc::grid::to_dir_traced(grid, best_path);
-      LogEntry best{grid,best_score,best_path.size()-1
-        ,best_turns.size()};
-      Outcome outcome{expected,best};
-      std::cout << NL << outcome;
-      if (outcome.expected == outcome.deduced) response << " PASSED";
-      else response << " failed";
-    }
-    else {
-      std::cout << NL << "UNEXPECTED: Read Log expected to have one entry, entires:" << log.size();
-    }
-    if (response.str().size() > 0) return response.str();
-    return std::nullopt;
-  }
-
-
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
-    std::ostringstream response{};
-    std::cout << NL << NL << "test";
-    if (in) {
-      auto model = parse(in);
-      auto doc = parse_doc(args);
-      auto examples = to_examples(doc);
-      for (auto const& [ix,example_lines] : aoc::views::enumerate(examples)) {
-        if (args.options.contains("-to_example")) {
-          auto example_file = aoc::to_working_dir_path(std::format("example{}.txt",ix));
-          if (aoc::raw::write_to_file(example_file, example_lines)) {
-            response << "Created " << example_file;
-          }
-          else {
-            response << "Sorry, failed to create file " << example_file;
-          }
-        }
-        else {
-          std::ostringstream oss{};
-          aoc::raw::write_to(oss, example_lines);
-          std::istringstream example_in{oss.str()};
-          auto example_model = ::parse(example_in);
-          std::cout << NL << NL << "example_model:" << example_model;
-          auto log = test::to_log_entries(doc, ix,args);
-          if (auto result = test1(example_model,log,args)) {
-            response << *result;
-          }
-        }
-      }
-    }
-    if (response.str().size()>0) return response.str();
-    else return std::nullopt;
+    Grid grid = example_model;
+    aoc::grid::to_dir_traced(grid, best_path);
+    Expected best{grid,best_score,best_path.size()-1
+      ,best_turns.size()};
+    Outcome outcome{expected,best};
+    std::cout << NL << outcome;
+    return (outcome.expected == outcome.deduced);
   }
 
 }
@@ -555,86 +517,19 @@ namespace part2 {
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-
-std::vector<Args> to_requests(Args const& args) {
-  std::vector<Args> result{};
-  result.push_back(args); // No fancy for now
-  return result;
-}
-
 int main(int argc, char *argv[]) {
-  Args user_args{};
-  
-  // Override by any user input
-  for (int i=1;i<argc;++i) {
-    user_args.arg["file"] = "example.txt";
-    std::string token{argv[i]};
-    if (token.starts_with("-")) user_args.options.insert(token);
-    else {
-      // assume options before <part> and <file>
-      auto non_option_index = i - user_args.options.size(); // <part> <file>
-      switch (non_option_index) {
-        case 1: user_args.arg["part"] = token; break;
-        case 2: user_args.arg["file"] = token; break;
-        default: std::cerr << NL << "Unknown argument " << std::quoted(token);
-      }
-    }
-  }
-  
-  auto requests = to_requests(user_args);
-  
-  if (not user_args or user_args.options.contains("-all")) {
-    requests.clear();
-    
-    std::vector<std::tuple<std::set<std::string>,std::string,std::string>> states{
-       {{},"test","example.txt"}
-      ,{{},"1","example.txt"}
-      ,{{},"1","puzzle.txt"}
-      ,{{},"2","example.txt"}
-      ,{{},"2","puzzle.txt"}
-    };
-    
-    for (const auto& [options,part, file] : states) {
-      Args args;
-      if (options.size()>0) args.options = options;
-      args.arg["part"] = part;
-      if (file.size()>0) args.arg["file"] = file;
-      requests.push_back(args);
-    }
-  }
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_test("test1",test::test1);
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"example1.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"example1.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
 
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  for (auto request : requests) {
-    auto part = request.arg["part"];
-    auto file = aoc::to_working_dir_path(request.arg["file"]);
-    std::cout << NL << "Using part:" << part << " file:" << file;
-    std::ifstream in{file};
-    if (in) {
-      if (part=="1") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part1::solve_for(in,request)});
-      }
-      else if (part=="2") {
-        answers.push_back({std::format("part{} {}",part,file.filename().string()),part2::solve_for(in,request)});
-      }
-      else if (part.starts_with("test")) {
-        answers.push_back({std::format("{} {}",part,file.filename().string()),test::solve_for(in,request)});
-      }
-    }
-    else std::cerr << "\nSORRY, no file " << file;
-    exec_times.push_back(std::chrono::system_clock::now());
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
   /*
 
    Xcode Debug -O2
@@ -642,12 +537,15 @@ int main(int argc, char *argv[]) {
    >day_16 -all
          
    ANSWERS
-   duration:10ms answer[test example.txt]  PASSED PASSED
-   duration:1ms answer[part1 example.txt] 7036
-   duration:109ms answer[part1 puzzle.txt] 95476
-   duration:7ms answer[part2 example.txt] 45
-   duration:3576ms answer[part2 puzzle.txt] 511
-
+   duration:4ms answer[part:"test1"] PASSED
+   duration:2ms answer[part 1 in:example.txt] 7036
+   duration:2ms answer[part 1 in:example1.txt] 11048
+   duration:110ms answer[part 1 in:puzzle.txt] 95476
+   duration:7ms answer[part 2 in:example.txt] 45
+   duration:6ms answer[part 2 in:example1.txt] 64
+   duration:3578ms answer[part 2 in:puzzle.txt] 511
+   
    */
   return 0;
+
 }
