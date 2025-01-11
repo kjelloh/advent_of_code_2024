@@ -82,30 +82,21 @@ namespace test {
     return result;
   }
 
-  bool test0(std::optional<aoc::parsing::Sections> const& sections,Args args) {
+  aoc::application::ExpectedTeBool test0(std::optional<aoc::parsing::Sections> const& opt_sections,Args args) {
     // This function is called by aoc::application if registered with add_test(test::test0)
     // Extract test data from provided sections from the day web page text.
     // See zsh-script pull_text.zsh for support to fetch advent of code day web page text to doc.txt
     std::cout << NL << "test0";
-    if (sections) {
-      std::cout << NL << T << "sections ok";
-      auto examples = to_examples(*sections);
-      if (examples.size()>0) {
-        std::cout << NL << T << "examples ok";
-        auto example_in = aoc::test::to_example_in(examples[0]);
-        auto example_model = parse(example_in);
-        std::cout << NL << std::format("\n{}",example_model);
-        
-        // return test result here
-        
-      }
-      else {
-        std::cout << NL << T << "NO examples";
-      }
-    }
-    else {
-      std::cout << NL << T << "NO sections";
-    }
+    if (not opt_sections) return std::unexpected("doc.txt required");
+    auto const& sections = *opt_sections;
+    std::cout << NL << T << "sections ok";
+    auto examples = to_examples(sections);
+    if (examples.size()==0) return std::unexpected("example from doc.txt required");
+    std::cout << NL << T << "examples ok";
+    auto example_in = aoc::test::to_example_in(examples[0]);
+    auto example_model = parse(example_in);
+    std::cout << NL << std::format("\n{}",example_model);
+    // return test result here
     return false;
   }
 

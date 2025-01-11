@@ -818,8 +818,12 @@ namespace aoc {
           return row * other.col - col * other.row;
       }
     };
+
+    std::string to_string(Vector const& v) {
+      return std::format("(row:{},col{})",v.row,v.col);
+    }
     std::ostream& operator<<(std::ostream& os,Vector const& v) {
-      os << "{row:" << v.row << ",col:" << v.col << "}";
+      os << to_string(v);
       return os;
     }
     using Vectors = std::vector<Vector>;
@@ -1366,7 +1370,8 @@ namespace aoc {
   class application {
   public:
     using ToExamplesFunction = std::function<std::vector<aoc::raw::Lines>(aoc::parsing::Sections const& sections)>;
-    using TestFunction = std::function<bool(std::optional<aoc::parsing::Sections> const& sections,Args args)>;
+    using ExpectedTeBool = std::expected<bool, std::string>;
+    using TestFunction = std::function<ExpectedTeBool(std::optional<aoc::parsing::Sections> const& sections,Args args)>;
     using Answer = std::string;
     using SolveForFunction = std::function<std::optional<Answer>(std::istream& in,Args const& args)>;
     using Answers = std::vector<std::pair<std::string,std::optional<Answer>>>;
@@ -1387,8 +1392,8 @@ namespace aoc {
       TestFunction m_test_function;
       std::optional<Answer> operator()(std::istream& in,Args const& args) const {
         auto result = m_test_function(m_doc,args);
-        if (result) return std::string("PASSED");
-        else return std::string("FAILED");
+        if (result) return (*result)?std::string("PASSED"):std::string("FAILED");
+        else return result.error();
       }
     };
   public:
