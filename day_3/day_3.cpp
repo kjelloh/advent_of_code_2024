@@ -1,3 +1,5 @@
+#include "aoc.hpp"
+
 #include <cctype>
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
@@ -27,7 +29,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 struct Expression {
   std::string f{"nop"};
   int left_op{0};
@@ -75,20 +77,18 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 namespace part1 {
 
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
-      Result acc{};
+      Integer acc{};
       auto model = parse(in);
       for (auto const& exp : model) {
         acc += exp.left_op*exp.right_op;
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -101,7 +101,7 @@ namespace part2 {
     if (in) {
       auto model = parse(in);
       bool disabled{false};
-      Result acc{};
+      Integer acc{};
       for (auto const& exp : model) {
         if (exp.f.find("don't") != std::string::npos) {
           disabled = true;
@@ -119,72 +119,35 @@ namespace part2 {
           std::cout << "\nNO OPERATION ON:" << std::quoted(exp.f);
         }
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-int main(int argc, char *argv[])
-{
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1,2,3};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Test",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 1: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 2: {
-        std::filesystem::path file{"../../example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Test",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 3: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+int main(int argc, char *argv[]) {
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example2.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
-  For my input:
+
+   Xcode Debug -O2
+
+   >day_3 -all
+   
+   For my input:
+               
    ANSWERS
-   duration:1ms answer[Part 1 Test] 161
-   duration:58ms answer[Part 1     ] 175615763
-   duration:0ms answer[Part 2 Test] 48
-   duration:35ms answer[Part 2     ] 74361272
+   duration:0ms answer[part 1 in:example.txt] 161
+   duration:57ms answer[part 1 in:puzzle.txt] 175615763
+   duration:0ms answer[part 2 in:example2.txt] 48
+   duration:35ms answer[part 2 in:puzzle.txt] 74361272
+   
    */
   return 0;
+
 }
