@@ -1423,9 +1423,16 @@ namespace aoc {
     }
     
     void add_solve_for(std::string part,SolveForFunction&& solve_for,std::optional<std::string> in_file_name = std::nullopt) {
-      auto index = solve_for_keyes.size();
-      solve_for_keyes.push_back({part,in_file_name?*in_file_name:""});
-      m_solve_for[solve_for_keyes[index]] = solve_for;
+      std::pair<std::string,std::string> key{part,in_file_name?*in_file_name:""};
+      auto iter = std::find(solve_for_keyes.begin(),solve_for_keyes.end(),key);
+      if (iter == solve_for_keyes.end()) {
+        auto index = solve_for_keyes.size();
+        solve_for_keyes.push_back(key);
+        m_solve_for[solve_for_keyes[index]] = solve_for;
+      }
+      else {
+        throw std::runtime_error(std::format("aoc::application::add_solve_for failed. key {} already occupied",key));
+      }
     }
 
     void run(int argc, char const* const argv[]) {
