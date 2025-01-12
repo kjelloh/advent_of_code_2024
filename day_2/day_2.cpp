@@ -1,3 +1,5 @@
+#include "aoc.hpp"
+
 #include <cctype>
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
@@ -22,21 +24,16 @@
 #include <optional>
 #include <regex>
 
-char const* example = R"()";
-
 auto const NL = "\n";
 auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
-using Answer = std::pair<std::string, Result>;
-using Answers = std::vector<Answer>;
-using Solution = std::map<int, Answers>; // Puzzle part -> Answers
+using Result = std::string;
 
-using Model = std::vector<std::vector<Result>>;
+using Model = std::vector<std::vector<Integer>>;
 
-std::ostream& operator<<(std::ostream& out,std::vector<Result> report) {
+std::ostream& operator<<(std::ostream& out,std::vector<Integer> report) {
   for (auto const& level : report) {
     out << " " << level;
   }
@@ -52,7 +49,7 @@ Model parse(auto& in) {
     result.push_back({});
     std::cout << "\nLine[" << count++ << "]:" << std::quoted(line);
     std::istringstream ls{line};
-    Result level{};
+    Integer level{};
     std::cout << " --> ";
     while (ls >> level) {
       std::cout << " level:" << level;
@@ -63,25 +60,25 @@ Model parse(auto& in) {
   return result;
 }
 
-bool is_safe(std::vector<Result> report) {
+bool is_safe(std::vector<Integer> report) {
   std::cout << "\nis_safe(" << report << ")";
   bool result;
   // Report is SAFE if all increasing or decreasing
   // AND the change is at leasts 1 and at most 3
-  std::vector<Result> diff{};
+  std::vector<Integer> diff{};
   for (int i=0;i<report.size()-1;++i) {
     diff.push_back(report[i+1]-report[i]);
   }
-  auto diffs_ok = std::all_of(diff.begin(), diff.end(), [](Result d){return std::abs(d) >= 1 and std::abs(d) <= 3;});
+  auto diffs_ok = std::all_of(diff.begin(), diff.end(), [](Integer d){return std::abs(d) >= 1 and std::abs(d) <= 3;});
   std::cout << "\n\tdiff:" << diff;
   if (diffs_ok) std::cout << " safe"; else std::cout << " unsafe";
-  std::vector<Result> trend{}; // increase +1, decrease -1 or 'flat' 0
+  std::vector<Integer> trend{}; // increase +1, decrease -1 or 'flat' 0
   for (int i=0;i<diff.size();++i) {
     if (diff[i]>0) trend.push_back(1);
     else if (diff[i]<0) trend.push_back(-1);
     else trend.push_back(0);
   }
-  auto trend_ok = std::abs(std::accumulate(trend.begin(),trend.end(),Result{})) == trend.size();
+  auto trend_ok = std::abs(std::accumulate(trend.begin(),trend.end(),Integer{})) == trend.size();
   std::cout << "\n\ttrend:" << trend;
   if (trend_ok) std::cout << " safe"; else std::cout << " unsafe";
 
@@ -92,23 +89,24 @@ bool is_safe(std::vector<Result> report) {
 }
 
 namespace part1 {
-  Result solve_for(Model& model,auto args) {
-    Result result{};
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::cout << NL << NL << "part1";
+    auto model = parse(in);
+    Integer acc{};
     for (auto const& report : model) {
       std::cout << "\nreport" << report;
       if (is_safe(report)) {
-        ++result;
-        std::cout << " #" << result;
+        ++acc;
+        std::cout << " #" << acc;
       }
     }
-    return result;
+    return std::to_string(acc);
   }
 }
 
 namespace part2 {
 
-  bool can_be_made_safe(std::vector<Result> report) {
+  bool can_be_made_safe(std::vector<Integer> report) {
     std::cout << "\ncan_be_made_safe(" << report << ")";
     bool result{};
     // TRAP! If we detect a level that causes the report to indicate UNSAFE
@@ -136,97 +134,43 @@ namespace part2 {
     return result;
   }
 
-  Result solve_for(Model& model,auto args) {
-    Result result{};
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::cout << NL << NL << "part2";
-    int count{};
-    for (auto const& report : model) {
-      if (can_be_made_safe(report)) {
-        ++result;
-        std::cout << " #" << result;
+    auto model = parse(in);
+    Integer acc{};
+      for (auto const& report : model) {
+        if (can_be_made_safe(report)) {
+          ++acc;
+          std::cout << " #" << acc;
+        }
       }
+      return std::to_string(acc);
     }
-    return result;
-  }
 }
 
-int main(int argc, char *argv[])
-{
-  Solution solution{};
-  std::cout << NL << "argc : " << argc;
-  for (int i = 0; i < argc; ++i) {
-    std::cout << NL << "argv[" << i << "] : " << std::quoted(argv[i]);
-  }
-  // day_n x y
-  std::tuple<char,std::vector<std::string>> args{{},{}};
-  auto& [part,files] = args;
-  if (argc > 1 and strlen(argv[1])==1) {
-    part = argv[1][0];
-    for (int i=2;i<argc;++i) {
-      files.push_back(argv[i]);
-    }
-  }
-  else {
-    part = '*';
-  }
-  if (files.size()==0) {
-    files.push_back("example.txt");
-    files.push_back("puzzle.txt");
-  }
+int main(int argc, char *argv[]) {
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
+  /*
 
-  constexpr std::string input_folder{"../../"};
+   Xcode Debug -O2
 
-  switch (part) {
-  case '1': {
-    for (auto file : files) {
-      file = input_folder + file;
-      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-      std::ifstream in{ file };
-      auto model = parse(in);
-      auto answer = part1::solve_for(model,args);
-      solution[part].push_back({ file,answer });
-    }
-  } break;
-  case '2': {
-    for (auto file : files) {
-      file = input_folder + file;
-      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-      std::ifstream in{ file };
-      auto model = parse(in);
-      auto answer = part2::solve_for(model,args);
-      solution[part].push_back({ file,answer });
-    }
-  } break;
-  case '*': {
-    for (auto file : files) {
-      file = input_folder + file;
-      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-      std::ifstream in{ file };
-      auto model = parse(in);
-      auto answer = part1::solve_for(model,args);
-      solution['1'].push_back({ file,answer });
-    }
-    for (auto file : files) {
-      file = input_folder + file;
-      std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-      std::ifstream in{ file };
-      auto model = parse(in);
-      auto answer = part2::solve_for(model,args);
-      solution['2'].push_back({ file,answer });
-    }
-  } break;
-  default:
-    std::cout << NL << "No part " << part << " only part 1 and 2";
-  }
+   >day_2 -all
+   
+   For my input:
+            
+   ANSWERS
+   duration:1ms answer[part 1 in:example.txt] 2
+   duration:35ms answer[part 1 in:puzzle.txt] 483
+   duration:0ms answer[part 2 in:example.txt] 4
+   duration:60ms answer[part 2 in:puzzle.txt] 528
 
-  std::cout << NL << NL << "------------ REPORT----------------";
-  for (auto const& [part, answers] : solution) {
-    std::cout << NL << "Part " << char(part) << " answers";
-    for (auto const& [heading, answer] : answers) {
-      if (answer != 0) std::cout << NT << "answer[" << heading << "] " << answer;
-      else std::cout << NT << "answer[" << heading << "] " << " NO OPERATION ";
-    }
-  }
-  std::cout << NL << NL;
+   */
   return 0;
+
 }
