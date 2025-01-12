@@ -212,7 +212,7 @@ Integer find_min_cost(const MachineConfig& config,Integer const PUSH_LIMIT,bool 
   Seen seen{};
   if (is_part_2) {
     // Shoot, this is actually an algebraic problem?
-    // Each config has a soluton given by wether the two equation system has an ineteger solution?
+    // Each config has a soluton given by wether the two equation system has an integer solution?
     /*
      Button A: X+94, Y+34
      Button B: X+22, Y+67
@@ -284,17 +284,8 @@ namespace part2 {
       Integer acc{};
       auto model = parse(in);
       for (auto const& mc : model) {
-        // Assume there is a cycle in the search space.
-        // That is from push 1 to push 'cycle' the cost is the same
-        // as from cycle+1 to 2*cycle.
-        // If this is true we can calculate the best cost fro the first cycle.
-        // And then just add that cost for each cycle until
-        // we have a remaning push count to try at target?
-        // We are seaching for {m,n} so that target = m*da + n*db.
-        // With the cost = 3*m + n we want the {m,n} that gives us the lowest cost possible.
-        // How do we find a cycle?
-        // For a push count cycle we get 2*best(cycle) == best(2*cycle).
-        
+        // shoot - due to the problem there is actually only one
+        // solution possible (it is not an optimisation problem)
         MachineConfig mc_p2 = {mc.da,mc.db,{mc.target.x+K,mc.target.y+K}};
         std::cout << NL << "processing:" << mc_p2;
         if (auto cost = find_min_cost(mc_p2,10000,true);cost >= 0) {
@@ -330,7 +321,7 @@ int main(int argc, char *argv[]) {
             
    ANSWERS
    duration:84ms answer[part 1 in:example.txt] 480
-   duration:3036ms answer[part 1 in:puzzle.txt] 39290
+   duration:3154ms answer[part 1 in:puzzle.txt] 39290
    duration:0ms answer[part 2 in:example.txt] 875318608908
    duration:18ms answer[part 2 in:puzzle.txt] 73458657399094
 
