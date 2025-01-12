@@ -1,3 +1,5 @@
+#include "aoc.hpp"
+
 #include <cctype>
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
@@ -26,7 +28,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using Model = std::vector<std::string>;
 
 Model parse(auto& in) {
@@ -74,7 +76,7 @@ private:
   Pos m_start;
   Pos m_pos{};
   Dir m_dir{};
-  Result m_count{};
+  Integer m_count{};
   std::set<Vector> m_visited{};
   Vector const UP{-1,0};
   Vector const RIGHT{0,1};
@@ -170,18 +172,16 @@ public:
   auto const& visited() const {return m_visited;}
 };
 
-using Args = std::vector<std::string>;
-
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
-    Result acc{};
+    Integer acc{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
       Simulation sim{model};
       while (++sim) {}
-      result = sim.visited().size();
+      result = std::to_string(sim.visited().size());
     }
     return result;
   }
@@ -248,72 +248,37 @@ namespace part2 {
 //        print("will loop with obstacle at:");
 //        print(pos);
 //      }
-      result = positions.size();
+      result = std::to_string(positions.size());
 
     }
     return result;
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
-int main(int argc, char *argv[])
-{
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {0,1,2,3};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 1: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 2: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 3: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+int main(int argc, char *argv[]) {
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
-  For my input:
-   duration:0ms answer[Part 1 Example] 41
-   duration:11ms answer[Part 1     ] 5516
-   duration:3ms answer[Part 2 Example] 6
-   duration:23863ms answer[Part 2     ] 2008
+
+   Xcode Debug -O2
+
+   >day_6 -all
+   
+   For my input:
+               
+   ANSWERS
+   duration:1ms answer[part 1 in:example.txt] 41
+   duration:11ms answer[part 1 in:puzzle.txt] 5516
+   duration:3ms answer[part 2 in:example.txt] 6
+   duration:24358ms answer[part 2 in:puzzle.txt] 2008
+
+   
    */
   return 0;
+
 }
