@@ -1,3 +1,5 @@
+#include "aoc.hpp"
+
 #include <cctype>
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
@@ -26,7 +28,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 
 namespace parsing {
   class Splitter {
@@ -112,8 +114,6 @@ std::ostream& operator<<(std::ostream& os,DiskMap const& disk_map) {
   return os;
 }
 
-using Args = std::vector<std::string>;
-
 struct Block {
   int id{}; // file id = 0..n or -1 for free block
   int count{};
@@ -144,7 +144,7 @@ std::ostream& operator<<(std::ostream& os,Blocks const& blocks) {
 }
 
 auto to_checksum(Blocks const& compressed){
-  Result acc{};
+  Integer acc{};
   int pos{};
   for (int i=0;i<compressed.size();++i) {
     auto const& b = compressed[i];
@@ -341,7 +341,7 @@ namespace part1 {
       auto blocks = to_blocks(model);
       std::cout << NL << blocks;
       auto compressed = Compressor{blocks,false}();
-      result = to_checksum(compressed);
+      result = std::to_string(to_checksum(compressed));
     }
     return result;
   }
@@ -359,7 +359,7 @@ namespace part2 {
       std::cout << NL << blocks;
       auto compressed = Compressor{blocks,true}(true);
       std::cout << NL << "compressed:" << compressed;
-      result = to_checksum(compressed);
+      result = std::to_string(to_checksum(compressed));
     }
     //
     return result;
@@ -368,69 +368,24 @@ namespace part2 {
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {0};
-//  std::vector<int> states = {0,1};
-//  std::vector<int> states = {2};
-//  std::vector<int> states = {2,3};
-  std::vector<int> states = {0,1,2,3};
-  for (auto state : states) {
-    switch (state) {
-      case 0: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 1: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 2: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 3: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
   
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_solve_for("test0", part1::solve_for,"example.txt");
+  app.add_solve_for("1", part1::solve_for,"puzzle.txt");
+  app.add_solve_for("test1", part2::solve_for,"example.txt");
+  app.add_solve_for("2", part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
+    
   /*
   For my input:
-
-   ANSWERS
-   duration:1ms answer[Part 1 Example] 1928
-   duration:266ms answer[Part 1     ] 6390180901651
-   duration:0ms answer[Part 2 Example] 2858
-   duration:695ms answer[Part 2     ] 6412390114238
    
+   ANSWERS
+   duration:0ms answer[part test0 in:example.txt] 1928
+   duration:278ms answer[part 1 in:puzzle.txt] 6390180901651
+   duration:0ms answer[part test1 in:example.txt] 2858
+   duration:702ms answer[part 2 in:puzzle.txt] 6412390114238
+      
   */
   return 0;
 }
