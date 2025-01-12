@@ -28,8 +28,8 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
-using Model = aoc::parsing::Lines;
+using Result = std::string;
+using Model = aoc::raw::Lines;
 
 Model parse(auto& in) {
   using namespace aoc::parsing;
@@ -45,8 +45,6 @@ Model parse(auto& in) {
   return result;
 }
 
-using Args = std::vector<std::string>;
-
 using aoc::grid::Position;
 using aoc::grid::Positions;
 
@@ -61,8 +59,8 @@ std::ostream& operator<<(std::ostream& os,TrailHeads const& ths) {
   return os;
 }
 
-Result to_scores_sum(TrailHeads const& ths) {
-  Result result{};
+Integer to_scores_sum(TrailHeads const& ths) {
+  Integer result{};
   std::cout << NL << "to_scores_sum";
   for (auto const& [start,ends] : ths) {
     auto score = ends.size();
@@ -81,9 +79,9 @@ Positions to_start_candidates(Grid const& grid) {
 //    std::cout << NL << T;
     for (int col=0;col<grid.width();++col) {
       Position pos{row,col};
-      if (auto och = grid.at(pos)) {
+      if (grid.on_map(pos)) {
 //        std::cout << "{" << *och << "}";
-        if (*och == '0') result.push_back(pos);
+        if (grid.at(pos) == '0') result.push_back(pos);
       }
     }
   }
@@ -91,12 +89,11 @@ Positions to_start_candidates(Grid const& grid) {
 }
 
 using aoc::grid::Path;
-using aoc::grid::Visited;
 
 Positions find_ends(Position const& start,Grid const& grid,bool for_part_2) {
   std::cout << NL << NL << "find_ends(start:" << start << ")";
   Positions result{};
-  Visited visited{};
+  std::map<Position,std::vector<Path>> visited{};
   std::stack<Path> to_visit;
 
   to_visit.push({start});
@@ -126,7 +123,7 @@ Positions find_ends(Position const& start,Grid const& grid,bool for_part_2) {
     }
 
     visited[current.back()].push_back(current);
-    char cell_value = *grid.at(current.back());
+    char cell_value = grid.at(current.back());
     
     std::cout << " '" << cell_value << "'";
 
@@ -145,10 +142,10 @@ Positions find_ends(Position const& start,Grid const& grid,bool for_part_2) {
     };
 
     for (const auto& neighbor : neighbors) {
-      if (auto och = grid.at(neighbor)) {
+      if (grid.on_map(neighbor)) {
         Path next{current};
         next.push_back(neighbor);
-        auto nch = *och;
+        auto nch = grid.at(neighbor);
         std::cout << NL << T << T << "neighbour:" << next << " '" << nch << "'";
         if (nch != cell_value+1) continue;
         if (is_visited(next)) continue;
@@ -186,17 +183,17 @@ namespace part1 {
     if (in) {
       auto model = parse(in);
       auto trail_heads = to_trail_heads(model,false);
-      result = to_scores_sum(trail_heads);
+      result = std::to_string(to_scores_sum(trail_heads));
     }
     return result;
   }
 }
 
-Result to_ratings_sum(TrailHeads const& ths) {
-  Result result{};
+Integer to_ratings_sum(TrailHeads const& ths) {
+  Integer result{};
   std::cout << NL << "to_ratings_sum";
   std::cout << " size:" << ths.size();
-  std::map<std::pair<Position,Position>,Result> end_counts{};
+  std::map<std::pair<Position,Position>,Integer> end_counts{};
   for (auto const& [start,ends] : ths) {
     std::cout << NL << T << "start:" << start;
     for (auto const& end : ends) {
@@ -218,7 +215,7 @@ namespace part2 {
     if (in) {
       auto model = parse(in);
       auto trail_heads = to_trail_heads(model,true);
-      result = to_ratings_sum(trail_heads);
+      result = std::to_string(to_ratings_sum(trail_heads));
     }
     return result;
   }
@@ -226,85 +223,29 @@ namespace part2 {
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-  std::vector<int> states = {12,10,22,20};
-  for (auto state : states) {
-    switch (state) {
-      case 11: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 12: {
-        std::filesystem::path file{"../../example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Larger Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        std::filesystem::path file{"../../example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 22: {
-        std::filesystem::path file{"../../example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Larger Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 23: {
-        std::filesystem::path file{"../../example3.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        std::filesystem::path file{"../../puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
   
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_solve_for("test0", part1::solve_for,"example.txt");
+  app.add_solve_for("test1", part1::solve_for,"example2.txt");
+  app.add_solve_for("1", part1::solve_for,"puzzle.txt");
+  app.add_solve_for("test2", part2::solve_for,"example.txt");
+  app.add_solve_for("test3", part2::solve_for,"example2.txt");
+  app.add_solve_for("2", part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
+  return 0;
+  
   /*
   For my input:
-   
+      
    ANSWERS
-   duration:12ms answer[Part 1 Larger Example] 36
-   duration:159ms answer[Part 1     ] 733
-   duration:8ms answer[Part 2 Larger Example] 81
-   duration:235ms answer[Part 2     ] 1514
+   duration:2ms answer[part test0 in:example.txt] 1
+   duration:22ms answer[part test1 in:example2.txt] 36
+   duration:353ms answer[part 1 in:puzzle.txt] 733
+   duration:4ms answer[part test2 in:example.txt] 16
+   duration:19ms answer[part test3 in:example2.txt] 81
+   duration:578ms answer[part 2 in:puzzle.txt] 1514
+
       
    */
   return 0;

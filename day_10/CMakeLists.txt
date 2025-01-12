@@ -17,3 +17,10 @@ if (CMAKE_GENERATOR STREQUAL "Xcode")
     # Generate a scheme for the target to specify what binary to run
     set_property(TARGET ${DAY_NAME} PROPERTY XCODE_GENERATE_SCHEME TRUE)
 endif()
+
+# Configure the binary output folder with a file containing the path to the working dir
+add_custom_command(
+    TARGET ${DAY_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "${CMAKE_SOURCE_DIR}" > $<TARGET_FILE_DIR:${DAY_NAME}>/working_dir.txt
+)
