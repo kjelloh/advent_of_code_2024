@@ -1412,9 +1412,6 @@ namespace aoc {
           }
         }
       }
-      else {
-        std::print("\naoc::application() - doc parse failed with error:{}",expected_doc.error());
-      }
     }
     
     void add_to_examples(ToExamplesFunction&& to_examples) {
