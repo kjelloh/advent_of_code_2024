@@ -47,7 +47,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using Number = Integer;
 using Numbers = std::vector<Number>;
 
@@ -76,8 +76,6 @@ Model parse(auto& in) {
   
   return result;
 }
-
-using Args = std::vector<std::string>;
 
 bool is_zero(Number num) {return num==0;}
 bool is_even(Number num) {
@@ -118,11 +116,12 @@ Numbers to_transformed(Number number) {
 }
 
 namespace part1 {
-  std::optional<Result> solve_for(std::istream& in,Args const& args) {
+  std::optional<Result> solve_for(std::istream& in,Args args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part1";
     if (in) {
-      int blink_count = (args.size()>0)?std::stoi(args[0]):25;
+      int blink_count = (args.arg.contains("step"))?std::stoi(args.arg["step"]):25;
+      std::cout << NL << "step:" << blink_count;
       auto model = parse(in);
       std::cout << NL << "Initial arrangement:";
       std::cout << NL << model;
@@ -140,106 +139,70 @@ namespace part1 {
 
       int remaining_steps = 25;
 
-      result = aoc::dfs::find_count<Key, Result, State>(
+      result = std::to_string(aoc::dfs::find_count<Key, Integer, State>(
           blink_count,
           model,
           transform_fn,
           state_fn
-      );
+      ));
     }
     return result;
   }
+
+  std::optional<Result> solve_for_1(std::istream& in,Args args) {
+    args.arg["step"] = "1";
+    return solve_for(in, args);
+  }
+
+  std::optional<Result> solve_for_6(std::istream& in,Args args) {
+    args.arg["step"] = "6";
+    return solve_for(in, args);
+  }
+  std::optional<Result> solve_for_25(std::istream& in,Args args) {
+    args.arg["step"] = "25";
+    return solve_for(in, args);
+  }
+  std::optional<Result> solve_for_75(std::istream& in,Args args) {
+    args.arg["step"] = "75";
+    return solve_for(in, args);
+  }
+
 }
 
 namespace part2 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
     std::cout << NL << NL << "part2";
-    result = part1::solve_for(in, args);
+    result = part1::solve_for_75(in, args);
     return result;
   }
 }
 
-using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=1;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-
-  std::filesystem::path working_dir{"../.."};
-  if (auto dir = get_working_dir()) {
-    working_dir = *dir;
-  }
-  else {
-    std::cout << NL << "No working directory path configured";
-  }
-  std::cout << NL << "Using working_dir " << working_dir;
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {11};
-  std::vector<int> states = {11,126,1225,10,20};
-  for (auto state : states) {
-    switch (state) {
-      case 11: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example 1 blink",part1::solve_for(in,{"1"})});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 126: {
-        std::filesystem::path file{working_dir / "example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example2 6 blinks",part1::solve_for(in,{"6"})});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 1225: {
-        std::filesystem::path file{working_dir / "example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example2 25 blinks",part1::solve_for(in,{"25"})});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,{"25"})});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,{"75"})});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
-  
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
+  aoc::application app{};
+  app.add_solve_for("test0",part1::solve_for_1,"example.txt");
+  app.add_solve_for("test1",part1::solve_for_6,"example2.txt");
+  app.add_solve_for("test2",part1::solve_for_25,"example2.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.run(argc, argv);
+  app.print_result();
   /*
-  For my input:
-         
+
+   Xcode Debug -O2
+
+   >day_0 -all
+   
+   For my input:
+                  
    ANSWERS
-   duration:0ms answer[Part 1 Example 1 blink] 7
-   duration:0ms answer[Part 1 Example2 6 blinks] 22
-   duration:6ms answer[Part 1 Example2 25 blinks] 55312
-   duration:11ms answer[Part 1     ] 231278
-   duration:249ms answer[Part 2     ] 274229228071551
+   duration:0ms answer[part test0 in:example.txt] 7
+   duration:0ms answer[part test1 in:example2.txt] 22
+   duration:6ms answer[part test2 in:example2.txt] 55312
+   duration:11ms answer[part 1 in:puzzle.txt] 231278
+   duration:226ms answer[part 2 in:example.txt] 149161030616311
    
    */
   return 0;
+
 }
