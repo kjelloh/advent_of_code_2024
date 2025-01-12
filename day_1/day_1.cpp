@@ -1,3 +1,5 @@
+#include "aoc.hpp"
+
 #include <cctype>
 #include <iostream>
 #include <iomanip> // E.g., std::quoted
@@ -88,10 +90,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
-using Answer = std::pair<std::string, Result>;
-using Answers = std::vector<Answer>;
-using Solution = std::map<int, Answers>; // Puzzle part -> Answers
+using Result = std::string;
 
 using Model = std::pair<std::vector<int>,std::vector<int>>;
 
@@ -109,76 +108,60 @@ Model parse(auto& in) {
 }
 
 namespace part1 {
-  Result solve_for(Model& model,auto args) {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     Result result{};
     std::cout << NL << NL << "part1";
+    auto model = parse(in);
     std::ranges::sort(model.first);
     std::ranges::sort(model.second);
+    Integer acc{};
     for (int i=0;i<model.first.size();++i) {
-      result += std::abs((model.first[i] - model.second[i]));
+      acc += std::abs((model.first[i] - model.second[i]));
     }
-    return result;
+    return std::to_string(acc);
   }
 }
 
 namespace part2 {
-  Result solve_for(Model& model,auto args) {
+  std::optional<Result> solve_for(std::istream& in,Args const& args) {
     Result result{};
     std::cout << NL << NL << "part2";
-    std::map<Result,Result> count{};
+    auto model = parse(in);
+    std::map<Integer,Integer> count{};
+    Integer acc{};
     std::for_each(model.second.begin(), model.second.end(), [&count](auto const& x){
       count[x]++;
     });
     for (int i=0;i<model.first.size();++i) {
-      result += model.first[i]*count[model.first[i]];
+      acc += model.first[i]*count[model.first[i]];
     }
-    return result;
+    return std::to_string(acc);
   }
 }
 
-int main(int argc, char *argv[])
-{
-  Solution solution{};
-  std::cout << NL << "argc : " << argc;
-  for (int i = 0; i < argc; ++i) {
-    std::cout << NL << "argv[" << i << "] : " << std::quoted(argv[i]);
-  }
-  // day_n x y
-  std::tuple<int,std::string> args{1,"example.txt"};
-  auto& [part,file] = args;
-  if (argc > 1 ) {
-    part = std::stoi(argv[1]);
-    if (argc > 2) {
-      file = argv[2];
-    }
-  }
-  constexpr std::string input_folder{"../../"};
-  file = input_folder + file;
-  std::cout << NL << "Part=" << part << " file=" << std::quoted(file);
-  std::ifstream in{ file };
-  auto model = parse(in);
+int main(int argc, char *argv[]) {
+  aoc::application app{};
+  app.add_solve_for("1",part1::solve_for,"example.txt");
+  app.add_solve_for("1",part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2",part2::solve_for,"example.txt");
+  app.add_solve_for("2",part2::solve_for,"puzzle.txt");
+  app.run(argc, argv);
+  app.print_result();
+  /*
 
-  switch (part) {
-  case 1: {
-    auto answer = part1::solve_for(model,args);
-    solution[part].push_back({ file,answer });
-  } break;
-  case 2: {
-    auto answer = part2::solve_for(model,args);
-    solution[part].push_back({ file,answer });
-  } break;
-  default:
-    std::cout << NL << "No part " << part << " only part 1 and 2";
-  }
+   Xcode Debug -O2
 
-  std::cout << NL << NL << "------------ REPORT----------------";
-  for (auto const& [part, answers] : solution) {
-    std::cout << NL << "Part " << part << " answers";
-    for (auto const& [heading, answer] : answers) {
-      if (answer != 0) std::cout << NT << "answer[" << heading << "] " << answer;
-      else std::cout << NT << "answer[" << heading << "] " << " NO OPERATION ";
-    }
-  }
-  std::cout << NL << NL;
+   >day_1 -all
+   
+   For my input:
+            
+   ANSWERS
+   duration:1ms answer[part 1 in:example.txt] 11
+   duration:3ms answer[part 1 in:puzzle.txt] 1603498
+   duration:0ms answer[part 2 in:example.txt] 31
+   duration:4ms answer[part 2 in:puzzle.txt] 25574739
+   
+   */
   return 0;
+
 }
