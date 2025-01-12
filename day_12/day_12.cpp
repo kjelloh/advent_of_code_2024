@@ -47,7 +47,7 @@ auto const T = "\t";
 auto const NT = "\n\t";
 
 using Integer = int64_t; // 16 bit int: 3.27 x 10^4, 32 bit int: 2.14 x 10^9, 64 bit int: 9.22 x 10^18
-using Result = Integer;
+using Result = std::string;
 using Model = aoc::raw::Lines;
 
 Model parse(auto& in) {
@@ -70,8 +70,6 @@ Model parse(auto& in) {
   }
   return result;
 }
-
-using Args = std::vector<std::string>;
 
 using aoc::grid::Grid;
 using aoc::grid::Position;
@@ -111,7 +109,7 @@ Perimeter to_perimeter(Region const& region,Grid const& grid) {
   auto const& [region_id,members] = region;
   for (auto const& pos : members) {
     for (auto const& neighbour : to_nighbours(pos)) {
-      if (not grid.on_map(neighbour) or grid.at(neighbour).value() != region_id) {
+      if (not grid.on_map(neighbour) or grid.at(neighbour) != region_id) {
         result.push_back(neighbour);
       }
     }
@@ -125,7 +123,7 @@ RegionInfo flood_fill(Grid const& grid, Position start, std::set<Position>& visi
   Region region;
 
   // Get the ID of the region (character at the starting position)
-  char region_id = grid.at(start).value();
+  char region_id = grid.at(start);
   region.first = region_id;
 
   // Begin the flood-fill
@@ -142,7 +140,7 @@ RegionInfo flood_fill(Grid const& grid, Position start, std::set<Position>& visi
     for (Position const& adjacent : to_adjacent(current)) {
       if (not grid.on_map(adjacent)) continue;
       if (visited.count(adjacent)) continue;
-      if (grid.at(adjacent).value() != region_id) continue;
+      if (grid.at(adjacent) != region_id) continue;
       to_visit.push(adjacent);
       visited.insert(adjacent);
     }
@@ -168,10 +166,38 @@ RegionInfos compute_regions(Grid const& grid) {
   return result;
 }
 
+namespace test {
+  std::vector<aoc::raw::Lines> to_examples(aoc::parsing::Sections const& sections) {
+    std::vector<aoc::raw::Lines> result{};
+
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[10])); // -
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[22])); // 1
+    result.push_back({});
+    result.back().append_range(aoc::parsing::to_raw(sections[29])); // 2
+    if (sections.size()>35) {
+      // part two
+      result.push_back({});
+      result.back().append_range(aoc::parsing::to_raw(sections[39])); // 3
+      result.push_back({});
+      result.back().append_range(aoc::parsing::to_raw(sections[44])); // 4
+      result.push_back({});
+      result.back().append_range(aoc::parsing::to_raw(sections[47])); // 5
+      result.push_back({}); // 6 (Own test - three regions shared corner)
+      result.back().push_back("VBB");
+      result.back().push_back("BNB");
+      result.back().push_back("BBB");
+    }
+    return result;
+  }
+
+}
+
 namespace part1 {
   std::optional<Result> solve_for(std::istream& in,Args const& args) {
     std::optional<Result> result{};
-    Result acc{};
+    Integer acc{};
     std::cout << NL << NL << "part1";
     if (in) {
       auto model = parse(in);
@@ -189,7 +215,7 @@ namespace part1 {
         std::cout << NL << "-------------------------";
         acc += price;
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -428,9 +454,9 @@ namespace part2 {
       return compressed;
   }
 
-  Result to_side_count(Region const& region) {
+  Integer to_side_count(Region const& region) {
 //    std::cout << NL << "to_side_count id:" << region.first;
-    Result result{};
+    Integer result{};
     auto all_grid_pos_edges = to_all_grid_pos_edges(region);
     auto perimeter_grid_pos_edges = to_perimeter_grid_pos_edges(all_grid_pos_edges);
     DisconnectedGraph disconnected_graph{perimeter_grid_pos_edges};
@@ -462,7 +488,7 @@ namespace part2 {
       auto model = parse(in);
       Grid grid{model};
       auto infos = compute_regions(grid);
-      Result acc{};
+      Integer acc{};
       for (const auto& [region,perimeter] : infos) {
         auto id = region.first;
         auto area = region.second.size();
@@ -478,7 +504,7 @@ namespace part2 {
         acc += price;
         std::cout << T << "acc:" << acc;
       }
-      result = acc;
+      result = std::to_string(acc);
     }
     return result;
   }
@@ -486,136 +512,40 @@ namespace part2 {
 
 using Answers = std::vector<std::pair<std::string,std::optional<Result>>>;
 int main(int argc, char *argv[]) {
-  Args args{};
-  for (int i=0;i<argc;++i) {
-    args.push_back(argv[i]);
-  }
-
-  std::filesystem::path working_dir{"../.."};
-  if (auto dir = get_working_dir()) {
-    working_dir = *dir;
-  }
-  else {
-    std::cout << NL << "No working directory path configured";
-  }
-  std::cout << NL << "Using working_dir " << working_dir;
-
-  Answers answers{};
-  std::vector<std::chrono::time_point<std::chrono::system_clock>> exec_times{};
-  exec_times.push_back(std::chrono::system_clock::now());
-//  std::vector<int> states = {21,22,23,24,25};
-  std::vector<int> states = {11,12,13,10,21,22,23,24,25,20};
-  for (auto state : states) {
-    switch (state) {
-      case 11: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example A to E",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 12: {
-        std::filesystem::path file{working_dir / "example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Example O around X",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 13: {
-        std::filesystem::path file{working_dir / "example3.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1 Larger Example",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 10: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 1     ",part1::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 21: {
-        std::filesystem::path file{working_dir / "example.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Larger Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 22: {
-        std::filesystem::path file{working_dir / "example2.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Example O around X",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 23: {
-        std::filesystem::path file{working_dir / "example3.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 Larger Example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 24: {
-        std::filesystem::path file{working_dir / "example4.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 E and X",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 25: {
-        std::filesystem::path file{working_dir / "example5.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2 A and B example",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 20: {
-        std::filesystem::path file{working_dir / "puzzle.txt"};
-        std::ifstream in{file};
-        if (in) answers.push_back({"Part 2     ",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      case 201: {
-        std::filesystem::path file{working_dir / "test4.txt"};
-        char const* raw = R"(VBB
-BNB
-BBB)";
-        std::istringstream in{raw};
-        if (in) answers.push_back({"Part 2 My own Corner Test",part2::solve_for(in,args)});
-        else std::cerr << "\nSORRY, no file " << file;
-        exec_times.push_back(std::chrono::system_clock::now());
-      } break;
-      default:{std::cerr << "\nSORRY, no action for state " << state;} break;
-    }
-  }
+  aoc::application app{};
+  app.add_to_examples(test::to_examples);
+  app.add_solve_for("1", part1::solve_for,"example.txt");
+  app.add_solve_for("1", part1::solve_for,"example1.txt");
+  app.add_solve_for("1", part1::solve_for,"example2.txt");
+  app.add_solve_for("1", part1::solve_for,"puzzle.txt");
+  app.add_solve_for("2", part2::solve_for,"example3.txt");
+  app.add_solve_for("2", part2::solve_for,"example1.txt");
+  app.add_solve_for("2", part2::solve_for,"example2.txt");
+  app.add_solve_for("2", part2::solve_for,"example4.txt");
+  app.add_solve_for("2", part2::solve_for,"example5.txt");
+  app.add_solve_for("2", part2::solve_for,"example6.txt");
+  app.add_solve_for("2", part2::solve_for,"puzzle.txt");
+  app.run(argc,argv);
+  app.print_result();
   
-  std::cout << "\n\nANSWERS";
-  for (int i=0;i<answers.size();++i) {
-    std::cout << "\nduration:" << std::chrono::duration_cast<std::chrono::milliseconds>(exec_times[i+1] - exec_times[i]).count() << "ms";
-    std::cout << " answer[" << answers[i].first << "] ";
-    if (answers[i].second) std::cout << *answers[i].second;
-    else std::cout << "NO OPERATION";
-  }
-  std::cout << "\n";
   /*
 
    Xcode Debug -O3
    
    For my input:
-
+   
    ANSWERS
-   duration:0ms answer[Part 1 Example A to E] 140
-   duration:0ms answer[Part 1 Example O around X] 772
-   duration:1ms answer[Part 1 Larger Example] 1930
-   duration:46ms answer[Part 1     ] 1352976
-   duration:0ms answer[Part 2 Larger Example] 80
-   duration:0ms answer[Part 2 Example O around X] 436
-   duration:0ms answer[Part 2 Larger Example] 1206
-   duration:0ms answer[Part 2 E and X] 236
-   duration:0ms answer[Part 2 A and B example] 368
-   duration:55ms answer[Part 2     ] 808796
+   duration:1ms answer[part 1 in:example.txt] 140
+   duration:0ms answer[part 1 in:example1.txt] 772
+   duration:0ms answer[part 1 in:example2.txt] 1930
+   duration:41ms answer[part 1 in:puzzle.txt] 1352976
+   duration:0ms answer[part 2 in:example3.txt] 80
+   duration:0ms answer[part 2 in:example1.txt] 436
+   duration:0ms answer[part 2 in:example2.txt] 1206
+   duration:0ms answer[part 2 in:example4.txt] 236
+   duration:0ms answer[part 2 in:example5.txt] 368
+   duration:0ms answer[part 2 in:example6.txt] 78
+   duration:51ms answer[part 2 in:puzzle.txt] 808796
 
    */
   return 0;
