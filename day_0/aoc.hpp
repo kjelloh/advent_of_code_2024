@@ -1398,11 +1398,22 @@ namespace aoc {
     };
   public:
     application() {
-      if (auto doc = aoc::doc::parse_doc()) {
-        m_doc = *doc;
+      if (auto expected_doc = aoc::doc::parse_doc()) {
+        auto const& doc = *expected_doc;
+        m_doc = doc;
+        if (doc.size()>2) {
+          if (doc[doc.size()-2][0].str().find("please identify yourself") != std::string::npos) {
+            // No session cookie (the aoc site exposes non logged in API)
+            std::cout << aoc::raw::NL << R"(Your session cookie seems to be out-of-date.
+              1) Please update the cookie for your advent of code session in 
+                 the file cookie.txt (in the root of this git repository).
+              2) Then execute the script pull_text.zsh again to update doc.txt.
+              3) Then run this app again.)";
+          }
+        }
       }
       else {
-        std::print("\naoc::application() - doc parse failed with error:{}",doc.error());
+        std::print("\naoc::application() - doc parse failed with error:{}",expected_doc.error());
       }
     }
     
